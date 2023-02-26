@@ -50,14 +50,14 @@ int main()
 	
 	
 	lua_pushcfunction(L, window, "window");
-    lua_setglobal(L, "window");
+    	lua_setglobal(L, "window");
 	
 	std::string source = R"(
         f = function()
-			print('return value from call: '.. window())
+		print('return value from call: '.. window())
         end
         print("starting ...")        
-    )";
+    	)";
 	size_t bytecodeSize = 0;
 	char* bytecode = luau_compile(source.c_str(), source.length(), NULL, &bytecodeSize);
 	assert(luau_load(L, "foo", bytecode, bytecodeSize, 0) == 0);
