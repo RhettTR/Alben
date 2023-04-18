@@ -94,9 +94,9 @@ extern "C" {
 	
 	
 	void drag_begin (GtkWidget* self,
-				     GdkDragContext* context,
-					 gpointer user_data
-					)
+			 GdkDragContext* context,
+			 gpointer user_data
+			)
 	{
 		
 		
@@ -120,16 +120,15 @@ extern "C" {
 		
 		
 		offset_x = abs_x - start_x;
-	    offset_y = abs_y - start_y;
+	    	offset_y = abs_y - start_y;
 
 		
 		gint width = gtk_widget_get_allocated_width (self);
 		gint height = gtk_widget_get_allocated_height (self);
 		
 		 
-		cairo_surface_t *surface = cairo_image_surface_create (CAIRO_FORMAT_ARGB32,
-															   width, height);                                    
-        cairo_t *cr = cairo_create (surface); 
+		cairo_surface_t *surface = cairo_image_surface_create (CAIRO_FORMAT_ARGB32, width, height);                                    
+        	cairo_t *cr = cairo_create (surface); 
                
 		
 		gtk_widget_draw (self, cr);                             
@@ -159,46 +158,46 @@ extern "C" {
 	
 	
 	void drag_get ( GtkWidget* self,
-					GdkDragContext* context,
-					GtkSelectionData* data,
-					guint info,
-					guint time,
-					gpointer user_data
-				  )
+			GdkDragContext* context,
+			GtkSelectionData* data,
+			guint info,
+			guint time,
+			gpointer user_data
+		      )
 	{
 		
 		gtk_selection_data_set ( data,
-								 gdk_atom_intern_static_string ("GTK_WIDGET"),
-								 32,
-								 (const guchar *)self,
-								 sizeof (gpointer)
-							   );						   
+					 gdk_atom_intern_static_string ("GTK_WIDGET"),
+					 32,
+					 (const guchar *)self,
+					 sizeof (gpointer)
+				       );						   
 	}
 	
 
 	
 	
 	void drag_received ( GtkWidget* self,
-						 GdkDragContext* context,
-						 gint x,
-						 gint y,
-						 GtkSelectionData* data,
-						 guint info,
-						 guint time,
-						 gpointer user_data
-					   )
+			     GdkDragContext* context,
+		             gint x,
+			     gint y,
+			     GtkSelectionData* data,
+			     guint info,
+		             guint time,
+			     gpointer user_data
+			   )
 	{		
 	}
 
 
 
 	gboolean drag_drop ( GtkWidget* self,
-						 GdkDragContext* context,
-						 gint x,
-						 gint y,
-						 guint time,
-						 gpointer user_data
-					   )
+		             GdkDragContext* context,
+			     gint x,
+			     gint y,
+			     guint time,
+			     gpointer user_data
+			   )
 	{
 				
 		// a trick to put the dragged counter topmost 
@@ -251,8 +250,8 @@ extern "C" {
 
 
     GtkWidget *makeCounter(GtkWidget *layout,
-						   const char *filename, 
-						   int x, int y)
+			   const char *filename, 
+			   int x, int y)
 	{
 		
 		// create the apperance of the counter
