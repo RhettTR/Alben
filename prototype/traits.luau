@@ -12,8 +12,10 @@ function Image:new (images, imageIndex)
 	--- fields
 	o.images = images
 	o.imageIndex = imageIndex
-	o.menuname = "Flip"
-	o.menuclick = "actionFlip"
+	if #images > 1 then
+		o.menuname = "Flip"
+		o.menuclick = "actionFlip"
+	end
 	return o
 end
 
@@ -74,16 +76,16 @@ end
 
 
 
---- since Rotate and Delete has the same function everywhere only one instance may exist
+--- since basic Rotate and Delete has the same function everywhere only one instance may exist
 
 
-Rotate = {	
-	degrees = 0,
+BaseRotate = {	
+	increment = 0,
 	menuname = "Rotate",
 	menuclick = "actionRotate",
 }
 
-				
+			
 	
 Delete = {
 	menuname = "Delete",
@@ -92,21 +94,70 @@ Delete = {
 
 
 
+--- define the rotation trait of one particular counter
 
+Rotate = {}
 
-Traits = {}
-
-function Traits:new (images, imageIndex)
-	local o = {}
+function Rotate:new ()
+	local o = BaseRotate
 	setmetatable(o, self)
-	self.__index = self
-	--- fields
-	o.Rotate = Rotate	
-	o.Image = Image:new(images, imageIndex)
-	o.MarkMoved = MarkMoved:new()
-	o.Delete = Delete
+	self.__index = self	
+	o.degrees = 0
 	return o
 end
 
-	
+
+
+
+
+
+
+Base = {}
+
+function Base:new ()
+	local o = {}
+	setmetatable(o, self)
+	self.__index = self
+	o.Delete = Delete
+	o.Side = ""
+	return o
+end
+
+
+Piece = {}
+
+function Piece:new ()
+	local o = Base:new ()
+	setmetatable(self, {__index = Base})
+	self.__index = self 
+	o.MarkMoved = MarkMoved:new()
+	o.Rotate = Rotate:new()
+	return o
+end
+
+
+German = {}
+
+function German:new()
+	local o = Piece:new ()
+	setmetatable(self, {__index = Piece})
+	self.__index = self
+	o.Side = "German"
+	return o   	
+end  
+
+
+French = {}
+
+function French:new()
+	local o = Piece:new ()
+	setmetatable(self, {__index = Piece})
+	self.__index = self
+	o.Side = "French"
+	return o   	
+end 
+
+
+
+ 
 return Traits

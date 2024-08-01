@@ -342,7 +342,7 @@ Counter::Counter(const char *name)
 
 // constructor for map
 
-Counter::Counter(int id, const char *image, int degrees, int zorder, int x, int y)  
+Counter::Counter(int id, const char *image, int degrees, int zorder, bool moved, int x, int y)  
 {
 	
 	this->id = id;
@@ -356,7 +356,7 @@ Counter::Counter(int id, const char *image, int degrees, int zorder, int x, int 
 	
 	this->state.x = x;
 	this->state.y = y;
-	this->state.moved = false;
+	this->state.moved = moved;
 	this->state.degrees = degrees;
 	this->state.image = string(image);
 	this->state.zorder = zorder;

@@ -103,6 +103,10 @@ void CentralFrame::mousePressEvent(QMouseEvent *event)
 		else
 		{	
 		
+			if (!Luau::beforeDrag(child->owner->name.c_str()))
+				return;
+			
+		
 			QImage img;
 			QRect  ghostRect = QRect();
 			stacks.clear();
@@ -413,9 +417,9 @@ void CentralFrame::dropEvent(QDropEvent *event)
 			const char *toId = std::to_string(Counter::nextId()).c_str();
 			int zorder = Counter::topZorder();
 				
-			Luau::copyCounter(fromId, toId, counter->state.degrees, zorder, droppedX, droppedY);
+			Luau::copyCounter(fromId, toId, counter->state.degrees, zorder, false, droppedX, droppedY);
 			
-			Luau::doCreate(fromId, "Create", toId, counter->state.degrees, zorder, droppedX, droppedY);		
+			Luau::doCreate(fromId, "Create", toId, counter->state.degrees, zorder, false, droppedX, droppedY);		
 			Luau::doEvent("end", "", "", "", 0);
 			
 			

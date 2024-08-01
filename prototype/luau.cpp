@@ -180,13 +180,14 @@ extern "C" {
 		
 		int y = lua_tonumber(L, -1);
 		int x = lua_tonumber(L, -2);
-		int zorder = lua_tonumber(L, -3);
-		int degrees = lua_tonumber(L, -4);
-		const char *image = lua_tostring(L, -5);
-		int id = lua_tonumber(L, -6);
-		lua_pop(L, 6);
-		printf("id image degrees zorder %d %s %d %d %d %d\n", id, image, degrees, zorder, x, y);
-		(void)new Counter(id, image, degrees, zorder, x, y);
+		int moved = lua_toboolean(L, -3); 
+		int zorder = lua_tonumber(L, -4);
+		int degrees = lua_tonumber(L, -5);
+		const char *image = lua_tostring(L, -6);
+		int id = lua_tonumber(L, -7);
+		lua_pop(L, 7);
+		printf("id image degrees zorder moved %d %s %d %d %d %d %d\n", id, image, degrees, zorder, moved, x, y);
+		(void)new Counter(id, image, degrees, zorder, moved == 1, x, y);
 		
 		return 0;
 	}
@@ -494,7 +495,7 @@ void Luau::doEvent(const char *eventName, const char *id, const char *trait, con
 }
 
 
-void Luau::doCreate(const char *fromId, const char *trait, const char *toId, int degrees, int zorder, int x, int y)
+void Luau::doCreate(const char *fromId, const char *trait, const char *toId, int degrees, int zorder, bool moved, int x, int y)
 {
 	lua_getglobal(L, "create");
 	lua_pushstring(L, fromId);
@@ -502,11 +503,28 @@ void Luau::doCreate(const char *fromId, const char *trait, const char *toId, int
 	lua_pushstring(L, toId);
 	lua_pushnumber(L, degrees);
 	lua_pushnumber(L, zorder);
+	lua_pushboolean(L, (moved == true ? 1 : 0));
 	lua_pushnumber(L, x);
 	lua_pushnumber(L, y);
 	
 	
-	lua_pcall(L, 7, 0, 0);
+	lua_pcall(L, 8, 0, 0);
+	
+}
+
+
+bool Luau::beforeDrag(const char *id)
+{
+	lua_getglobal(L, "beforeDrag");
+	lua_pushstring(L, id);
+	lua_pcall(L, 1, 1, 0);
+	
+	
+	int r = lua_toboolean (L, -1);
+	
+	lua_pop(L, 1);
+	
+	return (r != 0);
 	
 }
 
@@ -531,7 +549,7 @@ void Luau::redo()
 
 
 
-void Luau::copyCounter(const char *fromId, const char *toId, int degrees, int zorder, int x, int y)
+void Luau::copyCounter(const char *fromId, const char *toId, int degrees, int zorder, bool moved, int x, int y)
 {
 	
 	lua_getglobal(L, "copyCounter");
@@ -539,9 +557,10 @@ void Luau::copyCounter(const char *fromId, const char *toId, int degrees, int zo
 	lua_pushstring(L, toId);
 	lua_pushnumber(L, degrees);
 	lua_pushnumber(L, zorder);
+	lua_pushboolean(L, (moved == true ? 1 : 0));
 	lua_pushnumber(L, x);
 	lua_pushnumber(L, y);
-	lua_pcall(L, 6, 0, 0);
+	lua_pcall(L, 7, 0, 0);
 	
 }
 

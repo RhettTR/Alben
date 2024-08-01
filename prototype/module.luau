@@ -31,17 +31,19 @@ end
 local function actionRotate (window, id)
 	if window == 'Map' then
 		Counter:rotate(id)
-		rotate_counter(id, Counter[id].degrees)
+		rotate_counter(id, Counter[id].Rotate.degrees)
 	else
 		Repository:rotate(id)
-		rotate_counter(id, Repository[id].degrees)
+		rotate_counter(id, Repository[id].Rotate.degrees)
 	end
 end
 
 local function actionMoved (window, id)
 	if window == 'Map' then
-		Counter:toggleMoved(id)
-		set_moved_status(id, Counter[id].MarkMoved.moved)
+		if Counter[id].MarkMoved ~= nil then
+			Counter:toggleMoved(id)
+			set_moved_status(id, Counter[id].MarkMoved.moved)
+		end
 	end
 end
 
@@ -148,15 +150,15 @@ function events(event, id, trait, key, value)
 end
 
 
-function create(fromId, trait, toId, degrees, zorder, x, y)
-	State:addCreate (fromId, trait, toId, degrees, zorder, x, y)
+function create(fromId, trait, toId, degrees, zorder, moved, x, y)
+	State:addCreate (fromId, trait, toId, degrees, zorder, moved, x, y)
 end
 
 
 
 
 
-local Counter = counter()
+local Counter = counter() 
 local Traits = traits()
 local State = state()
 local Repository = repository()
@@ -171,30 +173,50 @@ local Repository = repository()
 
 -- set rotate degrees for counters
 
-Rotate.degrees = 45
+BaseRotate.increment = 45
 
 
 
 
 -- create counter from C++
 
-function copyCounter(fromId, toId, degrees, zorder, x, y)
+function copyCounter(fromId, toId, degrees, zorder, moved, x, y)
 	local images, imageIndex = Image:getImages(fromId)	
-	Counter[toId] = Counter:new(toId, images, imageIndex, degrees, zorder, x, y)
+	Counter[toId] = Counter:new(toId, images, imageIndex, degrees, zorder, moved, x, y)
+end
+
+
+
+
+-- event hooks
+
+function beforeDrag(id)
+
+	local side
+	
+	if Counter[id] ~= nil then
+		side = Counter[id]["Side"]
+	else
+		side = Repository[id]["Side"]
+	end
+	
+	if side ~= "French" then
+		return true
+	else
+		return false	
+	end
+	
 end
 
 
 
 
 
+print(dump(Repository["German/12R-51R"]))
 
 
 
----print(dump(Repository["12R-51R"]))
----print(dump(Counter["BRIGADE-3"]))
-
-
---Counter["1000"] = Counter:new("1000", {"German/12R-51R", "German/12R-51R_f"} , 1, 0, -1, 100, 100)
+Counter["1000"] = Counter:new("1000", {"French/BRIGADE-3", "French/BRIGADE-3_f"} , 1, 0, -1, false, 100, 100)
 
 
 

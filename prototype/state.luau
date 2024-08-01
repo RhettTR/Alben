@@ -20,9 +20,9 @@ function State:addMove (id, trait, key, value)
 	State.stageStack[State.stagePointer] = {id = id, trait = trait, key = key, value = value}
 end
 
-function State:addCreate (fromId, trait, toId, degrees, zorder, x, y)
+function State:addCreate (fromId, trait, toId, degrees, zorder, moved, x, y)
 	State.stagePointer = State.stagePointer + 1
-	State.stageStack[State.stagePointer] = {fromId = fromId, trait = trait, toId = toId, degrees = degrees, zorder = zorder, x = x, y = y}
+	State.stageStack[State.stagePointer] = {fromId = fromId, trait = trait, toId = toId, degrees = degrees, zorder = zorder, moved = moved, x = x, y = y}
 end
 
 function State:addStage ()
@@ -97,7 +97,7 @@ function State:reset()
 		
 		if type(value) ~= 'function' and key ~= 'stageStack' and key ~= 'stagePointer' then
 			if Counter[key] == nil then			
-				Counter[key] = Counter:new(key, value.Image.images, value.Image.imageIndex, value.degrees, value.zorder, value.x, value.y)
+				Counter[key] = Counter:new(key, value.Image.images, value.Image.imageIndex, value.degrees, value.zorder, value.moved, value.x, value.y)
 			else
 				Counter[key] = Counter:duplicate(value)
 			end
@@ -119,6 +119,7 @@ function State:executeUntil(stage)
 		local toId
 		local degrees
 		local zorder
+		local moved
 		local x
 		local y
 				
@@ -127,6 +128,7 @@ function State:executeUntil(stage)
 			toId = State.stageStack[i].toId
 			degrees = State.stageStack[i].degrees
 			zorder = State.stageStack[i].zorder
+			moved = State.stageStack[i].moved
 			x = State.stageStack[i].x
 			y = State.stageStack[i].y
 		else
@@ -141,6 +143,10 @@ function State:executeUntil(stage)
 			Counter[id][key] = value		 
 		end
 		
+		if trait == 'Rotate' then		
+			Counter[id][trait][key] = value		 
+		end
+		
 		if trait == 'MarkMoved' then
 			Counter[id][trait][key] = value		 
 		end
@@ -150,7 +156,7 @@ function State:executeUntil(stage)
 		end
 		
 		if trait == 'Create' then
-			copyCounter(fromId, toId, degrees, zorder, x, y) 			
+			copyCounter(fromId, toId, degrees, zorder, moved, x, y) 			
 		end
 		
 		if trait == 'Delete' then			

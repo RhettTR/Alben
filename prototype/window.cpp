@@ -144,8 +144,8 @@ Window::Window(QWidget *parent) : QMainWindow(parent, Qt::Window | Qt::WindowMin
 	setAutoFillBackground(true);
 	
     this->move(100, 100);
-    this->resize(550, 350); 
-    repositoryFrame->resize(550, 350);  
+    this->resize(400, 250); 
+    repositoryFrame->resize(400, 250);  
     
 	
 	this->show();

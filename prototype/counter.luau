@@ -6,10 +6,10 @@ Repository = {}
 
 
 function Repository:new (images)
-	local o = Traits:new(images, 1)
-	setmetatable(o, Repository)
-	Repository.__index = Repository
-	o.degrees = 0
+	local o = {}	
+	setmetatable(o, self)
+	Repository.__index = self
+	o.Image = Image:new(images, 1)
 	o.x = 0
 	o.y = 0
 	create_class(images[1])
@@ -22,20 +22,29 @@ function Repository:addTrait (id, key, trait)
 end
 
 
+function Repository:addTraits (id, traits)
+	for k, v in pairs(traits) do
+		Repository:addTrait(id, k, v)
+    end   
+end
+
+
 function Repository:flip (id)
-	print(id)
+	---print(id)
 	local name =  Image:Repository_nextImage(id)
 	return name
 end
 
 
-function Repository:rotate (id)	
-	Repository[id].degrees = Repository:incrementDegrees(id)
+function Repository:rotate (id)
+	if Repository[id].Rotate ~= nil then
+		Repository[id].Rotate.degrees = Repository:incrementDegrees(id)
+	end
 end
 
 
 function Repository:incrementDegrees (id)
-	local newDegrees = Repository[id].degrees + Rotate.degrees;	
+	local newDegrees = Repository[id].Rotate.degrees + BaseRotate.increment;	
 	newDegrees = math.fmod(newDegrees, 360)	
 	if newDegrees > 180 then
 		newDegrees = -(360 - newDegrees)
@@ -51,15 +60,20 @@ end
 Counter = {}
 
 
-function Counter:new (id, images, imageIndex, degrees, zorder, x, y)
-	local o = Traits:new(images, imageIndex)
+function Counter:new (id, images, imageIndex, degrees, zorder, moved, x, y)	
+	local o = Counter:duplicate(Repository[images[1]])	
 	setmetatable(o, Counter)
 	Counter.__index = Counter
-	o.degrees = degrees
+	if o.Rotate ~= nil then
+		o.Rotate.degrees = degrees
+	end
+	o.zorder = zorder
+	if o.MarkMoved ~= nil then
+		o.MarkMoved.moved = (moved == 1)
+	end
 	o.x = x
 	o.y = y
-	o.zorder = zorder
-	create_class_copy(id, images[imageIndex], degrees, zorder, x, y)
+	create_class_copy(id, images[imageIndex], degrees, zorder, moved, x, y)
 	return o
 end
 
@@ -80,15 +94,16 @@ end
 
 
 function Counter:toggleMoved (id)
-	Counter[id].MarkMoved.moved = not Counter[id].MarkMoved.moved;	
-	local flag = Counter[id].MarkMoved ~= nil and Counter[id].MarkMoved.moved
-	State:addMove(id, "MarkMoved", "moved", flag)
-	State:addStage()	
+	if Counter[id].MarkMoved ~= nil then
+		Counter[id].MarkMoved.moved = not Counter[id].MarkMoved.moved	
+		State:addMove(id, "MarkMoved", "moved", Counter[id].MarkMoved.moved)
+		State:addStage()
+	end	
 end
 
 
 function Counter:incrementDegrees (id)
-	local newDegrees = Counter[id].degrees + Rotate.degrees;	
+	local newDegrees = Counter[id].Rotate.degrees + BaseRotate.increment;	
 	newDegrees = math.fmod(newDegrees, 360)	
 	if newDegrees > 180 then
 		newDegrees = -(360 - newDegrees)
@@ -101,16 +116,19 @@ end
 
 
 function Counter:rotate (id)	
-	Counter[id].degrees = Counter:incrementDegrees(id);
-	State:addMove(id, "Counter", "degrees", Counter[id].degrees)
+	Counter[id].Rotate.degrees = Counter:incrementDegrees(id);
+	State:addMove(id, "Rotate", "degrees", Counter[id].Rotate.degrees)
 	State:addStage()	
 end
 
 
-function Counter:markMoved (id)	
-	Counter[id].MarkMoved.moved = true;	
-	State:addMove(id, "MarkMoved", "moved", true)
-	set_moved_status(id, true)
+function Counter:markMoved (id)
+	if Counter[id].MarkMoved ~= nil then	
+		Counter[id].MarkMoved.moved = true;	
+		State:addMove(id, "MarkMoved", "moved", true)
+		--State:addStage()
+		set_moved_status(id, true)
+	end
 end
 
 
@@ -134,13 +152,19 @@ function Counter:generateGUI()
 		if type(k) == "string" and k ~= '__index' and type(v) ~= 'function' then
 			
 			local name = Counter[k].Image.images[ Counter[k].Image.imageIndex ]
+			local degrees = 0
+			
+			if Counter[k].Rotate ~= nil then
+				degrees = Counter[k].Rotate.degrees
+			end				
+			
 			
 			updateState(k, 
 						Counter[k].x, 
 						Counter[k].y,
 						Counter[k].zorder,  
 						Counter[k].MarkMoved ~= nil and Counter[k].MarkMoved.moved,
-						Counter[k].degrees,
+						degrees,
 						name)
 		end
 	end

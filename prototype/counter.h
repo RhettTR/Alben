@@ -73,7 +73,7 @@ class Counter
 		
 		
 		Counter(const char *name);
-		Counter(int id, const char *image, int degrees, int zorder, int x, int y);
+		Counter(int id, const char *image, int degrees, int zorder, bool moved, int x, int y);
 		
 		~Counter();
 		
