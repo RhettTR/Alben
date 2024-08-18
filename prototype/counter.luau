@@ -12,7 +12,6 @@ function Repository:new (images)
 	o.Image = Image:new(images, 1)
 	o.x = 0
 	o.y = 0
-	create_class(images[1])
 	return o
 end
 
@@ -60,20 +59,22 @@ end
 Counter = {}
 
 
-function Counter:new (id, images, imageIndex, degrees, zorder, moved, x, y)	
+function Counter:new (id, images, imageIndex, zorder, x, y)	
 	local o = Counter:duplicate(Repository[images[1]])	
 	setmetatable(o, Counter)
 	Counter.__index = Counter
-	if o.Rotate ~= nil then
-		o.Rotate.degrees = degrees
-	end
-	o.zorder = zorder
-	if o.MarkMoved ~= nil then
-		o.MarkMoved.moved = (moved == 1)
-	end
+	o.Image.imageIndex = imageIndex
 	o.x = x
 	o.y = y
-	create_class_copy(id, images[imageIndex], degrees, zorder, moved, x, y)
+	o.zorder = zorder	
+	return o
+end
+
+
+function Counter:set (table)	
+	local o = Counter:duplicate(table)	
+	setmetatable(o, Counter)
+	Counter.__index = Counter
 	return o
 end
 

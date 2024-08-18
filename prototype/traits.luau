@@ -60,6 +60,22 @@ create_mask("MovedMarker", "__moved", 72, 15)
 
 
 
+
+Mask = {}
+
+function Mask:new ()
+	local o = {}
+	setmetatable(o, self)
+	self.__index = self
+	o.mask = ""
+	o.x = 0
+	o.y = 0
+	return o
+end
+
+
+
+
 MarkMoved = {}
 	
 function MarkMoved:new ()
@@ -143,6 +159,10 @@ function German:new()
 	setmetatable(self, {__index = Piece})
 	self.__index = self
 	o.Side = "German"
+	o.Mask = Mask:new()
+	o.Mask.mask = "German/Mask"
+	o.Mask.x = 46
+	o.Mask.y = 44
 	return o   	
 end  
 

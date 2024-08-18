@@ -417,9 +417,12 @@ void CentralFrame::dropEvent(QDropEvent *event)
 			const char *toId = std::to_string(Counter::nextId()).c_str();
 			int zorder = Counter::topZorder();
 				
-			Luau::copyCounter(fromId, toId, counter->state.degrees, zorder, false, droppedX, droppedY);
+			// create Luau representation and C++ representation of counter
+			Luau::copyCounter(fromId, toId, zorder, droppedX, droppedY);
 			
-			Luau::doCreate(fromId, "Create", toId, counter->state.degrees, zorder, false, droppedX, droppedY);		
+			// add counter to undo stack
+			//Luau::doCreate(fromId, "Create", toId, counter->state.degrees, zorder, false, droppedX, droppedY);		
+			Luau::doCreate(toId, "Create");
 			Luau::doEvent("end", "", "", "", 0);
 			
 			

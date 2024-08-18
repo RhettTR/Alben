@@ -150,8 +150,9 @@ function events(event, id, trait, key, value)
 end
 
 
-function create(fromId, trait, toId, degrees, zorder, moved, x, y)
-	State:addCreate (fromId, trait, toId, degrees, zorder, moved, x, y)
+
+function create(fromId, trait)
+	State:addCreate (fromId, trait)
 end
 
 
@@ -178,11 +179,17 @@ BaseRotate.increment = 45
 
 
 
--- create counter from C++
+-- create Luau and C++ counter
 
-function copyCounter(fromId, toId, degrees, zorder, moved, x, y)
+function copyCounter(fromId, toId, zorder, x, y)
 	local images, imageIndex = Image:getImages(fromId)	
-	Counter[toId] = Counter:new(toId, images, imageIndex, degrees, zorder, moved, x, y)
+	Counter[toId] = Counter:new(toId, images, imageIndex, zorder, x, y)
+	create_class_copy(Counter, toId)
+end
+
+function setCounter(id, table)
+	Counter[id] = Counter:set(table)
+	create_class_copy(Counter, id)
 end
 
 
@@ -216,8 +223,8 @@ print(dump(Repository["German/12R-51R"]))
 
 
 
-Counter["1000"] = Counter:new("1000", {"French/BRIGADE-3", "French/BRIGADE-3_f"} , 1, 0, -1, false, 100, 100)
 
+copyCounter("French/BRIGADE-3", "1000", -1, 100, 100)
 
 
 

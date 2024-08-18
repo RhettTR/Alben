@@ -61,19 +61,31 @@ class Counter
 		std::string name;			// unique string id of this counter
 		
 		
-		struct State
+		
+		class Table;
+		
+		typedef std::variant<int, std::string> Leftside;
+		typedef std::variant<int, double, bool, std::string, Table> Rightside;
+
+		class Table : public std::map<Leftside, Rightside> {};
+		
+		
+		struct State				// the subset of fields needed to render the counter/card
 		{
 			int x;					
 			int y;
 			bool moved;				// only true if trait		
 			int degrees;			// only not zero if trait
 			std::string image;		// name of current (flipped) image
-			int zorder;				// position in a stack	
+			int zorder;				// position in a stack
+									// masks
+									// labels
 		};
 		
 		
-		Counter(const char *name);
-		Counter(int id, const char *image, int degrees, int zorder, bool moved, int x, int y);
+		Counter(Table *state);
+		Counter(int id, Table *state); 
+		//Counter(int id, const char *image, int degrees, int zorder, bool moved, int x, int y);
 		
 		~Counter();
 		

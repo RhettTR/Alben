@@ -287,15 +287,15 @@ Counter::Mask::Mask(const char *name, const char *mask, int x, int y) : x(x), y(
 
 // constructor for the repository
 
-Counter::Counter(const char *name)		
+Counter::Counter(Table *state)		
 {
 	
 	this->id = Counter::nextId();
 	
 	Counter::repository[this->id] = this;
 	
-	
-	this->name = string(name);
+
+	this->name = std::get<std::string>(std::get<Table>(std::get<Table>((*state)["Image"])["images"])[1]);
 	
 	this->state.x = 0;
 	this->state.y = 0;
@@ -342,7 +342,8 @@ Counter::Counter(const char *name)
 
 // constructor for map
 
-Counter::Counter(int id, const char *image, int degrees, int zorder, bool moved, int x, int y)  
+Counter::Counter(int id, Table *state) 
+  
 {
 	
 	this->id = id;
@@ -350,17 +351,34 @@ Counter::Counter(int id, const char *image, int degrees, int zorder, bool moved,
 	Counter::counters[this->id] = this;
 	
 
-
 	
 	this->name = std::to_string(id);
 	
-	this->state.x = x;
-	this->state.y = y;
-	this->state.moved = moved;
-	this->state.degrees = degrees;
-	this->state.image = string(image);
-	this->state.zorder = zorder;
-	 
+	
+	this->state.x = (int)std::get<double>((*state)["x"]);	 	
+	this->state.y = (int)std::get<double>((*state)["y"]);
+	
+	Table images = std::get<Table>(std::get<Table>((*state)["Image"])["images"]);
+	int index = (int)std::get<double>(std::get<Table>((*state)["Image"])["imageIndex"]);	
+ 	this->state.image = std::get<std::string>(images[index]);
+ 	
+ 	
+ 	// optional fields
+ 	
+ 	if ((*state).find("MarkMoved") != (*state).end())	
+		this->state.moved = std::get<bool>(std::get<Table>((*state)["MarkMoved"])["moved"]);
+	else
+		this->state.moved = false;
+		
+	if ((*state).find("Rotate") != (*state).end())		
+		this->state.degrees = (int)std::get<double>(std::get<Table>((*state)["Rotate"])["degrees"]);
+	else
+		this->state.degrees = 0;
+		
+	if ((*state).find("zorder") != (*state).end())		
+		this->state.zorder = (int)std::get<double>((*state)["zorder"]);
+	else
+		this->state.zorder = topZorder();
 	
 	
 	
@@ -384,6 +402,7 @@ Counter::Counter(int id, const char *image, int degrees, int zorder, bool moved,
     
 	
 }
+
 
 
 Counter::~Counter() 
@@ -581,6 +600,15 @@ void Counter::setImage()
 		delete paint;
 		
 	}
+	
+	
+	// masks
+	
+	
+	// labels
+	
+	
+	
 	
 
 	// rotated

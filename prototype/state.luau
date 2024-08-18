@@ -20,9 +20,9 @@ function State:addMove (id, trait, key, value)
 	State.stageStack[State.stagePointer] = {id = id, trait = trait, key = key, value = value}
 end
 
-function State:addCreate (fromId, trait, toId, degrees, zorder, moved, x, y)
+function State:addCreate (id, trait)
 	State.stagePointer = State.stagePointer + 1
-	State.stageStack[State.stagePointer] = {fromId = fromId, trait = trait, toId = toId, degrees = degrees, zorder = zorder, moved = moved, x = x, y = y}
+	State.stageStack[State.stagePointer] = { id = id, trait = trait, table = Counter:set(Counter[id]) }
 end
 
 function State:addStage ()
@@ -96,9 +96,7 @@ function State:reset()
 	for key, value in pairs(State) do
 		
 		if type(value) ~= 'function' and key ~= 'stageStack' and key ~= 'stagePointer' then
-			if Counter[key] == nil then			
-				Counter[key] = Counter:new(key, value.Image.images, value.Image.imageIndex, value.degrees, value.zorder, value.moved, value.x, value.y)
-			else
+			if Counter[key] == nil then
 				Counter[key] = Counter:duplicate(value)
 			end
 		end
@@ -111,33 +109,19 @@ function State:executeUntil(stage)
 	
 	for i = 1, stage do
 		
-		local id
+		
 		local trait = State.stageStack[i].trait
+		local id = State.stageStack[i].id
 		local key
 		local value
-		local fromId
-		local toId
-		local degrees
-		local zorder
-		local moved
-		local x
-		local y
-				
-		if (trait == 'Create') then
-			fromId = State.stageStack[i].fromId
-			toId = State.stageStack[i].toId
-			degrees = State.stageStack[i].degrees
-			zorder = State.stageStack[i].zorder
-			moved = State.stageStack[i].moved
-			x = State.stageStack[i].x
-			y = State.stageStack[i].y
-		else
-			id = State.stageStack[i].id
+		
+		
+		if (trait ~= 'Create') then
 			key = State.stageStack[i].key
 			value = State.stageStack[i].value	
 		end
 		
-		
+			
 		
 		if trait == 'Counter' then
 			Counter[id][key] = value		 
@@ -156,7 +140,7 @@ function State:executeUntil(stage)
 		end
 		
 		if trait == 'Create' then
-			copyCounter(fromId, toId, degrees, zorder, moved, x, y) 			
+			setCounter(id, State.stageStack[i].table)			
 		end
 		
 		if trait == 'Delete' then			

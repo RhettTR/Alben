@@ -17,11 +17,12 @@ class Luau
 		static PopupEntries getTraits(const char *window, const char *id);
 		static void doAction(const char *window, const char *id, const char *name);
 		static void doEvent(const char *eventName, const char *id, const char *trait, const char *key, int value);
-		static void doCreate(const char *fromId, const char *trait, const char *toId, int degrees, int zorder, bool moved, int x, int y);
+		//static void doCreate(const char *fromId, const char *trait, const char *toId, int degrees, int zorder, bool moved, int x, int y);
+		static void doCreate(const char *fromId, const char *trait);
 		static bool beforeDrag(const char *id);
 		static void undo();
 		static void redo();
-		static void copyCounter(const char *fromId, const char *toId, int degrees, int zorder, bool moved, int x, int y);
+		static void copyCounter(const char *fromId, const char *toId, int zorder, int x, int y);
 		
 		
 		Luau();
@@ -31,5 +32,6 @@ class Luau
 		void compileScript();
 		void startVM();
 		void closeVM();
-	
+		
+		
 };

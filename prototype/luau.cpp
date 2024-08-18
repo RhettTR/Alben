@@ -1,6 +1,7 @@
 #include <iostream>
 #include <fstream>
 #include <cstring>
+#include <variant>
 
 
 #include <assert.h>
@@ -23,6 +24,7 @@ struct aScript
 };
 
 typedef struct std::vector<aScript> Scripts;
+
 
 
 
@@ -160,16 +162,22 @@ extern "C" {
 		return 0;
 	}
 	
+	Counter::Table getTable();
+	void outTable(Counter::Table);
 	
 	static int create_class(lua_State *L)
 	{	
 		
-		const char *id = lua_tostring(L, -1);	   
-		size_t length = lua_strlen(L, -1);         
-		assert(id[length] == '\0');
-		assert(strlen(id) <= length);
-		lua_pop(L, 1);
-		(void)new Counter(id);
+		(void)lua_gettable(L, -2);
+		
+		if (lua_istable(L, -1))
+		{			
+			Counter::Table state = getTable();
+	
+			(void)new Counter(&state);
+		}	
+		
+		lua_pop(L, 2);
 		
 		return 0;
 	}
@@ -178,16 +186,18 @@ extern "C" {
 	static int create_class_copy(lua_State *L)
 	{	
 		
-		int y = lua_tonumber(L, -1);
-		int x = lua_tonumber(L, -2);
-		int moved = lua_toboolean(L, -3); 
-		int zorder = lua_tonumber(L, -4);
-		int degrees = lua_tonumber(L, -5);
-		const char *image = lua_tostring(L, -6);
-		int id = lua_tonumber(L, -7);
-		lua_pop(L, 7);
-		printf("id image degrees zorder moved %d %s %d %d %d %d %d\n", id, image, degrees, zorder, moved, x, y);
-		(void)new Counter(id, image, degrees, zorder, moved == 1, x, y);
+		int id = lua_tointeger(L, -1);
+		
+		(void)lua_gettable(L, -2);
+		
+		if (lua_istable(L, -1))
+		{			
+			Counter::Table state = getTable();
+			
+			(void)new Counter(id, &state);	
+		}
+		
+		lua_pop(L, 2);
 		
 		return 0;
 	}
@@ -382,8 +392,109 @@ extern "C" {
 		return 0;
 	}
 	
+
 	
 }	// extern "C"
+
+
+
+
+Counter::Table getTable()
+{
+	
+	Counter::Leftside left;
+	Counter::Rightside right;
+	Counter::Table table;
+	
+	
+	lua_pushnil(L);
+	
+	while(lua_next(L, -2) != 0) 
+	{
+	
+		// key
+		
+		if (lua_isnumber(L, -2))
+		{
+			lua_Integer n = lua_tointeger(L, -2);			
+			left = n;
+		}
+		else	
+			if (lua_isstring(L, -2))
+			{
+				const char *str = lua_tostring(L, -2);
+				left = std::string(str);
+			}
+		
+		
+		// value
+		
+		if (lua_isboolean(L, -1))
+		{
+			int n = lua_toboolean(L, -1);
+			if (n)
+				right = true; 	
+			else
+				right = false; 
+		}
+		else
+			if (lua_isnumber(L, -1))
+			{
+				lua_Number n = lua_tonumber(L, -1);				
+				right = n;
+			}
+			else
+				if (lua_isstring(L, -1))
+				{
+					const char *str = lua_tostring(L, -1);
+					right = std::string(str);
+				}
+				else
+					if (lua_istable(L, -1))
+						right = getTable();
+	
+		
+		table[left] = right;
+		
+		
+		lua_pop(L, 1);
+		
+	}
+	
+	return table;
+	
+}
+
+
+template <class... Fs> struct Overload : Fs... { using Fs::operator()...; };
+template <class... Fs> Overload(Fs...) -> Overload<Fs...>;
+
+
+void outTable(Counter::Table t)
+{
+	for (auto obj = t.begin(); obj != t.end(); ++obj)
+	{
+		std::visit(
+			Overload{
+				[] (int k) { printf("%d=", k);  },
+				[] (std::string k) { printf("\"%s\"=", k.c_str()); }
+			},
+			obj->first
+		);
+		std::visit(
+			Overload{
+				[] (int k) { printf("%d\n", k); },
+				[] (double k) { printf("%f\n", k); },
+				[] (bool k) { (k ? printf("true\n") : printf("false\n")); },				
+				[] (std::string k) { printf("\"%s\"\n", k.c_str()); },
+				[] (Counter::Table k) { outTable(k); }
+			},
+			obj->second
+		);	
+	}
+}
+
+
 
 
 
@@ -437,6 +548,7 @@ void getEntries()
 		
 	
 }
+
 
 
     
@@ -495,20 +607,13 @@ void Luau::doEvent(const char *eventName, const char *id, const char *trait, con
 }
 
 
-void Luau::doCreate(const char *fromId, const char *trait, const char *toId, int degrees, int zorder, bool moved, int x, int y)
+void Luau::doCreate(const char *fromId, const char *trait)
 {
 	lua_getglobal(L, "create");
 	lua_pushstring(L, fromId);
 	lua_pushstring(L, trait);
-	lua_pushstring(L, toId);
-	lua_pushnumber(L, degrees);
-	lua_pushnumber(L, zorder);
-	lua_pushboolean(L, (moved == true ? 1 : 0));
-	lua_pushnumber(L, x);
-	lua_pushnumber(L, y);
 	
-	
-	lua_pcall(L, 8, 0, 0);
+	lua_pcall(L, 2, 0, 0);
 	
 }
 
@@ -549,18 +654,16 @@ void Luau::redo()
 
 
 
-void Luau::copyCounter(const char *fromId, const char *toId, int degrees, int zorder, bool moved, int x, int y)
+void Luau::copyCounter(const char *fromId, const char *toId, int zorder, int x, int y)
 {
 	
 	lua_getglobal(L, "copyCounter");
 	lua_pushstring(L, fromId);
 	lua_pushstring(L, toId);
-	lua_pushnumber(L, degrees);
 	lua_pushnumber(L, zorder);
-	lua_pushboolean(L, (moved == true ? 1 : 0));
 	lua_pushnumber(L, x);
 	lua_pushnumber(L, y);
-	lua_pcall(L, 7, 0, 0);
+	lua_pcall(L, 5, 0, 0);
 	
 }
 
@@ -633,6 +736,8 @@ void Luau::startVM()
 	
 	lua_pushcfunction(L, comboitem, "comboitem");
 	lua_setglobal(L, "comboitem");
+	
+	
 	
 	
 	lua_getglobal(L, "module");
