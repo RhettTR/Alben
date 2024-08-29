@@ -12,7 +12,7 @@ class Scale
 	
 	public:
 	
-		static constexpr float ratio = 2.0/3.0;
+		static constexpr float ratio = 1.0/1.0;
 		static constexpr int rotation = 0; 
 		
 		Scale();

@@ -21,7 +21,7 @@ int Counter::_lastZorder = 0;
 
 map<int, Counter *> Counter::repository;
 map<int, Counter *> Counter::counters;
-map<string, Counter::Mask *> Counter::masks;
+map<string, Counter::SystemMask *> Counter::masks;
 
 
 
@@ -270,7 +270,7 @@ void Counter::QtCounter::do_activate (QAction *action)
 	
 	
 	
-Counter::Mask::Mask(const char *name, const char *mask, int x, int y) : x(x), y(y)
+Counter::SystemMask::SystemMask(const char *name, const char *mask, int x, int y) : x(x), y(y)
 {
 	
 	this->name = string(name);
@@ -280,6 +280,16 @@ Counter::Mask::Mask(const char *name, const char *mask, int x, int y) : x(x), y(
 	
 }	
 
+
+Counter::Mask::Mask(std::string mask, int x, int y, bool apply) :
+	mask(mask), x(x), y(y), apply(apply)
+{
+}
+
+Counter::Label::Label(std::string text, std::string font, int size, int x, int y, bool apply) :
+	text(text), font(font), size(size), x(x), y(y), apply(apply)
+{	
+}
 
 
 	
@@ -302,6 +312,7 @@ Counter::Counter(Table *state)
 	this->state.moved = false;
 	this->state.degrees = 0;
 	this->state.image = this->name;
+	this->state.overlays = nullptr;
 	
 	
 	
@@ -379,6 +390,15 @@ Counter::Counter(int id, Table *state)
 		this->state.zorder = (int)std::get<double>((*state)["zorder"]);
 	else
 		this->state.zorder = topZorder();
+		
+	if ((*state).find("Overlays") != (*state).end())		
+	{	
+		Table *overlays = new Table();	
+		(*overlays) = std::get<Table>((*state)["Overlays"]);	
+		this->state.overlays = overlays;
+	}
+	else
+		this->state.overlays = nullptr;
 	
 	
 	
@@ -501,7 +521,6 @@ void Counter::snaptoDefaultGrid (Counter *counter, int &x, int &y)
 
 
 
-
 void Counter::setImage()
 {
 	
@@ -601,15 +620,71 @@ void Counter::setImage()
 		
 	}
 	
+
+	// masks & labels
 	
-	// masks
+	if (state.overlays != nullptr)
+	{
+			
+		for (auto const &table : (*state.overlays))
+		{
+			Table trait = std::get<Table>(table.second);
+		
+			auto itr = trait.find("mask");
+			
+			if (itr != trait.end()) 
+			{
+				// mask	
+				
+				if (std::get<bool>(trait["apply"]))
+				{
+					
+					int x = (int)std::get<double>(trait["x"]) + margin;
+					int y = (int)std::get<double>(trait["y"]) + margin;
+					
+					QImage const mask = io->getImage(std::get<std::string>(trait["mask"]));
+					
+					
+					QPainter *paint = new QPainter(&image);
+					paint->drawImage(x, y, mask);			
+					delete paint;
+					
+				} 
+					
+			}
+			else
+			{
+				// label
+				
+				if (std::get<bool>(trait["apply"]))
+				{
+					int x = (int)std::get<double>(trait["x"]) + margin;
+					int y = (int)std::get<double>(trait["y"]) + margin;
+					
+					QFont font;
+					font.setFamily(QString::fromStdString(std::get<std::string>(trait["font"])));
+					font.setPixelSize((int)std::get<double>(trait["size"]));
+					
+					std::string color = std::get<std::string>(trait["color"]);
 	
+
+					const QString text = QString::fromStdString(std::get<std::string>(trait["text"]));
+					
+					QPainter *paint = new QPainter(&image);
+					paint->setFont(font);
+					paint->setPen(QString::fromStdString(color));
+					paint->drawText(x, y, text);
+					delete paint;
+				}
+				 
+			}
+			
+			
+		}
 	
-	// labels
+	}
 	
-	
-	
-	
+
 
 	// rotated
 

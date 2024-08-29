@@ -421,7 +421,6 @@ void CentralFrame::dropEvent(QDropEvent *event)
 			Luau::copyCounter(fromId, toId, zorder, droppedX, droppedY);
 			
 			// add counter to undo stack
-			//Luau::doCreate(fromId, "Create", toId, counter->state.degrees, zorder, false, droppedX, droppedY);		
 			Luau::doCreate(toId, "Create");
 			Luau::doEvent("end", "", "", "", 0);
 			

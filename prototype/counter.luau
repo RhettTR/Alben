@@ -153,20 +153,23 @@ function Counter:generateGUI()
 		if type(k) == "string" and k ~= '__index' and type(v) ~= 'function' then
 			
 			local name = Counter[k].Image.images[ Counter[k].Image.imageIndex ]
-			local degrees = 0
+			local degrees = 0			
 			
 			if Counter[k].Rotate ~= nil then
 				degrees = Counter[k].Rotate.degrees
-			end				
+			end
 			
-			
-			updateState(k, 
+
+			updateState(k,
 						Counter[k].x, 
 						Counter[k].y,
 						Counter[k].zorder,  
 						Counter[k].MarkMoved ~= nil and Counter[k].MarkMoved.moved,
 						degrees,
-						name)
+						name,
+						Counter[k],
+						'Overlays')
+			
 		end
 	end
 	

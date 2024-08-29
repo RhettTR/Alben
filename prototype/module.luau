@@ -1,3 +1,8 @@
+--- set side
+
+PlayerSide = "German"
+
+
 -- set alpha transparency for counters
 
 setCounterDragAlpha(0.5)
@@ -179,6 +184,7 @@ BaseRotate.increment = 45
 
 
 
+
 -- create Luau and C++ counter
 
 function copyCounter(fromId, toId, zorder, x, y)
@@ -199,18 +205,18 @@ end
 
 function beforeDrag(id)
 
-	local side
+	local counter
 	
 	if Counter[id] ~= nil then
-		side = Counter[id]["Side"]
+		counter = Counter[id]
 	else
-		side = Repository[id]["Side"]
+		counter = Repository[id]
 	end
 	
-	if side ~= "French" then
+	if counter["Side"] == PlayerSide or counter["Side"] == "" then
 		return true
 	else
-		return false	
+		return false
 	end
 	
 end
@@ -225,6 +231,7 @@ print(dump(Repository["German/12R-51R"]))
 
 
 copyCounter("French/BRIGADE-3", "1000", -1, 100, 100)
+copyCounter("German/12R-51R", "1001", -2, 200, 100)
 
 
 

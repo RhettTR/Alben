@@ -17,6 +17,12 @@ class CentralFrame;
 class StackFrame;
 class StackOpen;
 
+
+template <class... Fs> struct Overload : Fs... { using Fs::operator()...; };
+template <class... Fs> Overload(Fs...) -> Overload<Fs...>;
+
+
+
 class Counter
 {
 	
@@ -43,16 +49,41 @@ class Counter
 		};
 			
 		
-		class Mask
+		class SystemMask
 		{
 			public:
 					
-				Mask(const char *name, const char *mask, int x, int y);
+				SystemMask(const char *name, const char *mask, int x, int y);
 				
 				int x;
 				int y;
 				std::string name;
 				std::string mask;		
+		};
+		
+		
+		class Mask
+		{
+			public:
+				Mask(std::string mask, int x, int y, bool apply);
+				
+				std::string mask; 
+				int x; 
+				int y; 
+				bool apply;
+		};
+		
+		class Label
+		{
+			public:
+				Label(std::string text, std::string font, int size, int x, int y, bool apply);
+				
+				std::string text; 
+				std::string font;
+				int size; 
+				int x; 
+				int y;
+				bool apply;
 		};
 		
 		
@@ -62,10 +93,12 @@ class Counter
 		
 		
 		
+		
+		
 		class Table;
 		
 		typedef std::variant<int, std::string> Leftside;
-		typedef std::variant<int, double, bool, std::string, Table> Rightside;
+		typedef std::variant<double, bool, std::string, Table> Rightside;
 
 		class Table : public std::map<Leftside, Rightside> {};
 		
@@ -78,14 +111,13 @@ class Counter
 			int degrees;			// only not zero if trait
 			std::string image;		// name of current (flipped) image
 			int zorder;				// position in a stack
-									// masks
-									// labels
+			Table *overlays;		// masks & labels if any
+									
 		};
 		
 		
 		Counter(Table *state);
 		Counter(int id, Table *state); 
-		//Counter(int id, const char *image, int degrees, int zorder, bool moved, int x, int y);
 		
 		~Counter();
 		
@@ -139,7 +171,7 @@ class Counter
 		
 		static std::map<int, Counter *> repository;
 		
-		static std::map<std::string, Counter::Mask *> masks;
+		static std::map<std::string, Counter::SystemMask *> masks;
 		
 			
 	private:

@@ -61,17 +61,53 @@ create_mask("MovedMarker", "__moved", 72, 15)
 
 
 
-Mask = {}
+Overlays = {}
 
-function Mask:new ()
+function Overlays:new ()
 	local o = {}
 	setmetatable(o, self)
 	self.__index = self
-	o.mask = ""
-	o.x = 0
-	o.y = 0
 	return o
 end
+
+
+function Overlays:add (value, apply)
+	value["apply"] = apply
+	table.insert(self, value)
+end
+
+
+
+Mask = {}
+
+function Mask:new (mask, x, y)
+	local o = {}
+	setmetatable(o, self)
+	self.__index = self
+	o.mask = mask
+	o.x = x
+	o.y = y	
+	o.apply = true	
+	return o
+end
+
+Label = {}
+
+function Label:new (text, font, size, color, x, y)
+	local o = {}
+	setmetatable(o, self)
+	self.__index = self
+	o.text = text
+	o.font = font
+	o.size = size
+	o.color = color
+	o.x = x
+	o.y = y
+	o.apply = true
+	return o
+end
+
+
 
 
 
@@ -159,10 +195,9 @@ function German:new()
 	setmetatable(self, {__index = Piece})
 	self.__index = self
 	o.Side = "German"
-	o.Mask = Mask:new()
-	o.Mask.mask = "German/Mask"
-	o.Mask.x = 46
-	o.Mask.y = 44
+	o.Overlays = Overlays:new ()
+	o.Overlays:add(Mask:new("German/Mask", 46, 44), (o.Side ~= PlayerSide))
+	o.Overlays:add(Label:new("7", "times", 28, "white", 45, 63), (o.Side ~= PlayerSide))
 	return o   	
 end  
 
@@ -174,6 +209,9 @@ function French:new()
 	setmetatable(self, {__index = Piece})
 	self.__index = self
 	o.Side = "French"
+	o.Overlays = Overlays:new ()
+	o.Overlays:add(Mask:new("French/Mask", 46, 45), (o.Side ~= PlayerSide))
+	o.Overlays:add(Label:new("R", "times", 24, "black", 45, 64), (o.Side ~= PlayerSide))
 	return o   	
 end 
 

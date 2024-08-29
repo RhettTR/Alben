@@ -210,7 +210,7 @@ extern "C" {
 		const char *mask = lua_tostring(L, -3);
 		const char *name = lua_tostring(L, -4);
 		lua_pop(L, 4);
-		(void)new Counter::Mask(name, mask, x, y);
+		(void)new Counter::SystemMask(name, mask, x, y);
 		
 		return 0;
 	}
@@ -291,15 +291,48 @@ extern "C" {
 	static int updateState(lua_State *L)
 	{		
 		
-		const char *image	= lua_tostring(L, -1);	
-		int degrees 		= lua_tonumber(L, -2);	
-		bool moved 			= lua_toboolean(L, -3);
-		int zorder			= lua_tonumber(L, -4);
-		int y 				= lua_tonumber(L, -5);
-		int x 				= lua_tonumber(L, -6);
-		const char *id 		= lua_tostring(L, -7);
-		lua_pop(L, 7);
-
+		const char *id;
+		Counter::Table *overlays = nullptr;
+		const char *image;	
+		int degrees;	
+		bool moved;
+		int zorder;
+		int y;
+		int x;
+		
+		
+		(void)lua_gettable(L, -2);
+	
+		
+		if (lua_istable(L, -1))
+		{
+			overlays = new Counter::Table();
+			
+			(*overlays) = getTable();
+			lua_pop(L, 2);	
+			image	= lua_tostring(L, -1);			
+			degrees = lua_tonumber(L, -2);	
+			moved 	= lua_toboolean(L, -3);
+			zorder	= lua_tonumber(L, -4);
+			y 		= lua_tonumber(L, -5);
+			x 		= lua_tonumber(L, -6);
+			id 		= lua_tostring(L, -7);
+			lua_pop(L, 7);			
+		}
+		else
+		{
+			lua_pop(L, 2);
+			image	= lua_tostring(L, -1);	
+			degrees = lua_tonumber(L, -2);	
+			moved 	= lua_toboolean(L, -3);
+			zorder	= lua_tonumber(L, -4);
+			y 		= lua_tonumber(L, -5);
+			x 		= lua_tonumber(L, -6);
+			id 		= lua_tostring(L, -7);
+			lua_pop(L, 7);
+		}
+		
+		
 		
 		Counter *found = Counter::findObj(id);
 		if (found)
@@ -310,6 +343,7 @@ extern "C" {
 			found->state.moved = moved;
 			found->state.degrees = degrees;
 			found->state.image = string(image);
+			found->state.overlays = overlays;	
 		}
 		else
 			printf("error\n");
@@ -414,17 +448,20 @@ Counter::Table getTable()
 	
 		// key
 		
-		if (lua_isnumber(L, -2))
+		if (lua_type(L, -2) == LUA_TSTRING)
 		{
-			lua_Integer n = lua_tointeger(L, -2);			
-			left = n;
+			const char *str = lua_tostring(L, -2);
+			left = std::string(str);
 		}
-		else	
-			if (lua_isstring(L, -2))
+		else
+			if (lua_isnumber(L, -2))
 			{
-				const char *str = lua_tostring(L, -2);
-				left = std::string(str);
+				lua_Integer n = lua_tointeger(L, -2);			
+				left = n;
+					
 			}
+			
+		
 		
 		
 		// value
@@ -438,16 +475,16 @@ Counter::Table getTable()
 				right = false; 
 		}
 		else
-			if (lua_isnumber(L, -1))
+			if (lua_type(L, -1) == LUA_TSTRING)
 			{
-				lua_Number n = lua_tonumber(L, -1);				
-				right = n;
+				const char *str = lua_tostring(L, -1);
+				right = std::string(str);
 			}
 			else
-				if (lua_isstring(L, -1))
+				if (lua_isnumber(L, -1))
 				{
-					const char *str = lua_tostring(L, -1);
-					right = std::string(str);
+					lua_Number n = lua_tonumber(L, -1);				
+					right = n;
 				}
 				else
 					if (lua_istable(L, -1))
@@ -460,14 +497,12 @@ Counter::Table getTable()
 		lua_pop(L, 1);
 		
 	}
-	
+		
 	return table;
 	
 }
 
 
-template <class... Fs> struct Overload : Fs... { using Fs::operator()...; };
-template <class... Fs> Overload(Fs...) -> Overload<Fs...>;
 
 
 void outTable(Counter::Table t)
@@ -483,7 +518,6 @@ void outTable(Counter::Table t)
 		);
 		std::visit(
 			Overload{
-				[] (int k) { printf("%d\n", k); },
 				[] (double k) { printf("%f\n", k); },
 				[] (bool k) { (k ? printf("true\n") : printf("false\n")); },				
 				[] (std::string k) { printf("\"%s\"\n", k.c_str()); },
