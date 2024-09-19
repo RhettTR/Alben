@@ -95,7 +95,8 @@ class Overlay : public QFrame
 				
 
 		};
-			
+		
+		
 			
 		Overlay();
 		
@@ -104,6 +105,7 @@ class Overlay : public QFrame
 		QRegion overlayMask;
 		
 		static int border;
+		
 		
 		static Overlay::StackFrame *hooverView;
 		static Overlay::StackOpen *openView;

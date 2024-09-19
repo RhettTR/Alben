@@ -281,16 +281,6 @@ Counter::SystemMask::SystemMask(const char *name, const char *mask, int x, int y
 }	
 
 
-Counter::Mask::Mask(std::string mask, int x, int y, bool apply) :
-	mask(mask), x(x), y(y), apply(apply)
-{
-}
-
-Counter::Label::Label(std::string text, std::string font, int size, int x, int y, bool apply) :
-	text(text), font(font), size(size), x(x), y(y), apply(apply)
-{	
-}
-
 
 	
 
@@ -313,8 +303,7 @@ Counter::Counter(Table *state)
 	this->state.degrees = 0;
 	this->state.image = this->name;
 	this->state.overlays = nullptr;
-	
-	
+	this->state.opacity = 1.0;
 	
 	
 	this->width = io->getSize(this->state.image).width();
@@ -343,6 +332,7 @@ Counter::Counter(Table *state)
     
 	
 	this->selected = false;
+	this->doesNotStack = ((*state).find("DoesNotStack") != (*state).end());	
 	
 	
 	this->counter->show();
@@ -400,6 +390,15 @@ Counter::Counter(int id, Table *state)
 	else
 		this->state.overlays = nullptr;
 	
+	if ((*state).find("Visibility") != (*state).end())		
+		this->state.opacity = (float)std::get<double>(std::get<Table>((*state)["Visibility"])["opacity"]);
+	else
+		this->state.opacity = 1.0;	
+
+	
+	
+	
+	this->table = *state;
 	
 	
 	this->width = io->getSize(this->state.image).width();
@@ -408,6 +407,7 @@ Counter::Counter(int id, Table *state)
     
    
 	this->selected = false;
+	this->doesNotStack = ((*state).find("DoesNotStack") != (*state).end());
 	
 	
 	this->parentFrame = mapFrame;
@@ -428,11 +428,16 @@ Counter::Counter(int id, Table *state)
 Counter::~Counter() 
 {
 		
+	if (this->state.overlays != nullptr)
+		delete this->state.overlays;
+	
 	this->counter->close();
 	
 	Overlay::hooverView->setVisible(false);
 	
 	Counter::counters.erase(this->id);
+	
+	mapFrame->repaint();
 	
 }
 
@@ -442,12 +447,14 @@ void Counter::deleteAll()
 {
 	
 	for (auto &&entry : repository) 
-		entry.second->counter->close();
+		//entry.second->counter->close();
+		delete entry.second->counter;
 		 
 	repository.clear();
 	
 	for (auto &&entry : counters) 
-		entry.second->counter->close();
+		//entry.second->counter->close();
+		delete entry.second->counter;
 		 
 	counters.clear();
 	
@@ -491,31 +498,56 @@ Counter* Counter::findObj(const char *name)
 			return obj->second;
 	
 			
-	return NULL;
+	return nullptr;
 	
 }
 
 
-void Counter::snaptoDefaultGrid (Counter *counter, int &x, int &y)
+bool Counter::snaptoDefaultGrid (Counter *counter, int &x, int &y)
 {
 	
-	// find the first (if any) counter close enough to snap to 
+	// find the first (if any) counter close enough to snap to
+	// returns true if snap found and trait doesnotstack present 
 
 	int maxDistance = 8;
 		
 	for ( auto obj = counters.begin(); obj != counters.end(); ++obj  )
 	{
-		if (x != obj->second->state.x || y != obj->second->state.y)
+		if (counter->name != obj->second->name)
 		{
 			if (abs(x - obj->second->state.x) < maxDistance && 
 				abs(y - obj->second->state.y) < maxDistance)
 			{	
+				if (counter->doesNotStack)
+					return false;
+				
+				if (obj->second->doesNotStack)
+					return false;
+				
 				x = obj->second->state.x;
 				y = obj->second->state.y;
-				return;
+				
+				return true;
 			}
 		}
 	}
+	
+	return true;
+}
+
+
+
+void Counter::toggleSelect(const char *name)
+{
+	
+	Counter *counter = findObj(name);
+	
+	if (counter != nullptr)
+	{
+		counter->selected = !counter->selected;
+		counter->setImage();
+	}
+		
 }
 
 
@@ -684,6 +716,29 @@ void Counter::setImage()
 	
 	}
 	
+	
+	// visibility 
+	
+	if (state.opacity < 1.0)
+	{
+		auto itr = this->table.find("Visibility");
+		
+		if (itr != this->table.end()) 
+		
+			if (std::get<bool>(std::get<Table>((this->table)["Visibility"])["apply"]))
+			{
+				
+				QImage temp(image.size(), QImage::Format_ARGB32_Premultiplied);
+				temp.fill(Qt::transparent);
+				
+				QPainter *paint = new QPainter(&temp);
+				paint->setOpacity(this->state.opacity);
+				paint->drawImage(0, 0, image);
+				delete paint;
+				
+				image = temp;
+			}
+	}
 
 
 	// rotated

@@ -1,10 +1,5 @@
-
--- set the content of the repository window
-
-root(0)
-
 	
-	-- create repository
+-- create repository
 	
 	Repository["German/12R-51R"] = Repository:new({"German/12R-51R", "German/12R-51R_f"})
 	Repository["German/38-94"] = Repository:new({"German/38-94", "German/38-94_f"})
@@ -14,7 +9,7 @@ root(0)
 	Repository["Markers/GAS"] = Repository:new({"Markers/GAS"})
 	
 	
-	-- set traits for all counters
+-- set traits for all counters
 	
 	Repository:addTraits("German/12R-51R", German:new())
 	Repository:addTraits("German/38-94", German:new())
@@ -23,9 +18,19 @@ root(0)
 	Repository:addTraits("French/VII-40", French:new())
 	
 	Repository:addTraits("Markers/FLAME", Base:new())
-	Repository:addTraits("Markers/GAS", Base:new())		
+	Repository:addTraits("Markers/GAS", Base:new())	
+	
+	Repository:addTrait("Markers/GAS", "AreaOfEffect", AreaOfEffect:new(0.5, "red", 0.2))
+	Repository:addTrait("German/12R-51R", "Clone", Clone:new())	
+	Repository:addTrait("French/BRIGADE-3", "Select", Select:new())
+	Repository:addTrait("French/VII-40", "DoesNotStack", DoesNotStack)
+	Repository:addTrait("German/38-94", "Visibility", Visibility:new(0.3))			 	
+
+	
 		
-		
+-- set the content of the repository window
+
+root(0)		
 			
 	tabs(1)
 		tab(2, "German")

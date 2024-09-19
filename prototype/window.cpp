@@ -519,6 +519,7 @@ void Window::comboItem(int level, std::string text)
 }
 	
 	
+
 void Window::reset()
 {
 	

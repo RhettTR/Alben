@@ -15,6 +15,13 @@ class CentralFrame : public QFrame
 {
 	
 	public:
+	
+		class Button : public QPushButton
+		{
+			public:
+				Button(const QString &text, QWidget *parent);
+		};
+			
 		
 		CentralFrame(QWidget *parent, std::string name, QScrollArea *scrollArea = nullptr);
 		
@@ -23,7 +30,10 @@ class CentralFrame : public QFrame
 		QScrollArea *scrollArea;
 		
 		static std::string backgroundID;
-	
+		
+		static QScrollArea *buttonParent;
+		static void createButton(const char *id, const char *text, const char *handler, int x, int y, int w, int h);
+		static void deleteButton(const char *id);
 		
 		struct pt 
 		{

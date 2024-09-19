@@ -33,12 +33,12 @@ local function actionFlip (window, id)
 	set_counter_image(id, name)
 end
 
-local function actionRotate (window, id)
+local function actionRotate (window, id, sign)
 	if window == 'Map' then
-		Counter:rotate(id)
+		Counter:rotate(id, sign*Rotate.increment)
 		rotate_counter(id, Counter[id].Rotate.degrees)
 	else
-		Repository:rotate(id)
+		Repository:rotate(id, sign*Rotate.increment)
 		rotate_counter(id, Repository[id].Rotate.degrees)
 	end
 end
@@ -52,6 +52,23 @@ local function actionMoved (window, id)
 	end
 end
 
+local function actionClone (window, id)
+	if window == 'Map' then
+		if Counter[id].Clone ~= nil then
+			toId = next_id()
+			zorder = top_zorder()
+			cloneCounter(id, toId, zorder)
+		end
+	end
+end
+
+local function actionSelect (window, id)
+	if window == 'Map' then
+		if Counter[id].Select ~= nil then
+			Counter:select(id)
+		end
+	end
+end
 
 
 function action(window, id, action)
@@ -68,11 +85,20 @@ function action(window, id, action)
 	if action == 'actionFlip' then
 		actionFlip(window, id)
 	end	
-	if action == 'actionRotate' then
-		actionRotate(window, id)
+	if action == 'actionRotateCw' then
+		actionRotate(window, id, 1)
+	end	
+	if action == 'actionRotateCcw' then
+		actionRotate(window, id, -1)
 	end	
 	if action == 'actionMoved' then
 		actionMoved(window, id)
+	end
+	if action == 'actionClone' then
+		actionClone(window, id)
+	end 
+	if action == 'actionSelect' then
+		actionSelect(window, id)
 	end 
 	
 end
@@ -179,7 +205,8 @@ local Repository = repository()
 
 -- set rotate degrees for counters
 
-BaseRotate.increment = 45
+Rotate.increment = 45
+
 
 
 
@@ -189,7 +216,12 @@ BaseRotate.increment = 45
 
 function copyCounter(fromId, toId, zorder, x, y)
 	local images, imageIndex = Image:getImages(fromId)	
-	Counter[toId] = Counter:new(toId, images, imageIndex, zorder, x, y)
+	Counter[toId] = Counter:new(images, imageIndex, zorder, x, y)
+	create_class_copy(Counter, toId)
+end
+
+function cloneCounter(fromId, toId, zorder)
+	Counter[toId] = Counter:clone(fromId, zorder)
 	create_class_copy(Counter, toId)
 end
 
@@ -198,6 +230,12 @@ function setCounter(id, table)
 	create_class_copy(Counter, id)
 end
 
+function updatePos(id, x, y)
+	Counter[id]["x"] = x
+	Counter[id]["y"] = y
+end
+
+
 
 
 
@@ -205,22 +243,72 @@ end
 
 function beforeDrag(id)
 
-	local counter
+	--local counter
 	
-	if Counter[id] ~= nil then
+	--if Counter[id] ~= nil then
+	--	counter = Counter[id]
+	--else
+	--	counter = Repository[id]
+	--end
+	
+	--if counter["Side"] == PlayerSide or counter["Side"] == "" then
+		return true
+	--else
+	--	return false
+	--end
+	
+end
+
+function afterDrag(id, x, y)
+	
+ 	local counter
+ 		
+ 	if Counter[id] ~= nil then
 		counter = Counter[id]
 	else
 		counter = Repository[id]
 	end
 	
-	if counter["Side"] == PlayerSide or counter["Side"] == "" then
-		return true
-	else
-		return false
+	
+	local maxDistance = 8;
+		
+	for k, v in pairs(Counter) do
+	
+		if type(k) == "string" and k ~= '__index' and type(v) ~= 'function' then
+	
+			if k ~= id then
+				
+				if math.abs(v["x"] - x) < maxDistance and math.abs(v["y"] - y) < maxDistance then
+				   				
+					if counter["DoesNotStack"] ~= nil then
+						return false, x , y
+					end
+					if v["DoesNotStack"] ~= nil then
+						return false, x , y
+					end
+					
+					x = v["x"]
+					y = v["y"]					
+					return true, x , y
+				   
+				end 
+				  	
+			end	 
+		end	
 	end
+			
+	
+	return true, x , y
 	
 end
 
+
+
+-- handlers
+
+function handlers(id, func)
+	_G[func](id)	
+end
 
 
 
@@ -230,8 +318,43 @@ print(dump(Repository["German/12R-51R"]))
 
 
 
-copyCounter("French/BRIGADE-3", "1000", -1, 100, 100)
-copyCounter("German/12R-51R", "1001", -2, 200, 100)
+--copyCounter("French/BRIGADE-3", "1000", -1, 100, 100)
+--copyCounter("German/12R-51R", "1001", -2, 200, 100)
+
+--copyCounter("German/38-94", "1002", -3, 300, 100)
+--copyCounter("French/VII-40", "1003", -4, 30, 30)
+
+
+
+--local ok = beforeDrag("1002")
+--if ok then
+--	local x,y
+--	ok, x, y = afterDrag("1002", 37, 27)
+--	if ok then
+--		updatePos("1002", x, y)
+--		Counter:generateGUI()
+--	end
+--end 
+
+
+
+
+
+function buttonHandler(id)	
+	delete_button(id)
+	create_button(id, id, "buttonHandler", 200+math.random(100), 100+math.random(100), 70, 30)	
+end
+
+function buttonHandler2(id)
+	print('do something')
+end	
+
+
+--create_button("button 1", "button 1", "buttonHandler", 100, 100, 70, 30)
+--create_button("button 2", "button 2", "buttonHandler2", 200, 100, 70, 30)
+
+
+
 
 
 

@@ -19,8 +19,14 @@ extern Scale *scaled;
 
 inline static CentralFrame::Stacks stacks;   // holds the dragged counter(s)
 
+QScrollArea *CentralFrame::buttonParent;
 string CentralFrame::backgroundID;
 
+
+
+CentralFrame::Button::Button(const QString &text, QWidget *parent) : QPushButton(text, parent) {}
+	
+	
 	
 	
 CentralFrame::CentralFrame(QWidget *parent, std::string name, QScrollArea *scrollArea) : QFrame(parent)
@@ -31,6 +37,7 @@ CentralFrame::CentralFrame(QWidget *parent, std::string name, QScrollArea *scrol
 	if (name == "Map")
 	{
 		this->scrollArea = scrollArea;
+		buttonParent = this->scrollArea;
 		setAcceptDrops(true);
 	}
 	
@@ -227,34 +234,65 @@ void CentralFrame::dragMoveEvent(QDragMoveEvent *event)
 			
 		if (event->mimeData()->hasFormat("application/x-alben-counter"))
 		{	
-			int magicNumber = 64;		// distance to edge to begin scrolling
-			int increment = 8;			// the scroll amount
+					
+			// only scroll map if dragged for a minimum distance
 			
-			QPoint relativeToWindow = mapToParent(event->position().toPoint());
+			QByteArray itemData = event->mimeData()->data("application/x-alben-counter");
+			QDataStream dataStream(&itemData, QIODevice::ReadOnly);
 			
-			int width = ((QMainWindow *)this->parent())->width();
-			int height = ((QMainWindow *)this->parent())->height();
+			QPoint counterOffset, ghostOrigo;
 			
+			dataStream >> counterOffset; 
+			dataStream >> ghostOrigo;	
+			
+			int x = event->position().toPoint().x() - counterOffset.x();
+			int y = event->position().toPoint().y() - counterOffset.y();
+		
+			QPoint source(ghostOrigo);
+			QPoint target(x, y);
+			
+			int minimumMovement = 8;
+			
+			
+			if (abs(target.x() - source.x()) < minimumMovement &&
+				abs(target.y() - source.y()) < minimumMovement)
+			{
+				event->acceptProposedAction();
+				return;
+			}
+			else   	// scroll map
+			{	
+				
+				int magicNumber = 64;		// distance to edge to begin scrolling
+				int increment = 8;			// the scroll amount
+				
+				QPoint relativeToWindow = mapToParent(event->position().toPoint());
+				
+				int width = ((QMainWindow *)this->parent())->width();
+				int height = ((QMainWindow *)this->parent())->height();
+				
 												
-			if (width - relativeToWindow.x() < magicNumber)
-			{
-				scrollArea->horizontalScrollBar()->setValue(horizontalPos + increment);
+				if (width - relativeToWindow.x() < magicNumber)
+				{
+					scrollArea->horizontalScrollBar()->setValue(horizontalPos + increment);
+				}
+				else
+				if (relativeToWindow.x() < magicNumber)
+				{
+					scrollArea->horizontalScrollBar()->setValue(horizontalPos - increment);
+				}
+				else
+				if (height - relativeToWindow.y() < magicNumber)
+				{
+					scrollArea->verticalScrollBar()->setValue(verticalPos + increment);
+				}
+				else
+				if (relativeToWindow.y() < magicNumber)
+				{
+					scrollArea->verticalScrollBar()->setValue(verticalPos - increment);
+				}
 			}
-			else
-			if (relativeToWindow.x() < magicNumber)
-			{
-				scrollArea->horizontalScrollBar()->setValue(horizontalPos - increment);
-			}
-			else
-			if (height - relativeToWindow.y() < magicNumber)
-			{
-				scrollArea->verticalScrollBar()->setValue(verticalPos + increment);
-			}
-			else
-			if (relativeToWindow.y() < magicNumber)
-			{
-				scrollArea->verticalScrollBar()->setValue(verticalPos - increment);
-			}
+			
 			
 		}
 		
@@ -355,35 +393,37 @@ void CentralFrame::dropEvent(QDropEvent *event)
 			
 				for ( auto obj = stack.begin(); obj != stack.end(); ++obj )		
 				{															
-					obj->second->state.x += delta.x();
-					obj->second->state.y += delta.y();	
+					
+					int x = obj->second->state.x + delta.x();
+					int y = obj->second->state.y + delta.y();
+					
+					//bool ok = Counter::snaptoDefaultGrid (obj->second, x, y);
+					
+					//if (!ok)			// does not stack
+					if (!Luau::afterDrag(obj->second->name.c_str(), x, y))
+						continue;
+					else
+					{	
+						obj->second->state.x = x;
+						obj->second->state.y = y;
+						
+						Luau::updatePos(obj->second->name.c_str(), obj->second->state.x, obj->second->state.y);
+						
+						obj->second->state.zorder = Counter::topZorder();
+						
+												
+						Luau::doEvent("movetrigger", obj->second->name.c_str(), "", "", 0);
+						Luau::doEvent("move", obj->second->name.c_str(), "Counter", "x", obj->second->state.x);
+						Luau::doEvent("move", obj->second->name.c_str(), "Counter", "y", obj->second->state.y);
+						Luau::doEvent("move", obj->second->name.c_str(), "Counter", "zorder", obj->second->state.zorder);
+						
+						obj->second->counter->raise();	
+					}
+					
 				}
 		
 			}
 			
-			
-			// align all counters if possible and add them to undo stack
-			
-			for (auto const& [point, stack] : stacks)	
-			{
-			
-				for ( auto obj = stack.begin(); obj != stack.end(); ++obj )		
-				{	
-										
-					Counter::snaptoDefaultGrid (obj->second, obj->second->state.x, obj->second->state.y);
-					
-					obj->second->state.zorder = Counter::topZorder();
-					
-											
-					Luau::doEvent("movetrigger", obj->second->name.c_str(), "", "", 0);
-					Luau::doEvent("move", obj->second->name.c_str(), "Counter", "x", obj->second->state.x);
-					Luau::doEvent("move", obj->second->name.c_str(), "Counter", "y", obj->second->state.y);
-					Luau::doEvent("move", obj->second->name.c_str(), "Counter", "zorder", obj->second->state.zorder);
-					
-					obj->second->counter->raise();		
-				}
-				
-			}
 			
 			Luau::doEvent("end", "", "", "", 0);
 			
@@ -410,7 +450,14 @@ void CentralFrame::dropEvent(QDropEvent *event)
 			
 	
 			
-			Counter::snaptoDefaultGrid (counter, droppedX, droppedY);
+			//bool ok = Counter::snaptoDefaultGrid (counter, droppedX, droppedY);
+			
+			//if (!ok)			
+			if (!Luau::afterDrag(counter->name.c_str(), droppedX, droppedY))
+			{
+				event->acceptProposedAction();
+				return;
+			}
 			
 		
 			const char *fromId = counter->name.c_str();
@@ -727,6 +774,40 @@ QImage CentralFrame::selectedGhostImage(QRect &totalRect)
 
 
 
+std::map<const char*,CentralFrame::Button*> buttons;
+
+
+void CentralFrame::createButton(const char *id, const char *text, const char *handler, int x, int y, int w, int h)
+{
+	CentralFrame::Button *btn;
+	
+	btn = new CentralFrame::Button(text, buttonParent);
+	
+	QObject::connect(btn, &QPushButton::clicked, [=]() { Luau::handlers(id, handler); });
+	
+	
+	btn->setVisible(true);
+	
+	btn->move(x, y);
+	btn->resize(w, h);
+	
+	buttons[id] = btn;
+	
+}	
+
+
+void CentralFrame::deleteButton(const char *id)
+{
+	if (buttons.find(id) == buttons.end()) 
+		return;
+		
+	delete buttons[id];
+	buttons.erase(id);
+	
+}
+
+
+
 
 void CentralFrame::paintEvent(QPaintEvent *e)
 {
@@ -749,9 +830,10 @@ void CentralFrame::paintEvent(QPaintEvent *e)
 	painter.drawImage(0,0,image);
 	
 	int offsetAmount = Counter::stackOffset * Scale::ratio;
-
 	
 	
+	
+	// generate stacks
 	
 	for (auto obj = Counter::counters.begin(); obj != Counter::counters.end(); ++obj)
 	{
@@ -773,9 +855,58 @@ void CentralFrame::paintEvent(QPaintEvent *e)
 	}
 	
 	
-
-
 	
+	
+	// draw below counters
+	
+	for (auto const& [point, stack] : stacks)		
+		for ( auto obj = stack.begin(); obj != stack.end(); ++obj  )
+		{
+			
+			if ((obj->second->table).find("AreaOfEffect") != (obj->second->table).end())
+			{
+				
+				Counter::Table trait = std::get<Counter::Table>(obj->second->table["AreaOfEffect"]);
+				
+				if (std::get<bool>(trait["apply"]))	
+				{
+					
+					int x = obj->second->state.x + obj->second->margin;
+					int y = obj->second->state.y + obj->second->margin;
+				
+					float radius = (float)std::get<double>(trait["radius"]);
+					
+					const QPoint points[4] = {
+					QPoint(x - (int)(radius*obj->second->width), y - (int)(radius*obj->second->height)),
+					QPoint(x - (int)(radius*obj->second->width), y + (int)((1 + radius)*obj->second->height)),
+					QPoint(x + (int)((1 + radius)*obj->second->width), y + (int)((1 + radius)*obj->second->height)),
+					QPoint(x + (int)((1 + radius)*obj->second->width), y - (int)(radius*obj->second->height))
+					};
+
+					
+					string str = std::get<std::string>(trait["color"]);
+					QColor color(QString::fromStdString(str));	
+					painter.setBrush(color);
+
+					float opacity = (float)std::get<double>(trait["opacity"]);	
+					painter.setOpacity(opacity);
+					
+					painter.drawConvexPolygon(points, 4);
+
+					// reset
+					painter.setOpacity(1.0);
+					
+					// draw only once per stack
+					break;
+				}
+			}
+		}
+	
+	
+	
+	
+	
+		
 	
 	// render all "stacks" with 1 or more counters
 	

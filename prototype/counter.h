@@ -62,29 +62,6 @@ class Counter
 		};
 		
 		
-		class Mask
-		{
-			public:
-				Mask(std::string mask, int x, int y, bool apply);
-				
-				std::string mask; 
-				int x; 
-				int y; 
-				bool apply;
-		};
-		
-		class Label
-		{
-			public:
-				Label(std::string text, std::string font, int size, int x, int y, bool apply);
-				
-				std::string text; 
-				std::string font;
-				int size; 
-				int x; 
-				int y;
-				bool apply;
-		};
 		
 		
 		
@@ -112,6 +89,7 @@ class Counter
 			std::string image;		// name of current (flipped) image
 			int zorder;				// position in a stack
 			Table *overlays;		// masks & labels if any
+			float opacity;			// opacity 0.0 to 1.0 (full)
 									
 		};
 		
@@ -145,7 +123,8 @@ class Counter
 		static int nextId();
 		static int topZorder();
 		static Counter* findObj(const char *name);
-		static void snaptoDefaultGrid (Counter *counter, int &x, int &y);
+		static bool snaptoDefaultGrid (Counter *counter, int &x, int &y);
+		static void toggleSelect(const char *name);
 		
 		void setImage();
 		static void setGUI();
@@ -154,7 +133,7 @@ class Counter
 		
 		
 		State state;
-		
+		Table table;
 							     					      
 							      
 		static float alpha;
@@ -164,6 +143,7 @@ class Counter
 				
 		
 		bool selected;			// true if this counter is selected
+		bool doesNotStack;		// true if stacking is prohibited
 		
 		
 				

@@ -161,13 +161,15 @@ int main(int argc, char *argv[])
 	scaled = new Scale();
 	
 
-
+	
+	
+	
+	
     mapFrame = new CentralFrame(&window, "Map", window.scrollArea);
     mapFrame->setObjectName("centralFrame");	
 	
 	
 	window.scrollArea->setWidget(mapFrame);
-	
 	
 	
 	Overlay *overlay = new Overlay();
@@ -182,7 +184,13 @@ int main(int argc, char *argv[])
 	Overlay::openView = new Overlay::StackOpen(Overlay::overlay);
 	
 	
+	
+	
+	
+	
 	window.show();
+	
+	
 	
 	
    
@@ -193,7 +201,9 @@ int main(int argc, char *argv[])
     repositoryWindow = new Window(&window);
     repositoryWindow->setCentralWidget((QWidget *)repositoryFrame);
     
-   
+    
+	
+    
     
     
     

@@ -110,6 +110,54 @@ end
 
 
 
+AreaOfEffect = {}
+
+function AreaOfEffect:new (radius, color, opacity)
+	local o = {}
+	setmetatable(o, self)
+	self.__index = self
+	o.radius = radius
+	o.color = color
+	o.opacity = opacity
+	o.apply = true
+	return o
+end
+
+
+Clone = {}
+
+function Clone:new ()
+	local o = {}
+	setmetatable(o, self)
+	self.__index = self	
+	o.menuname = "Clone"
+	o.menuclick = "actionClone"
+	return o
+end
+
+
+Select = {}
+
+function Select:new ()
+	local o = {}
+	setmetatable(o, self)
+	self.__index = self	
+	o.menuname = "Select"
+	o.menuclick = "actionSelect"
+	return o
+end
+
+
+Visibility = {}
+
+function Visibility:new (opacity)
+	local o = {}
+	setmetatable(o, self)
+	self.__index = self	
+	o.opacity = opacity
+	o.apply = true
+	return o
+end
 
 
 MarkMoved = {}
@@ -128,13 +176,18 @@ end
 
 
 
---- since basic Rotate and Delete has the same function everywhere only one instance may exist
+--- since basic Rotate, Delete and DoesNotStack have the same function everywhere only one instance need exist
 
 
-BaseRotate = {	
-	increment = 0,
-	menuname = "Rotate",
-	menuclick = "actionRotate",
+RotateCW = {	
+	menuname = "Rotate cw",
+	menuclick = "actionRotateCw"
+}
+
+
+RotateCCW = {	
+	menuname = "Rotate ccw",
+	menuclick = "actionRotateCcw"
 }
 
 			
@@ -145,15 +198,22 @@ Delete = {
 } 
 
 
+DoesNotStack = {
+}
+
+
+
 
 --- define the rotation trait of one particular counter
 
 Rotate = {}
 
 function Rotate:new ()
-	local o = BaseRotate
+	local o = {}
 	setmetatable(o, self)
-	self.__index = self	
+	self.__index = self
+	o.rotatecw = RotateCW
+	o.rotateccw = RotateCCW
 	o.degrees = 0
 	return o
 end

@@ -292,6 +292,7 @@ extern "C" {
 	{		
 		
 		const char *id;
+		float opacity;
 		Counter::Table *overlays = nullptr;
 		const char *image;	
 		int degrees;	
@@ -309,27 +310,29 @@ extern "C" {
 			overlays = new Counter::Table();
 			
 			(*overlays) = getTable();
-			lua_pop(L, 2);	
-			image	= lua_tostring(L, -1);			
-			degrees = lua_tonumber(L, -2);	
-			moved 	= lua_toboolean(L, -3);
-			zorder	= lua_tonumber(L, -4);
-			y 		= lua_tonumber(L, -5);
-			x 		= lua_tonumber(L, -6);
-			id 		= lua_tostring(L, -7);
-			lua_pop(L, 7);			
+			lua_pop(L, 2);
+			opacity = lua_tonumber(L, -1); 
+			image	= lua_tostring(L, -2);			
+			degrees = lua_tonumber(L, -3);	
+			moved 	= lua_toboolean(L, -4);
+			zorder	= lua_tonumber(L, -5);
+			y 		= lua_tonumber(L, -6);
+			x 		= lua_tonumber(L, -7);
+			id 		= lua_tostring(L, -8);
+			lua_pop(L, 8);			
 		}
 		else
 		{
 			lua_pop(L, 2);
-			image	= lua_tostring(L, -1);	
-			degrees = lua_tonumber(L, -2);	
-			moved 	= lua_toboolean(L, -3);
-			zorder	= lua_tonumber(L, -4);
-			y 		= lua_tonumber(L, -5);
-			x 		= lua_tonumber(L, -6);
-			id 		= lua_tostring(L, -7);
-			lua_pop(L, 7);
+			opacity = lua_tonumber(L, -1); 
+			image	= lua_tostring(L, -2);	
+			degrees = lua_tonumber(L, -3);	
+			moved 	= lua_toboolean(L, -4);
+			zorder	= lua_tonumber(L, -5);
+			y 		= lua_tonumber(L, -6);
+			x 		= lua_tonumber(L, -7);
+			id 		= lua_tostring(L, -8);
+			lua_pop(L, 8);
 		}
 		
 		
@@ -343,7 +346,8 @@ extern "C" {
 			found->state.moved = moved;
 			found->state.degrees = degrees;
 			found->state.image = string(image);
-			found->state.overlays = overlays;	
+			found->state.overlays = overlays;
+			found->state.opacity = opacity;		
 		}
 		else
 			printf("error\n");
@@ -426,7 +430,57 @@ extern "C" {
 		return 0;
 	}
 	
+	static int create_button(lua_State *L)
+	{		
+		int height = lua_tonumber(L, -1);
+		int width  = lua_tonumber(L, -2);
+		int y  = lua_tonumber(L, -3);
+		int x  = lua_tonumber(L, -4);
+		const char *handler = lua_tostring(L, -5);	
+		const char *text = lua_tostring(L, -6);
+		const char *id = lua_tostring(L, -7); 	
+		lua_pop(L, 7);		
+		CentralFrame::createButton(id, text, handler, x, y, width, height);
+		
+		return 0;
+	}
 
+	static int delete_button(lua_State *L)
+	{		
+		const char *id = lua_tostring(L, -1); 	
+		lua_pop(L, 1);	
+		CentralFrame::deleteButton(id);
+		
+		return 0;
+	}
+	
+	static int top_zorder(lua_State *L)
+	{				
+		int zorder = Counter::topZorder();		
+		lua_pushnumber(L, zorder);
+		
+		return 1;
+	}
+	
+	static int next_id(lua_State *L)
+	{				
+		const char *id = std::to_string(Counter::nextId()).c_str();		
+		lua_pushstring(L, id);
+		
+		return 1;
+	}
+	
+	static int toggle_select_status(lua_State *L)
+	{		
+		const char *id = lua_tostring(L, -1); 	
+		lua_pop(L, 1);	
+		Counter::toggleSelect(id);
+		
+		return 0;
+	}
+	
+	
+	
 	
 }	// extern "C"
 
@@ -489,7 +543,9 @@ Counter::Table getTable()
 				else
 					if (lua_istable(L, -1))
 						right = getTable();
-	
+
+
+
 		
 		table[left] = right;
 		
@@ -668,6 +724,35 @@ bool Luau::beforeDrag(const char *id)
 }
 
 
+bool Luau::afterDrag(const char *id, int &x, int &y)
+{
+	lua_getglobal(L, "afterDrag");
+	lua_pushstring(L, id);
+	lua_pushnumber(L, x);
+	lua_pushnumber(L, y);
+	lua_pcall(L, 3, 3, 0);
+	
+	
+	y = (int)lua_tonumber (L, -1);
+	x = (int)lua_tonumber (L, -2);
+	int flag = lua_toboolean (L, -3);
+	
+	lua_pop(L, 3);
+	
+	return (flag != 0);
+	
+}
+
+
+void Luau::handlers(const char *id, const char *func)
+{
+	lua_getglobal(L, "handlers");
+	lua_pushstring(L, id);
+	lua_pushstring(L, func);
+	lua_pcall(L, 2, 0, 0);	
+}
+
+
 void Luau::undo()
 {
 	
@@ -699,6 +784,17 @@ void Luau::copyCounter(const char *fromId, const char *toId, int zorder, int x, 
 	lua_pushnumber(L, y);
 	lua_pcall(L, 5, 0, 0);
 	
+}
+
+
+
+void Luau::updatePos(const char *id, int x, int y)
+{
+	lua_getglobal(L, "updatePos");
+	lua_pushstring(L, id);
+	lua_pushnumber(L, x);
+	lua_pushnumber(L, y);
+	lua_pcall(L, 3, 0, 0);
 }
 
 
@@ -770,6 +866,23 @@ void Luau::startVM()
 	
 	lua_pushcfunction(L, comboitem, "comboitem");
 	lua_setglobal(L, "comboitem");
+	
+	// gui
+	
+	lua_pushcfunction(L, create_button, "create_button");
+	lua_setglobal(L, "create_button");
+	
+	lua_pushcfunction(L, delete_button, "delete_button");
+	lua_setglobal(L, "delete_button");
+	
+	lua_pushcfunction(L, top_zorder, "top_zorder");
+	lua_setglobal(L, "top_zorder");
+	
+	lua_pushcfunction(L, next_id, "next_id");
+	lua_setglobal(L, "next_id");
+	
+	lua_pushcfunction(L, toggle_select_status, "toggle_select_status");
+	lua_setglobal(L, "toggle_select_status");
 	
 	
 	

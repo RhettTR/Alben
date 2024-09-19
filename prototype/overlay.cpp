@@ -638,6 +638,7 @@ void Overlay::StackOpen::hideStack()
 
 
 
+
 Overlay::Overlay() : QFrame() 
 {
   
@@ -652,6 +653,8 @@ Overlay::Overlay() : QFrame()
 	setMask(overlayMask);
 	
 }
+
+
 
 
 	

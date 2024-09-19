@@ -29,21 +29,20 @@ end
 
 
 function Repository:flip (id)
-	---print(id)
-	local name =  Image:Repository_nextImage(id)
+	local name = Image:Repository_nextImage(id)
 	return name
 end
 
 
-function Repository:rotate (id)
+function Repository:rotate (id, increment)
 	if Repository[id].Rotate ~= nil then
-		Repository[id].Rotate.degrees = Repository:incrementDegrees(id)
+		Repository[id].Rotate.degrees = Repository:incrementDegrees(id, increment)
 	end
 end
 
 
-function Repository:incrementDegrees (id)
-	local newDegrees = Repository[id].Rotate.degrees + BaseRotate.increment;	
+function Repository:incrementDegrees (id, increment)
+	local newDegrees = Repository[id].Rotate.degrees + increment;	
 	newDegrees = math.fmod(newDegrees, 360)	
 	if newDegrees > 180 then
 		newDegrees = -(360 - newDegrees)
@@ -59,7 +58,7 @@ end
 Counter = {}
 
 
-function Counter:new (id, images, imageIndex, zorder, x, y)	
+function Counter:new (images, imageIndex, zorder, x, y)	
 	local o = Counter:duplicate(Repository[images[1]])	
 	setmetatable(o, Counter)
 	Counter.__index = Counter
@@ -67,6 +66,14 @@ function Counter:new (id, images, imageIndex, zorder, x, y)
 	o.x = x
 	o.y = y
 	o.zorder = zorder	
+	return o
+end
+
+function Counter:clone (id, zorder)	
+	local o = Counter:duplicate(Counter[id])	
+	setmetatable(o, Counter)
+	Counter.__index = Counter
+	o.zorder = zorder
 	return o
 end
 
@@ -103,8 +110,8 @@ function Counter:toggleMoved (id)
 end
 
 
-function Counter:incrementDegrees (id)
-	local newDegrees = Counter[id].Rotate.degrees + BaseRotate.increment;	
+function Counter:incrementDegrees (id, increment)
+	local newDegrees = Counter[id].Rotate.degrees + increment;	
 	newDegrees = math.fmod(newDegrees, 360)	
 	if newDegrees > 180 then
 		newDegrees = -(360 - newDegrees)
@@ -116,8 +123,8 @@ function Counter:incrementDegrees (id)
 end
 
 
-function Counter:rotate (id)	
-	Counter[id].Rotate.degrees = Counter:incrementDegrees(id);
+function Counter:rotate (id, increment)	
+	Counter[id].Rotate.degrees = Counter:incrementDegrees(id, increment);
 	State:addMove(id, "Rotate", "degrees", Counter[id].Rotate.degrees)
 	State:addStage()	
 end
@@ -131,6 +138,13 @@ function Counter:markMoved (id)
 		set_moved_status(id, true)
 	end
 end
+
+function Counter:select (id)
+	if Counter[id].Select ~= nil then	
+		toggle_select_status(id)
+	end
+end
+
 
 
 function Counter:duplicate(o)
@@ -153,10 +167,15 @@ function Counter:generateGUI()
 		if type(k) == "string" and k ~= '__index' and type(v) ~= 'function' then
 			
 			local name = Counter[k].Image.images[ Counter[k].Image.imageIndex ]
-			local degrees = 0			
+			local degrees = 0
+			local opacity = 1.0			
 			
 			if Counter[k].Rotate ~= nil then
 				degrees = Counter[k].Rotate.degrees
+			end
+			
+			if Counter[k].Visibility ~= nil then
+				opacity = Counter[k].Visibility.opacity
 			end
 			
 
@@ -167,6 +186,7 @@ function Counter:generateGUI()
 						Counter[k].MarkMoved ~= nil and Counter[k].MarkMoved.moved,
 						degrees,
 						name,
+						opacity,
 						Counter[k],
 						'Overlays')
 			
