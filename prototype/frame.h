@@ -21,7 +21,8 @@ class CentralFrame : public QFrame
 			public:
 				Button(const QString &text, QWidget *parent);
 		};
-			
+		
+		
 		
 		CentralFrame(QWidget *parent, std::string name, QScrollArea *scrollArea = nullptr);
 		
@@ -29,11 +30,19 @@ class CentralFrame : public QFrame
 		
 		QScrollArea *scrollArea;
 		
+		bool anySelected(Counter *counter, Counter *&selected);
+		void toggleOpenStack(Counter *counter, int sign);
+		void closeAllOpenStacks();
+		void selectCounter(Counter *counter);	
+		
 		static std::string backgroundID;
+		static bool openStackoffset;
+		
 		
 		static QScrollArea *buttonParent;
 		static void createButton(const char *id, const char *text, const char *handler, int x, int y, int w, int h);
 		static void deleteButton(const char *id);
+		
 		
 		struct pt 
 		{
@@ -64,23 +73,26 @@ class CentralFrame : public QFrame
 		typedef struct std::map<int, Counter *> Stack;
 		typedef struct std::map<Point, Stack> Stacks;
 			
-				
+		
+		
+			
 	protected:
 	
 		virtual void mousePressEvent(QMouseEvent *event);
 		virtual void dragEnterEvent(QDragEnterEvent *event);
 		virtual void dropEvent(QDropEvent *event);
-		virtual void dragMoveEvent(QDragMoveEvent *event);
-		
+		virtual void dragMoveEvent(QDragMoveEvent *event);		
 		virtual void paintEvent (QPaintEvent *e);
+		
 		
 	private:
 		
-		void stackSelect(Counter *counter);
-		bool anySelected(Counter *counter);
+		std::map<Point, int> stackOpen;		// int is sign for offset
+		void selectStack(Counter *counter);			
 		void unselect();
 		QImage stackGhostImage(Counter *counter, QRect &totalRect);
 		QImage selectedGhostImage(QRect &totalRect);
+		
 		
 };
 

@@ -24,7 +24,7 @@
 	Repository:addTrait("German/12R-51R", "Clone", Clone:new())	
 	Repository:addTrait("French/BRIGADE-3", "Select", Select:new())
 	Repository:addTrait("French/VII-40", "DoesNotStack", DoesNotStack)
-	Repository:addTrait("German/38-94", "Visibility", Visibility:new(0.3))			 	
+	--Repository:addTrait("German/38-94", "Visibility", Visibility:new(0.3))			 	
 
 	
 		

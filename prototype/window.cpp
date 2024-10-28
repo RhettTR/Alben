@@ -183,7 +183,10 @@ Window::Pane* Window::getParent()
 	
 	
 	if ((*pane)->layout() == nullptr)
+	{
 		(*pane)->setLayout(new Overlay::FlowLayout(*pane));
+		(*pane)->layout()->setContentsMargins(0, 0, 0, 0);
+	}
 
 
 	return *pane;

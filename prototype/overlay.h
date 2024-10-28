@@ -98,13 +98,18 @@ class Overlay : public QFrame
 		
 		
 			
-		Overlay();
+		Overlay(QWidget *parent, QScrollArea *scrollArea);
+		
+		QScrollArea *scrollArea;
+		
+		void setMasks();
 		
 		static Overlay *overlay;
 		
 		QRegion overlayMask;
 		
 		static int border;
+		
 		
 		
 		static Overlay::StackFrame *hooverView;

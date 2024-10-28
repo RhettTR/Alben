@@ -99,7 +99,10 @@ function action(window, id, action)
 	end 
 	if action == 'actionSelect' then
 		actionSelect(window, id)
-	end 
+	end
+	if action == 'actionEnd' then
+		State:addStage()
+	end  
 	
 end
 
@@ -313,7 +316,7 @@ end
 
 
 
-print(dump(Repository["German/12R-51R"]))
+--print(dump(Repository["German/12R-51R"]))
 
 
 

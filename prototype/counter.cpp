@@ -28,7 +28,7 @@ map<string, Counter::SystemMask *> Counter::masks;
 
 float Counter::alpha = 1.0;
 
-bool Counter::haveOffset = true;
+bool Counter::haveOffset = true;	// true = unopened stack has offset
 int Counter::stackOffset = 5;
 
 
@@ -75,64 +75,109 @@ Counter::QtCounter::~QtCounter()
 }
 
  
+ 
+ 
+void Counter::QtCounter::showRightClickMenu(QtCounter *counter)
+{
+	
+	QMenu MyMenu(counter);
+		
+	if (counter->actions().isEmpty())
+	{
+		popupentries.clear();
+	
+		QByteArray ba = 
+			QString::fromStdString(((CentralFrame *)counter->owner->parentFrame)->name).toLocal8Bit();
+		const char *window = ba.data();
+		
+		popupentries = Luau::getTraits(window, counter->owner->name.c_str());
+		
+
+	
+		for (auto e : popupentries)
+		{
+			 
+			const QString name = QString::fromStdString(e.entryname);
+			
+			QAction* action = new QAction(name, counter);
+			
+			QVariant v = QVariant(QString(e.entryaction));
+			action->setData(v);
+			
+			if (strcmp(window, "Repository") == 0 && 
+			   (e.entryname == "Delete" || e.entryname == "Moved"))
+				action->setEnabled(false);
+			
+			//action->setShortcut(QKeySequence("Ctrl+D"));
+		   
+			counter->addAction(action);
+			
+			QObject::connect( action, &QAction::triggered, counter, [=]()->void{ do_activate(action); } );
+			
+		}
+	}
+	
+	MyMenu.addActions(counter->actions());
+	
+	MyMenu.exec(QCursor::pos());
+	
+}
+
 
 void Counter::QtCounter::mousePressEvent (QMouseEvent * e) 
 {
 	
-	if (e->button() == Qt::RightButton)
+	if (this->owner->disabled)
 	{
-
-		
-		QMenu MyMenu(this);
-		
-		if (this->actions().isEmpty())
-		{
-			popupentries.clear();
-		
-			QByteArray ba = QString::fromStdString(this->owner->parentFrame->name).toLocal8Bit();
-			const char *window = ba.data();
-			
-			popupentries = Luau::getTraits(window, this->owner->name.c_str());
-			
-			
-			
-		
-			for (auto e : popupentries)
-			{
-				 
-				const QString name = QString::fromStdString(e.entryname);
-				
-				QAction* action = new QAction(name, this);
-				
-				QVariant v = QVariant(QString(e.entryaction));
-				action->setData(v);
-				
-				if (strcmp(window, "Repository") == 0 && 
-				   (e.entryname == "Delete" || e.entryname == "Moved"))
-					action->setEnabled(false);
-				
-				//action->setShortcut(QKeySequence("Ctrl+D"));
-			   
-				this->addAction(action);
-				
-				QObject::connect( action, &QAction::triggered, this, [=]()->void{ do_activate(action); } );
-				
-			}
-		}
-		
-		MyMenu.addActions(this->actions());
-		
-		MyMenu.exec(QCursor::pos());
+		e->ignore();
+		return;
 	}
 	
-	else 
-	
+
+		
+	if (e->button() == Qt::RightButton)
+	{
+		
+		if (QApplication::keyboardModifiers() == Qt::ControlModifier)
+		{
+			if (CentralFrame::openStackoffset)
+				((CentralFrame *)this->parent())->toggleOpenStack(this->owner, -1);
+		}
+		else
+		{
+		
+			Counter *selected;
+			
+			if (this->owner->parentFrame->anySelected(this->owner, selected))
+				selected->counter->showRightClickMenu(selected->counter);
+			else
+				showRightClickMenu(this);
+				
+		}
+	}
+	else 	
 		e->ignore();
 		
-	
-	
-	
 }
+
+
+void Counter::QtCounter::mouseDoubleClickEvent(QMouseEvent *e)
+{
+	if (CentralFrame::openStackoffset)
+	{	
+		((CentralFrame *)this->parent())->selectCounter(this->owner);						
+		((CentralFrame *)this->parent())->toggleOpenStack(this->owner, 1);
+	}
+	else
+	{
+		((CentralFrame *)this->parent())->selectCounter(this->owner);
+		QPoint pos = e->position().toPoint() + this->pos();		
+		Overlay::openView->open(this->owner, pos);
+	}
+}
+
+
+
 
 
 
@@ -144,6 +189,9 @@ void Counter::QtCounter::hooverAction()
 		return;
 		
 	if (QApplication::keyboardModifiers() == Qt::ControlModifier)
+		return;
+		
+	if (QApplication::keyboardModifiers() == Qt::ShiftModifier)
 		return;
 		
 
@@ -212,7 +260,6 @@ void Counter::QtCounter::hooverAction()
 	
 	
 	QPoint pnt = this->popupPoint + this->pos();
-	pnt = this->owner->parentFrame->mapToParent(pnt);
 	
 	Overlay::hooverView->moveThis(pnt, 
 								  box + Overlay::border + size.width(), 
@@ -220,9 +267,8 @@ void Counter::QtCounter::hooverAction()
 	
 	
 	Overlay::hooverView->setVisible(true);
-	Overlay::overlay->repaint();
+	Overlay::overlay->setMasks();	
 	
-
 	
 }
 
@@ -230,12 +276,12 @@ void Counter::QtCounter::hooverAction()
 
 void Counter::QtCounter::mouseMoveEvent (QMouseEvent * e)
 {
-	if (this->owner->parentFrame->name == "Map")
+	if (((CentralFrame *)this->owner->parentFrame)->name == "Map")
 	{	
 		Overlay::hooverView->setVisible(false);
-		Overlay::overlay->repaint();
+		Overlay::overlay->setMasks();
 		popupPoint = e->position().toPoint();		
-		timer->start(700);
+		timer->start(1000);
 	}
 }
 
@@ -243,10 +289,10 @@ void Counter::QtCounter::mouseMoveEvent (QMouseEvent * e)
 
 void Counter::QtCounter::leaveEvent (QEvent *e)
 {	
-	if (this->owner->parentFrame->name == "Map")
+	if (((CentralFrame *)this->owner->parentFrame)->name == "Map")
 	{	
 		Overlay::hooverView->setVisible(false);
-		Overlay::overlay->repaint();	
+		Overlay::overlay->setMasks();	
 		timer->stop();
 	}
 }
@@ -261,9 +307,58 @@ void Counter::QtCounter::do_activate (QAction *action)
 	QString str = (QString) v.value<QString>();
 	QByteArray ba = str.toLocal8Bit();
 	const char *entryaction = ba.data();
-	QByteArray bb = QString::fromStdString(this->owner->parentFrame->name).toLocal8Bit();
-	const char *window = bb.data();			
-	Luau::doAction(window, this->owner->name.c_str(), entryaction);			
+	QByteArray bb = QString::fromStdString(((CentralFrame *)this->owner->parentFrame)->name).toLocal8Bit();
+	const char *window = bb.data();
+
+	
+	CentralFrame::Stacks stacks;
+
+
+	
+	if (this->owner->selected && (strcmp(entryaction, "actionSelect") != 0))	// select is always individual
+	{
+		// generate stacks of selected
+		
+		for (auto obj = counters.begin(); obj != counters.end(); ++obj)
+		{
+			if (obj->second->selected == true)
+			{
+				CentralFrame::Point p = (CentralFrame::Point){.x = obj->second->state.x, .y = obj->second->state.y};
+				
+				if (stacks.find( p ) == stacks.end()) 
+				{
+					// not found
+					CentralFrame::Stack stack = {{obj->second->state.zorder, obj->second}};
+					stacks[p] = stack;
+				} 
+				else 
+				{
+					// found			
+					CentralFrame::Stack stack = stacks.at( p );
+					stack[obj->second->state.zorder] = obj->second;
+					stacks[p] = stack;
+				}
+			}	
+		}
+	
+	
+		// do action on all selected
+		
+		for (auto const& [point, stack] : stacks)	
+			for ( auto obj = stack.begin(); obj != stack.end(); ++obj )
+				Luau::doAction(window, obj->second->name.c_str(), entryaction);
+				
+		Luau::doAction("", "", "actionEnd");
+		
+	}
+	else	
+	{	
+		// else do action on unselected this
+				
+		Luau::doAction(window, this->owner->name.c_str(), entryaction);
+		Luau::doAction("", "", "actionEnd");
+	}
+					
 }
 	
 	
@@ -332,7 +427,8 @@ Counter::Counter(Table *state)
     
 	
 	this->selected = false;
-	this->doesNotStack = ((*state).find("DoesNotStack") != (*state).end());	
+	this->doesNotStack = ((*state).find("DoesNotStack") != (*state).end());
+	this->disabled = false;	
 	
 	
 	this->counter->show();
@@ -408,6 +504,7 @@ Counter::Counter(int id, Table *state)
    
 	this->selected = false;
 	this->doesNotStack = ((*state).find("DoesNotStack") != (*state).end());
+	this->disabled = false;
 	
 	
 	this->parentFrame = mapFrame;
@@ -422,6 +519,8 @@ Counter::Counter(int id, Table *state)
     
 	
 }
+
+
 
 
 
@@ -620,7 +719,7 @@ void Counter::setImage()
 		
 	// selected
 	
-	if (this->selected == true && this->parentFrame->name == "Map")
+	if (this->selected == true && ((CentralFrame *)this->parentFrame)->name == "Map")
 	{
 		
 		QPainter *paint = new QPainter(&image);
@@ -716,30 +815,6 @@ void Counter::setImage()
 	
 	}
 	
-	
-	// visibility 
-	
-	if (state.opacity < 1.0)
-	{
-		auto itr = this->table.find("Visibility");
-		
-		if (itr != this->table.end()) 
-		
-			if (std::get<bool>(std::get<Table>((this->table)["Visibility"])["apply"]))
-			{
-				
-				QImage temp(image.size(), QImage::Format_ARGB32_Premultiplied);
-				temp.fill(Qt::transparent);
-				
-				QPainter *paint = new QPainter(&temp);
-				paint->setOpacity(this->state.opacity);
-				paint->drawImage(0, 0, image);
-				delete paint;
-				
-				image = temp;
-			}
-	}
-
 
 	// rotated
 
@@ -798,18 +873,65 @@ void Counter::setImage()
 	
 	this->scaledBuffer = image.scaled( scaledSize, Qt::KeepAspectRatio, Qt::SmoothTransformation);
 		
-		
-	if (this->parentFrame->name == "Map")	
+	
+	
+	if (((CentralFrame *)this->parentFrame)->name == "Map")	
 	{	
 		this->counter->resize(scaledSize);
-		this->counter->setPixmap(QPixmap::fromImage(this->scaledBuffer));		
 		this->counter->setMask(QBitmap::fromImage(this->scaledBuffer.createAlphaMask()));
 	}
 	else	
-	{	this->counter->setMinimumSize(image.width(), image.height());
-		this->counter->setPixmap(QPixmap::fromImage(this->baseBuffer));		
+	{	this->counter->setMinimumSize(image.width(), image.height());	
 		this->counter->setMask(QBitmap::fromImage(this->baseBuffer.createAlphaMask()));
 	}
+	
+
+	
+		
+	// visibility 
+	
+	if (state.opacity < 1.0)
+	{
+		auto itr = this->table.find("Visibility");
+		
+		if (itr != this->table.end()) 
+		
+			if (std::get<bool>(std::get<Table>((this->table)["Visibility"])["apply"]))
+			{
+				
+				QImage temp1(baseBuffer.size(), QImage::Format_ARGB32_Premultiplied);
+				temp1.fill(Qt::transparent);
+				
+				QPainter *paint = new QPainter(&temp1);
+				paint->setOpacity(this->state.opacity);
+				paint->drawImage(0, 0, baseBuffer);
+				delete paint;
+				
+				baseBuffer = temp1;
+				
+				
+				QImage temp2(scaledBuffer.size(), QImage::Format_ARGB32_Premultiplied);
+				temp2.fill(Qt::transparent);
+				
+				paint = new QPainter(&temp2);
+				paint->setOpacity(this->state.opacity);
+				paint->drawImage(0, 0, scaledBuffer);
+				delete paint;
+				
+				scaledBuffer = temp2;
+			}
+	}
+
+
+
+	
+	if (((CentralFrame *)this->parentFrame)->name == "Map")	
+		this->counter->setPixmap(QPixmap::fromImage(this->scaledBuffer));		
+		
+	else
+		this->counter->setPixmap(QPixmap::fromImage(this->baseBuffer));		
+		
+	
 	
 	
 }
@@ -819,7 +941,7 @@ void Counter::setImage()
 void Counter::setGUI()
 {
 	
-	std::map<CentralFrame::Point, CentralFrame::Stack> stacks;
+	CentralFrame::Stacks stacks;
 	
 	
 	for (auto obj = counters.begin(); obj != counters.end(); ++obj)

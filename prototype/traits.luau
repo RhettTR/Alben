@@ -142,7 +142,7 @@ function Select:new ()
 	local o = {}
 	setmetatable(o, self)
 	self.__index = self	
-	o.menuname = "Select"
+	o.menuname = "Selected"
 	o.menuclick = "actionSelect"
 	return o
 end

@@ -12,7 +12,9 @@
 
 #include "luau.h"
 #include "counter.h"
-#include "window.h" 
+#include "window.h"
+#include "overlay.h"
+ 
 
 
 using namespace std;
@@ -351,6 +353,8 @@ extern "C" {
 		}
 		else
 			printf("error\n");
+			
+		Overlay::overlay->repaint();
 			
 		
 		return 0;

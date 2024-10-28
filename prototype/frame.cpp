@@ -23,6 +23,11 @@ QScrollArea *CentralFrame::buttonParent;
 string CentralFrame::backgroundID;
 
 
+bool CentralFrame::openStackoffset = true;	// true = open stack with offset method
+
+
+
+
 
 CentralFrame::Button::Button(const QString &text, QWidget *parent) : QPushButton(text, parent) {}
 	
@@ -48,9 +53,11 @@ CentralFrame::CentralFrame(QWidget *parent, std::string name, QScrollArea *scrol
 		this->layout()->setSpacing(0);
 	}
 	
+	
 }
 	
-	
+
+
 				
 void CentralFrame::mousePressEvent(QMouseEvent *event)
 {
@@ -64,8 +71,7 @@ void CentralFrame::mousePressEvent(QMouseEvent *event)
 	{
 	
 		QDrag *drag = new QDrag(this);
-		drag->deleteLater();
-		
+		drag->deleteLater();		
 		
 		
 		QPoint frameCoordinates;
@@ -109,19 +115,40 @@ void CentralFrame::mousePressEvent(QMouseEvent *event)
 		}
 		else
 		{	
+			
+			if (child->owner->disabled)
+				return;
 		
 			if (!Luau::beforeDrag(child->owner->name.c_str()))
 				return;
 			
 		
 			QImage img;
-			QRect  ghostRect = QRect();
+			QRect  ghostRect = QRect();			
 			stacks.clear();
+			Counter *selected;
+			QPoint offset = QPoint();
 			
 			
-			if (anySelected(child->owner))	
+			if (anySelected(child->owner, selected))
+			{	
 				img = selectedGhostImage(ghostRect);
 				
+				int x = selected->counter->pos().x();
+				int y = selected->counter->pos().y();
+				
+				if (selected->state.degrees != 0)
+				{
+					// sets the counter coordinate for rotated counter to the standard non-rotated
+					// upper left corner coordinate of a counter
+					
+					x += std::round(((selected->scaledBuffer.width() - selected->scaledWidth) / 2) - selected->scaledMargin);
+					y += std::round(((selected->scaledBuffer.height() - selected->scaledHeight) / 2) - selected->scaledMargin);
+				}
+				offset.setX(x - child->owner->state.x);
+				offset.setY(y - child->owner->state.y);
+			
+			}
 			else
 				img = stackGhostImage(child->owner, ghostRect);
 		
@@ -140,6 +167,8 @@ void CentralFrame::mousePressEvent(QMouseEvent *event)
 		
 		
 			
+			
+			
 			QPoint counterOffset = frameCoordinates - origo - ghostRect.topLeft();
 					
 			if (this->name == "Repository")	
@@ -148,12 +177,13 @@ void CentralFrame::mousePressEvent(QMouseEvent *event)
 			
 			QPoint ghostOrigo = ghostRect.topLeft();
 			
-			
-				
-																	
+			int id = child->owner->id;
+			      
+																			
 			dataStream << counterOffset;
 			dataStream << ghostOrigo;
-			
+			dataStream << offset;
+			dataStream << id;
 
 
 			QMimeData *mimeData = new QMimeData;
@@ -164,7 +194,8 @@ void CentralFrame::mousePressEvent(QMouseEvent *event)
 			drag->setMimeData(mimeData);
 			drag->setPixmap(pix);
 			drag->setHotSpot(counterOffset);
-		
+			
+			
 		}
 		
 		
@@ -177,26 +208,52 @@ void CentralFrame::mousePressEvent(QMouseEvent *event)
 			
 			if (!child)
 			{
-				unselect();
-				Overlay::openView->setVisible(false);
+				if (!Overlay::openView->isVisible())
+					unselect();
+				Overlay::openView->hideStack();
 				Overlay::hooverView->setVisible(false);
 			}
 			else
 			{	
-			
+				Point point = (Point){.x = child->owner->state.x, .y = child->owner->state.y};		
+				
 				// add to selection if SHIFT button (right or left) is pressed
 				if (QApplication::keyboardModifiers() == Qt::ShiftModifier)
-					stackSelect(child->owner);
+				{		
+					if (stackOpen.count(point))
+					{
+						child->owner->selected = true;
+						child->owner->setImage();
+					}
+					else
+						selectStack(child->owner);
+				}
 				else
+				// CTRL button toggle open stack
 				if (QApplication::keyboardModifiers() == Qt::ControlModifier)
-					Overlay::openView->open(child->owner, event->position().toPoint());
+				{
+					if (CentralFrame::openStackoffset)
+						toggleOpenStack(child->owner, 1);
+					else
+						Overlay::openView->open(child->owner, event->position().toPoint());
+										
+				}
 				else
 				{
-					if (!anySelected(child->owner))
+					Counter *dummy;					
+					
+					if (stackOpen.count(point))
 					{
 						unselect();
-						stackSelect(child->owner);
+						child->owner->selected = true;
+						child->owner->setImage();
 					}
+					else
+						if (!anySelected(child->owner, dummy))
+						{
+							unselect();
+							selectStack(child->owner);						
+						}
 				}
 				
 			}	
@@ -243,7 +300,7 @@ void CentralFrame::dragMoveEvent(QDragMoveEvent *event)
 			QPoint counterOffset, ghostOrigo;
 			
 			dataStream >> counterOffset; 
-			dataStream >> ghostOrigo;	
+			dataStream >> ghostOrigo;
 			
 			int x = event->position().toPoint().x() - counterOffset.x();
 			int y = event->position().toPoint().y() - counterOffset.y();
@@ -266,10 +323,11 @@ void CentralFrame::dragMoveEvent(QDragMoveEvent *event)
 				int magicNumber = 64;		// distance to edge to begin scrolling
 				int increment = 8;			// the scroll amount
 				
-				QPoint relativeToWindow = mapToParent(event->position().toPoint());
+				QPoint relativeToWindow = 
+					((QWidget *)this->parent())->mapToParent(event->position().toPoint());
 				
-				int width = ((QMainWindow *)this->parent())->width();
-				int height = ((QMainWindow *)this->parent())->height();
+				int width = ((QMainWindow *)this->parent()->parent())->width();
+				int height = ((QMainWindow *)this->parent()->parent())->height();
 				
 												
 				if (width - relativeToWindow.x() < magicNumber)
@@ -306,12 +364,15 @@ void CentralFrame::dragMoveEvent(QDragMoveEvent *event)
 
 			QPoint lastPoint;
 			
-			dataStream >> lastPoint; 
+			dataStream >> lastPoint;
+			
+			int dx = horizontalPos + (lastPoint.x() - event->position().toPoint().x());
+			int dy = verticalPos + (lastPoint.y() - event->position().toPoint().y()); 
 
-			scrollArea->horizontalScrollBar()->setValue(
-				horizontalPos + (lastPoint.x() - event->position().toPoint().x()));
-			scrollArea->verticalScrollBar()->setValue(
-				verticalPos + (lastPoint.y() - event->position().toPoint().y()));
+			scrollArea->horizontalScrollBar()->setValue(dx);
+			scrollArea->verticalScrollBar()->setValue(dy);
+				
+					
 		}
 		
 	}
@@ -327,9 +388,10 @@ void CentralFrame::dragMoveEvent(QDragMoveEvent *event)
 
 
 
+
 void CentralFrame::dropEvent(QDropEvent *event)
 {
-	
+
 	
 	if (event->mimeData()->hasFormat("application/x-alben-counter")) 
 	{
@@ -338,11 +400,15 @@ void CentralFrame::dropEvent(QDropEvent *event)
 		QByteArray itemData = event->mimeData()->data("application/x-alben-counter");
 		QDataStream dataStream(&itemData, QIODevice::ReadOnly);
 
-		QPoint counterOffset, ghostOrigo;
+		QPoint counterOffset, ghostOrigo, offset;
+		
+		int id;		// id of dragged counter
 		
 		
 		dataStream >> counterOffset; 
 		dataStream >> ghostOrigo;
+		dataStream >> offset;
+		dataStream >> id;
 		
 	
 		
@@ -377,57 +443,160 @@ void CentralFrame::dropEvent(QDropEvent *event)
 			return;
 		}
 		
-			
-		
+				
 		
 		if (event->source() == this)
 		{
-					
-			QPoint delta = target - source;
 			
+			int dropX = 0;
+			int dropY = 0; 
+			int dropZorder = 0;
+			Stack dropTo;
+			
+		
+			// find if dropped on a counter
+												
+			Counter::QtCounter *drop = 
+				dynamic_cast<Counter::QtCounter*>(childAt(event->position().toPoint()));
+				
+				
+			if (drop)
+			{	
+				
+				Stack dropFrom;
+				
+				dropX = drop->owner->state.x;
+				dropY = drop->owner->state.y;				
+				dropZorder = drop->owner->state.zorder;
+				
+				// find the stack dropped from
+				
+				for (auto const& [point, stack] : stacks)						
+					if (Counter::counters[id]->state.x == stack.begin()->second->state.x &&
+						Counter::counters[id]->state.y == stack.begin()->second->state.y)
+					{
+						dropFrom = stack;
+						break;
+					}					
+			
+				
+				// find the stack dropped to
+				
+				QPoint point = QPoint(dropX, dropY);
+					   				   			
+				for ( auto obj = Counter::counters.begin(); obj != Counter::counters.end(); ++obj  )	
+				{
+					QPoint p = QPoint(obj->second->state.x, obj->second->state.y);
+						
+					if (p == point)
+						dropTo[obj->second->state.zorder] = obj->second;
+				}
+				
+				
+				// if dropTo and dropFrom is the same stack delete all dropFrom in dropTo
+				
+				for ( auto obj = dropFrom.begin(); obj != dropFrom.end(); ++obj  )
+					dropTo.erase(obj->second->state.zorder);
+				
+				
+			}
+			
+			
+	
+			
+							
 					
 			// move all counters
+			
+			QPoint delta = target - source;
+			
+			QSize map = scaled->getScaledSize(CentralFrame::backgroundID);
+		
 			
 			for (auto const& [point, stack] : stacks)	
 			{
 			
+				bool draggedStack = Counter::counters[id]->state.x == stack.begin()->second->state.x &&
+									Counter::counters[id]->state.y == stack.begin()->second->state.y;
+				
+				
 				for ( auto obj = stack.begin(); obj != stack.end(); ++obj )		
 				{															
 					
-					int x = obj->second->state.x + delta.x();
-					int y = obj->second->state.y + delta.y();
+					int x, y;
 					
-					//bool ok = Counter::snaptoDefaultGrid (obj->second, x, y);
-					
-					//if (!ok)			// does not stack
-					if (!Luau::afterDrag(obj->second->name.c_str(), x, y))
-						continue;
+					if (drop && draggedStack)
+					{
+						x = dropX;
+						y = dropY;
+					}
 					else
-					{	
-						obj->second->state.x = x;
-						obj->second->state.y = y;
+					{			
+						x = obj->second->state.x + delta.x() + offset.x();
+						y = obj->second->state.y + delta.y() + offset.y();
 						
-						Luau::updatePos(obj->second->name.c_str(), obj->second->state.x, obj->second->state.y);
-						
-						obj->second->state.zorder = Counter::topZorder();
-						
-												
-						Luau::doEvent("movetrigger", obj->second->name.c_str(), "", "", 0);
-						Luau::doEvent("move", obj->second->name.c_str(), "Counter", "x", obj->second->state.x);
-						Luau::doEvent("move", obj->second->name.c_str(), "Counter", "y", obj->second->state.y);
-						Luau::doEvent("move", obj->second->name.c_str(), "Counter", "zorder", obj->second->state.zorder);
-						
-						obj->second->counter->raise();	
 					}
 					
-				}
+					if (!Luau::afterDrag(obj->second->name.c_str(), x, y))
+						continue;
+						
+					// cant drop outside map
+					if (x < -obj->second->scaledWidth || y < -obj->second->scaledHeight || 
+						x > map.width() || y > map.height())
+						continue;	
+					
+							
+							
+					if (!(obj->second->state.x == x && obj->second->state.y == y))
+					{						
+						//stackOpen.erase((Point){.x = obj->second->state.x, .y = obj->second->state.y});
+						Luau::doEvent("movetrigger", obj->second->name.c_str(), "", "", 0);
+					}
+						
+						
+					obj->second->state.x = x;
+					obj->second->state.y = y;
+					
+					Luau::updatePos(obj->second->name.c_str(), obj->second->state.x, obj->second->state.y);			
+					
+					Luau::doEvent("move", obj->second->name.c_str(), "Counter", "x", obj->second->state.x);
+					Luau::doEvent("move", obj->second->name.c_str(), "Counter", "y", obj->second->state.y);
 		
+					
+					
+				}
+				
 			}
 			
 			
+			
+			
+			// assign new zorder to all dropped counters
+			
+			for (auto const& [point, stack] : stacks)	
+				for (auto obj = stack.begin(); obj != stack.end(); ++obj)	
+				{
+					obj->second->state.zorder = Counter::topZorder();						
+					Luau::doEvent("move", obj->second->name.c_str(), "Counter", "zorder", obj->second->state.zorder);
+					obj->second->counter->raise();
+				}
+				
+				
+			// update drop stack zorders for counters higher than dropped
+					
+			for (auto obj = dropTo.begin(); obj != dropTo.end(); ++obj)	
+				if (obj->second->state.zorder > dropZorder)
+				{
+					obj->second->state.zorder = Counter::topZorder();
+					Luau::doEvent("move", obj->second->name.c_str(), "Counter", "zorder", obj->second->state.zorder);						
+					obj->second->counter->raise();
+				}
+			
+
+
+			
 			Luau::doEvent("end", "", "", "", 0);
 			
-			repaint();
 			
 		}
 		else
@@ -449,10 +618,7 @@ void CentralFrame::dropEvent(QDropEvent *event)
 			}
 			
 	
-			
-			//bool ok = Counter::snaptoDefaultGrid (counter, droppedX, droppedY);
-			
-			//if (!ok)			
+					
 			if (!Luau::afterDrag(counter->name.c_str(), droppedX, droppedY))
 			{
 				event->acceptProposedAction();
@@ -480,9 +646,7 @@ void CentralFrame::dropEvent(QDropEvent *event)
 		
 		
 		event->acceptProposedAction();
-		
-		Overlay::overlay->repaint();
-		
+
 		
 	}
 	
@@ -518,48 +682,94 @@ void CentralFrame::dropEvent(QDropEvent *event)
 		event->ignore();
 		
 		
+		
+		
+	repaint();
+	Overlay::overlay->setMasks();	
+	Overlay::overlay->update();	
+	
+	
 				
 }
 
 
 
-void CentralFrame::stackSelect(Counter *counter)
+void CentralFrame::selectStack(Counter *counter)
 {
 	
-	QPoint point = QPoint(counter->state.x, counter->state.y);
+	Point point = {counter->state.x, counter->state.y};
 	
 	
-	for (auto obj = Counter::counters.begin(); obj !=Counter::counters.end(); ++obj)
+	for (auto obj = Counter::counters.begin(); obj != Counter::counters.end(); ++obj)
 	{
-		QPoint p = QPoint(obj->second->state.x, obj->second->state.y);
+		Point p = {obj->second->state.x, obj->second->state.y};			
 			
-		if (p == point)	
+		if (p == point)
 		{	
 			obj->second->selected = true;
 			obj->second->setImage();
-		}
-	}
+		}	
+	}	
 	
 }
 
 
-bool CentralFrame::anySelected(Counter *counter)
+void CentralFrame::selectCounter(Counter *counter)
 {
 	
-	// decide if any selected in this stack
+	Point point = {counter->state.x, counter->state.y};
+	
+	if (!stackOpen.count(point))
+	{
+		for (auto obj = Counter::counters.begin(); obj != Counter::counters.end(); ++obj)
+		{
+			Point p = {obj->second->state.x, obj->second->state.y};			
+				
+			if (p == point)
+			{	
+				obj->second->selected = false;
+				obj->second->setImage();
+			}	
+		}
+
+		counter->selected = true;
+		counter->setImage();
+	}
+		
+}
+
+
+bool CentralFrame::anySelected(Counter *counter, Counter *&selected)
+{
+	
+	// decide if any selected in this stack, returns first selected
+	
 	
 	QPoint point = QPoint(counter->state.x, counter->state.y);
 	
+	Stack stack;
 	
-	for (auto obj = Counter::counters.begin(); obj !=Counter::counters.end(); ++obj)
+	
+	// find stack of this counter
+	
+	for (auto obj = Counter::counters.begin(); obj != Counter::counters.end(); ++obj)
 	{
+		
 		QPoint p = QPoint(obj->second->state.x, obj->second->state.y);
 			
 		if (p == point)	
-		{	
-			if (obj->second->selected == true)
-				return true;
-		}
+			stack[obj->second->state.zorder] = obj->second;		
+			
+	}
+	
+	
+	for (auto obj = stack.begin(); obj != stack.end(); ++obj)
+	{		
+		if (obj->second->selected == true)
+		{
+			selected = obj->second;
+			return true;
+		}	
 	}
 	
 	return false;
@@ -577,7 +787,6 @@ void CentralFrame::unselect()
 	}
 	
 }
-
 
 
 
@@ -701,7 +910,6 @@ QImage CentralFrame::selectedGhostImage(QRect &totalRect)
 	
 	
 	
-	
 	// find size of ghost
 	
 	
@@ -725,6 +933,7 @@ QImage CentralFrame::selectedGhostImage(QRect &totalRect)
 		
 	}
 	
+
 	
 	
 	// paint ghost
@@ -804,6 +1013,26 @@ void CentralFrame::deleteButton(const char *id)
 	delete buttons[id];
 	buttons.erase(id);
 	
+}
+
+
+void CentralFrame::toggleOpenStack(Counter *counter, int sign)
+{
+	Point point = (Point){.x = counter->state.x, .y = counter->state.y};
+	
+	if (stackOpen.count(point))		
+		stackOpen.erase(point);
+	else
+		stackOpen[point] = sign;
+	
+	repaint();
+}
+
+
+void CentralFrame::closeAllOpenStacks()
+{
+	stackOpen.clear();
+	repaint();		
 }
 
 
@@ -915,20 +1144,30 @@ void CentralFrame::paintEvent(QPaintEvent *e)
 
 	
 		int offset = 0;
+		
+		
+		Counter *first = stack.begin()->second; 
+		
+		int fx = first->state.x;
+		int fy = first->state.y;
+		int openFactor = 1;		
+		
+		if (CentralFrame::openStackoffset && stackOpen.count(point))
+			openFactor = 3 * stackOpen[point]; 	// multiplied with the sign +1 or -1
+		
 			
 			
 		for ( auto obj = stack.begin(); obj != stack.end(); ++obj  )
 		{		
-			
-			int x = obj->second->state.x;
-			int y = obj->second->state.y;
-			
-			
+				
+			int x = fx;
+			int y = fy;
+
 			// offset is 0, 1, 2 ... the postion in the stack with 0 bottom
 			if (Counter::haveOffset)
 			{
-				x = x + (offsetAmount * offset);
-				y = y - (offsetAmount * offset);
+				x = x + (offsetAmount * offset * openFactor);
+				y = y - (offsetAmount * offset * openFactor);
 			}
 	
 			
@@ -950,10 +1189,12 @@ void CentralFrame::paintEvent(QPaintEvent *e)
 			source.moveCenter( dest.center() );
 			
 			obj->second->counter->move(source.topLeft());
+			
 				
 					
 		}
 		
+
 				
 	}
 	

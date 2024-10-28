@@ -30,7 +30,7 @@ Scale *scaled;
 Window *repositoryWindow;
 
 
-
+QWidget *container;
 
 
 
@@ -66,8 +66,9 @@ void redo ()
 
 void cancel ()
 {
-	Overlay::openView->setVisible(false);
+	Overlay::openView->hideStack();
 	Overlay::hooverView->setVisible(false);
+	mapFrame->closeAllOpenStacks();
 }
 
 
@@ -85,8 +86,7 @@ class MainWindow : public QMainWindow
 	protected:
 		void resizeEvent(QResizeEvent* event)
 		{
-		   QMainWindow::resizeEvent(event);	   
-		   Overlay::overlay->setFixedSize(event->size());
+		   QMainWindow::resizeEvent(event);    
 		}
 		void keyPressEvent(QKeyEvent *e)
 		{
@@ -110,7 +110,6 @@ class MainWindow : public QMainWindow
 		}
 		
 };
-
 
 
 
@@ -160,28 +159,28 @@ int main(int argc, char *argv[])
 	// scale resources
 	scaled = new Scale();
 	
-
+	
+	
+	QWidget *container = new QWidget(&window);
+	container->setAcceptDrops(true);
+		
+	window.scrollArea->setWidget(container);
+	
+	
+    mapFrame = new CentralFrame(container, "Map", window.scrollArea);
+    mapFrame->setObjectName("centralFrame");
 	
 	
 	
 	
-    mapFrame = new CentralFrame(&window, "Map", window.scrollArea);
-    mapFrame->setObjectName("centralFrame");	
-	
-	
-	window.scrollArea->setWidget(mapFrame);
-	
-	
-	Overlay *overlay = new Overlay();
-	overlay->setParent(&window);
-	overlay->setFixedSize(window.width(), window.height());
+	Overlay *overlay = new Overlay(container, window.scrollArea);
 	Overlay::overlay = overlay;
 	
 	overlay->raise();
 	
 	
-	Overlay::hooverView = new Overlay::StackFrame(Overlay::overlay);
-	Overlay::openView = new Overlay::StackOpen(Overlay::overlay);
+	Overlay::hooverView = new Overlay::StackFrame(overlay);
+	Overlay::openView = new Overlay::StackOpen(overlay);
 	
 	
 	
@@ -212,7 +211,9 @@ int main(int argc, char *argv[])
     
     
     scaled->resourceScaleRotate(CentralFrame::backgroundID);
+    container->setFixedSize(scaled->getScaledSize(CentralFrame::backgroundID));
     mapFrame->setFixedSize(scaled->getScaledSize(CentralFrame::backgroundID));
+    overlay->setFixedSize(scaled->getScaledSize(CentralFrame::backgroundID));
     scaled->coordinatesScaleRotate();	
     
       

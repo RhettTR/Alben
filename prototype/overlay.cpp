@@ -14,15 +14,11 @@ Overlay::StackFrame *Overlay::hooverView = nullptr;
 Overlay::StackOpen *Overlay::openView = nullptr;
 
 
-extern CentralFrame *mapFrame;
-
-
 
 
 
 Overlay::FlowLayout::FlowLayout(QWidget *parent) : QLayout(parent)
 {
-    setContentsMargins(0, 0, 0, 0);
     setSpacing(0);
 }
 
@@ -52,31 +48,23 @@ QSize Overlay::FlowLayout::sizeHint() const
 
 QSize Overlay::FlowLayout::minimumSize() const
 {
+	
 	if (itemList.count() == 0)
 		return QSize(0,0);
 	
 	
-  
-    
     int items = 0;
     
-    int width = 0;
-    int height = 0;
+    int maxWidth = 0;
+    int maxHeight = 0;
     
-    int lineHeight = 0;
-    
-    QRect total;
     
     
 	for (QLayoutItem *item : std::as_const(itemList)) 
 	{
           
         if (items == FlowLayout::maxColumns)
-		{ 
-			lineHeight += height;
-			
-			height = 0;
-            width = 0;   
+		{   
             items = 0;         
         }
         
@@ -84,15 +72,12 @@ QSize Overlay::FlowLayout::minimumSize() const
         
         assert(widget != nullptr);
         
+       
         
-        QRect rect(width, lineHeight, widget->width(), widget->height());
-             
-			 
-        width += widget->width();
+        maxWidth = qMax(maxWidth, widget->width());
               	
-		height = qMax(height, widget->height());
+		maxHeight = qMax(maxHeight, widget->height());
 		
-		total = total.united(rect);
 		
 		
         items++;
@@ -103,7 +88,12 @@ QSize Overlay::FlowLayout::minimumSize() const
     
     const QMargins margins = contentsMargins();
     
-    return total.size() + QSize(margins.left() + margins.right(), margins.top() + margins.bottom());
+    int w = (itemList.size() < FlowLayout::maxColumns ? itemList.size() : FlowLayout::maxColumns);
+    int h = std::ceil(itemList.size() / (float)FlowLayout::maxColumns);
+    QSize total = QSize(maxWidth * w, maxHeight * h);
+  
+  
+    return total + QSize(margins.left() + margins.right(), margins.top() + margins.bottom());
     
 }
 
@@ -168,22 +158,17 @@ int Overlay::FlowLayout::doLayout(const QRect &rect, bool measure) const
 	int height = 0;
     int totalHeight = 0;
 	
+	
 	// set multi-line layout
-	 
-	int w = rect.width();
-	int h = rect.height();
-	int n = itemList.count();
-	int incx = w / (n < FlowLayout::maxColumns? n : FlowLayout::maxColumns);	
-	int incy = h / std::ceil(n / (float)FlowLayout::maxColumns);
-	
-	
-	const QMargins margins = contentsMargins();
-	
 
+	int n = itemList.count();
+	int incx = rect.width() / (n < FlowLayout::maxColumns? n : FlowLayout::maxColumns);	
+	int incy = rect.height() / std::ceil(n / (float)FlowLayout::maxColumns);
 	
-	int x = margins.left() + incx/2;
-    int y = margins.top() + incy/2;
-    
+	
+	int x = rect.x() + incx/2;
+    int y = rect.y() + incy/2;
+      
     
     int items = 0;
     
@@ -193,24 +178,27 @@ int Overlay::FlowLayout::doLayout(const QRect &rect, bool measure) const
       
          
         if (items == FlowLayout::maxColumns)
-		{     
+		{           
+            x = rect.x() + incx/2;
+            y += incy;
+            
             totalHeight += height;
 			height = 0;
             
-            x = margins.left() + incx/2;
-            y += incy;
             items = 0;          
         }
              
-	
+		
+			
+		
 		
 		QRect current(QPoint(x - (item->sizeHint().width()/2), 
-							 y - (item->sizeHint().height()/2)),
+							 y - (item->sizeHint().height()/2)), 
 					  item->sizeHint());
 		   	   
 		      	   
 		if (!measure)
-		{			   
+		{	
 			item->setGeometry(current);
 		}
 		
@@ -225,8 +213,10 @@ int Overlay::FlowLayout::doLayout(const QRect &rect, bool measure) const
         	
     }
     
+    
+	const QMargins margins = contentsMargins(); 
    
-    return totalHeight +  margins.top() + margins.bottom(); 
+    return totalHeight + margins.top() + margins.bottom(); 
    
 }
 
@@ -247,6 +237,7 @@ Overlay::StackFrame::StackFrame(QWidget *parent) : QLabel(parent)
 	grid->setVisible(true); 
 	layout = new Overlay::FlowLayout(grid);	
 	grid->setLayout(layout);
+	grid->layout()->setContentsMargins(0, 0, 0, 0);
 			
 }
  
@@ -258,10 +249,14 @@ void Overlay::StackFrame::moveThis(QPoint hotspot, int w, int h)
 		hotspot += QPoint(0, -h);
 	else
 		hotspot += QPoint(0, -h + std::abs(hotspot.y() - h));
+	
+	
+	
+	int width = Overlay::overlay->scrollArea->horizontalScrollBar()->width();
+	int scroll = Overlay::overlay->scrollArea->horizontalScrollBar()->value();
 		
-	if (hotspot.x() + w > window()->width())
-		hotspot += QPoint(-w + std::abs(this->window()->width() - hotspot.x()), 0);
-		
+	if (hotspot.x() + w > scroll + width)
+		hotspot -= QPoint(std::abs((hotspot.x() + w) - (scroll + width)), 0);			
 	 
 	this->move(hotspot);
 	
@@ -303,6 +298,7 @@ void Overlay::StackFrame::setImages(CentralFrame::Stack stack)
 		
 	}
 	
+	((Overlay *)this->parent())->setMasks(); 
 	
 }
 
@@ -323,12 +319,15 @@ void Overlay::StackFrame::paintEvent(QPaintEvent *e)
 
 
 
+
+
+
+
+
 Overlay::StackOpen::Item::Item(StackOpen *parent) : QLabel(parent)
 {
 	this->setAttribute(Qt::WA_DeleteOnClose);
 }
-
-
 
 
 Overlay::StackOpen::StackOpen(QWidget *parent) : QFrame(parent)
@@ -346,7 +345,7 @@ Overlay::StackOpen::StackOpen(QWidget *parent) : QFrame(parent)
 	setAcceptDrops(true);
 		
 }
- 
+
  
  
 inline static Overlay::StackOpen::Item *dragged = NULL;
@@ -496,24 +495,21 @@ void Overlay::StackOpen::open(Counter *counter, QPoint pos)
 		return;
     
     if (this->isVisible())
-    {
 		this->hideStack();
-		return;	
-	}
-	
-	
-	pos = counter->parentFrame->mapToParent(pos);
-	
+		
+
+
 	this->updateImages(counter);
 	
 	
-	QSize size = Overlay::openView->layout->minimumSize();
+	QSize size = Overlay::openView->layout->minimumSize(); 
 	
 	this->resize(size);
-	
+
 		
 	this->moveThis(pos, size.width(), size.height());
-        
+	
+    ((Overlay *)this->parent())->setMasks();    
     this->showStack();
 }
 
@@ -521,18 +517,20 @@ void Overlay::StackOpen::open(Counter *counter, QPoint pos)
 
 void Overlay::StackOpen::moveThis(QPoint hotspot, int w, int h)
 {
-	
 	if (hotspot.y() - h > 0)
 		hotspot += QPoint(0, -h);
 	else
 		hotspot += QPoint(0, -h + std::abs(hotspot.y() - h));
+	
+	
+	
+	int width = Overlay::overlay->scrollArea->horizontalScrollBar()->width();
+	int scroll = Overlay::overlay->scrollArea->horizontalScrollBar()->value();
 		
-	if (hotspot.x() + w > this->window()->width())
-		hotspot += QPoint(-w + std::abs(this->window()->width() - hotspot.x()), 0);
-		
+	if (hotspot.x() + w > scroll + width)
+		hotspot -= QPoint(std::abs((hotspot.x() + w) - (scroll + width)), 0);			
 	 
 	this->move(hotspot);
-	
 }
 
 
@@ -566,7 +564,7 @@ void Overlay::StackOpen::swapWidget(int fromIndex, int toIndex)
 void Overlay::StackOpen::updateImages(Counter *counter)
 {	
 	
-	// clear layout of previous content
+	// clear layout of content
 	
 	QLayoutItem *item;
 	
@@ -590,17 +588,20 @@ void Overlay::StackOpen::updateImages(Counter *counter)
 		QPoint p = QPoint(obj->second->state.x, obj->second->state.y);
 		
 		if (p == point)
-			stack[obj->second->state.zorder] = obj->second;	
+		{
+			stack[obj->second->state.zorder] = obj->second;
+			obj->second->disabled = true;
+		}	
 	}	
 	
 		
 	// loop stack and add counter images to layout	
-	
+
 	for (auto obj = stack.begin(); obj != stack.end(); ++obj)
 	{		
 		Item *item = new Item(this);
 		item->setStyleSheet("border-style: none");
-		item->resize(obj->second->baseBuffer.width(), obj->second->baseBuffer.height());		
+		item->resize(obj->second->baseBuffer.width(), obj->second->baseBuffer.height());
 		item->setPixmap(QPixmap::fromImage(obj->second->baseBuffer));
 		item->source = obj->second;
 		
@@ -609,7 +610,8 @@ void Overlay::StackOpen::updateImages(Counter *counter)
 		layout->addItem((QLayoutItem *)listItem);
 		item->setVisible(true);	
 		
-		obj->second->counter->raise();		// this does the reorder in Qt	
+		obj->second->counter->raise();		// this does the reorder in Qt
+		
 	}
 	
 	
@@ -624,14 +626,30 @@ void Overlay::StackOpen::showStack()
 		return;
 	
 	this->setVisible(true);
-	Overlay::overlay->repaint();
+	Overlay::overlay->setMasks();
 }
 
 
 void Overlay::StackOpen::hideStack()
 {
 	this->setVisible(false);
-	Overlay::overlay->repaint();
+	
+	
+	// clear layout of content
+	
+	QLayoutItem *item;
+	
+	
+	while ((item = layout->takeAt(0)) != nullptr) 
+	{	
+		((Counter *)(((Item *)item->widget())->source))->disabled = false;
+		delete item->widget(); 
+		delete item;   
+	}
+	
+	
+	
+	Overlay::overlay->setMasks();
 }
 
 
@@ -639,7 +657,7 @@ void Overlay::StackOpen::hideStack()
 
 
 
-Overlay::Overlay() : QFrame() 
+Overlay::Overlay(QWidget *parent, QScrollArea *scrollArea) : QFrame(parent)
 {
   
 	setWindowFlags(Qt::WindowStaysOnTopHint | Qt::FramelessWindowHint);
@@ -648,6 +666,7 @@ Overlay::Overlay() : QFrame()
 	
 	setAcceptDrops(true);
 	
+	this->scrollArea = scrollArea;
 	
 	overlayMask = QRegion(0, 0, 1, 1);
 	setMask(overlayMask);
@@ -655,8 +674,84 @@ Overlay::Overlay() : QFrame()
 }
 
 
-
-
+	
+void Overlay::setMasks()
+{
+	
+	
+	clearMask();
+	
+	overlayMask = QRegion(0, 0, 1, 1);
+	
+	
+	
+	if (!Counter::haveOffset)
+	{
+		
+		CentralFrame::Stacks stacks;
+		
+			
+		
+		for (auto obj = Counter::counters.begin(); obj != Counter::counters.end(); ++obj)
+		{
+			CentralFrame::Point p = (CentralFrame::Point){.x = obj->second->state.x, .y = obj->second->state.y};
+			
+			if (stacks.find( p ) == stacks.end()) 
+			{
+				// not found
+				CentralFrame::Stack stack = {{obj->second->state.zorder, obj->second}};
+				stacks[p] = stack;
+			} 
+			else 
+			{
+				// found			
+				CentralFrame::Stack stack = stacks.at( p );
+				stack[obj->second->state.zorder] = obj->second;
+				stacks[p] = stack;
+			}	
+		}
+		
+		
+	
+		
+		for (auto const& [point, stack] : stacks)	
+		{	
+	
+			int stackSize = (int)stack.size();
+					
+			if (stackSize > 1)
+			{		
+				
+				auto *top = prev(stack.end())->second;
+				
+				QRect rectangle = QRect(top->state.x + top->margin + top->width - 8, 
+										top->state.y + 1, // margin 9
+										16, 
+										16);
+										
+				overlayMask = overlayMask.united(rectangle);
+									
+			}
+							
+		}
+	}
+	
+	
+	
+	if (openView->isVisible())
+		overlayMask = overlayMask.united(openView->geometry());
+	
+	if (hooverView->isVisible())
+		overlayMask = overlayMask.united(hooverView->geometry());
+		
+		
+		
+	setMask(overlayMask);
+		
+}	
+	
+	
+	
 	
 void Overlay::paintEvent(QPaintEvent *e)
 {
@@ -664,16 +759,16 @@ void Overlay::paintEvent(QPaintEvent *e)
 	QPainter painter(this);
 	
 	
-		
-	
-	clearMask();
-	overlayMask = QRegion(0, 0, 1, 1);
-	
 	
 	if (!Counter::haveOffset)
 	{
-		std::map<CentralFrame::Point, CentralFrame::Stack> stacks;
+		CentralFrame::Stacks stacks;
 		
+		painter.setRenderHint(QPainter::Antialiasing);
+		painter.setRenderHint(QPainter::TextAntialiasing);
+		painter.setRenderHint(QPainter::SmoothPixmapTransform);
+		
+		painter.setFont(QFont("Arial", 10, QFont::Bold));	
 		
 		for (auto obj = Counter::counters.begin(); obj != Counter::counters.end(); ++obj)
 		{
@@ -700,33 +795,25 @@ void Overlay::paintEvent(QPaintEvent *e)
 		
 		for (auto const& [point, stack] : stacks)	
 		{	
-
-			
+		
 			int stackSize = (int)stack.size();
 					
 			if (stackSize > 1)
-			{
-					
-				painter.setRenderHint(QPainter::Antialiasing);
-				painter.setRenderHint(QPainter::TextAntialiasing);
-				painter.setRenderHint(QPainter::SmoothPixmapTransform);
-					
+			{		
 				
 				auto *top = prev(stack.end())->second;
 				
 				QRect rectangle = QRect(top->state.x + top->margin + top->width - 8, 
-										top->state.y + top->margin + 8, 
+										top->state.y + 1, // margin 9
 										16, 
 										16);
 										
-				overlayMask = overlayMask.united(rectangle);
 				
-					
+									
 				painter.setPen(QPen(QColor("#000000")));
 				painter.setBrush(QBrush(Qt::black));
 				painter.drawEllipse(rectangle);				
-				
-				painter.setFont(QFont("Arial", 10, QFont::Bold));
+								
 				painter.setPen(QPen(QColor("#ffffff")));
 				QString str = QString::fromUtf8(std::to_string(stackSize).c_str());
 				painter.drawText(rectangle, Qt::AlignHCenter, str);	
@@ -738,15 +825,5 @@ void Overlay::paintEvent(QPaintEvent *e)
 	}
 	
 	
-	
-	if (openView->isVisible())
-		overlayMask = overlayMask.united(openView->geometry());
-	
-	if (hooverView->isVisible())
-		overlayMask = overlayMask.united(hooverView->geometry());
-		
-		
-		
-	setMask(overlayMask);
 	
 }

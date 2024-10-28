@@ -88,7 +88,7 @@ end
 
 function Counter:delete (id)
 	State:addMove (id, "Delete", "", 0)	
-	State:addStage()
+	--State:addStage()
 	Counter[id] = nil
 end
 
@@ -96,7 +96,7 @@ end
 function Counter:flip (id)
 	local name = Image:Counter_nextImage(id)
 	State:addMove (id, "Image", "imageIndex", Counter[id].Image.imageIndex)
-	State:addStage()
+	--State:addStage()
 	return name
 end
 
@@ -105,7 +105,7 @@ function Counter:toggleMoved (id)
 	if Counter[id].MarkMoved ~= nil then
 		Counter[id].MarkMoved.moved = not Counter[id].MarkMoved.moved	
 		State:addMove(id, "MarkMoved", "moved", Counter[id].MarkMoved.moved)
-		State:addStage()
+		--State:addStage()
 	end	
 end
 
@@ -126,7 +126,7 @@ end
 function Counter:rotate (id, increment)	
 	Counter[id].Rotate.degrees = Counter:incrementDegrees(id, increment);
 	State:addMove(id, "Rotate", "degrees", Counter[id].Rotate.degrees)
-	State:addStage()	
+	--State:addStage()	
 end
 
 

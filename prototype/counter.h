@@ -36,11 +36,13 @@ class Counter
 				QtCounter(Counter *owner, QFrame *parent);
 				~QtCounter();
 				QTimer *timer;
+				void showRightClickMenu(QtCounter *counter);
 				
 			protected:
 				virtual void mousePressEvent (QMouseEvent *e);
-				virtual void mouseMoveEvent (QMouseEvent *e);				
+				virtual void mouseMoveEvent (QMouseEvent *e);
 				virtual void leaveEvent (QEvent *e);
+				virtual void mouseDoubleClickEvent (QMouseEvent *e);
 				
 			private:
 				void do_activate (QAction *action);
@@ -95,7 +97,7 @@ class Counter
 		
 		
 		Counter(Table *state);
-		Counter(int id, Table *state); 
+		Counter(int id, Table *state);
 		
 		~Counter();
 		
@@ -134,6 +136,7 @@ class Counter
 		
 		State state;
 		Table table;
+		Counter *source;		// stores the source if the counter has a copy
 							     					      
 							      
 		static float alpha;
@@ -144,6 +147,7 @@ class Counter
 		
 		bool selected;			// true if this counter is selected
 		bool doesNotStack;		// true if stacking is prohibited
+		bool disabled;			// true prevent selection, moving and right-click
 		
 		
 				
