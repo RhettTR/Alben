@@ -127,6 +127,7 @@ class Counter
 		static Counter* findObj(const char *name);
 		static bool snaptoDefaultGrid (Counter *counter, int &x, int &y);
 		static void toggleSelect(const char *name);
+		static void clearMoved();
 		
 		void setImage();
 		static void setGUI();
@@ -142,6 +143,7 @@ class Counter
 		static float alpha;
 		static bool  haveOffset;
 		static int   stackOffset;
+		static QString selectionColor;
 		
 				
 		

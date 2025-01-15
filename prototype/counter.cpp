@@ -30,6 +30,7 @@ float Counter::alpha = 1.0;
 
 bool Counter::haveOffset = true;	// true = unopened stack has offset
 int Counter::stackOffset = 5;
+QString Counter::selectionColor = QString("#bc145e");
 
 
 
@@ -165,7 +166,7 @@ void Counter::QtCounter::mouseDoubleClickEvent(QMouseEvent *e)
 {
 	if (CentralFrame::openStackoffset)
 	{	
-		((CentralFrame *)this->parent())->selectCounter(this->owner);						
+		//((CentralFrame *)this->parent())->selectCounter(this->owner);						
 		((CentralFrame *)this->parent())->toggleOpenStack(this->owner, 1);
 	}
 	else
@@ -210,28 +211,38 @@ void Counter::QtCounter::hooverAction()
 	}
 	
 	
-	
-	
-	int cellWidth = stack.begin()->second->width;
-	int cellHeight = stack.begin()->second->height;
-
+	Counter *counter = stack.begin()->second;
 	
 	QImage baseImage = scaled->getScaledImage(CentralFrame::backgroundID);
 	
-	int centerX = this->owner->state.x + (int)(cellWidth / 2);
-	int centerY = this->owner->state.y + (int)(cellHeight / 2);
-
-	int imageSize = cellHeight + 2*Overlay::border;
 	
-	QImage background = baseImage.copy(centerX - (int)(imageSize / 2), centerY - (int)(imageSize / 2), 
-									   imageSize, imageSize);
+	
+	QRect source(0, 
+				 0, 
+				 counter->scaledBuffer.width(), 
+				 counter->scaledBuffer.height());
+					
+	QRect dest(counter->state.x,
+			   counter->state.y,
+			   counter->scaledWidth + 2*counter->scaledMargin,					   
+			   counter->scaledHeight + 2*counter->scaledMargin);						   			
+				  
+	source.moveCenter( dest.center() );
+	
+
+	CentralFrame::Point trans = 
+		scaled->getScaleRotateCoordinate(counter, source.topLeft().x(), source.topLeft().y());
+	
+	
+	QImage background = baseImage.copy(trans.x, trans.y, source.width(), source.height());
+
 
 	Overlay::hooverView->setImage(background);
 	
 	
 	
 	
-	int box = imageSize + 2*Overlay::border;
+	int box = source.height() + 2*Overlay::border;
 	
 	Overlay::hooverView->grid->move(box, 2);
 	
@@ -651,6 +662,22 @@ void Counter::toggleSelect(const char *name)
 
 
 
+void Counter::clearMoved()
+{
+	bool atLeastOne = false;
+	
+	for (auto obj = counters.begin(); obj != counters.end(); ++obj)
+		if (obj->second->state.moved)
+		{		
+			Luau::updateMoved(obj->second->name.c_str(), false);
+			atLeastOne = true;
+		}
+	
+	if (atLeastOne)
+		Luau::doEvent("end", "", "", "", 0);	
+}
+
+
 
 void Counter::setImage()
 {
@@ -668,13 +695,20 @@ void Counter::setImage()
 	
 	// rotated
 	
-	if (this->state.degrees != 0)
+	
+	int degrees = this->state.degrees;
+	
+	
+	if (degrees != 0 || (Scale::rotation != 0 && CentralFrame::facingMatters))
 	{
 	
-		// compute size of rotated image
+		// compute size of rotated image	
+		
+		if (Scale::rotation != 0 && CentralFrame::facingMatters)
+			degrees = degrees + Scale::rotation;
 		
 		
-		float rad = (abs(this->state.degrees) % 90) * (M_PI/180);		
+		float rad = (abs(degrees) % 90) * (M_PI/180);		
 		float sine = sin(rad);
 		float cosine = cos(rad);
 		
@@ -688,7 +722,6 @@ void Counter::setImage()
 		
 				
 	}
-
 
 
 	this->counter->resize(w, h);
@@ -723,7 +756,7 @@ void Counter::setImage()
 	{
 		
 		QPainter *paint = new QPainter(&image);
-		QPen pen = QPen(QColor(Qt::red));
+		QPen pen = QPen(QColor::fromString(Counter::selectionColor));
 		pen.setWidth(3);
 		pen.setCapStyle(Qt::SquareCap);
 		paint->setPen(pen);
@@ -818,11 +851,9 @@ void Counter::setImage()
 
 	// rotated
 
-	if (state.degrees != 0)
+	if (degrees != 0)
 	{
 				
-		qreal degrees = (qreal)state.degrees;
-		
 		
 		QImage base = QImage (this->counter->width(), this->counter->height(), QImage::Format_ARGB32_Premultiplied);
 		
@@ -837,7 +868,7 @@ void Counter::setImage()
 		
 		QTransform transform;
 		transform.translate(image.width()/2, image.height()/2);
-		transform.rotate(degrees);
+		transform.rotate((qreal)degrees);
 		transform.translate(-(margin+width/2), -(margin+height/2));
 		
 		
@@ -864,12 +895,12 @@ void Counter::setImage()
 
 	
 	
-	this->scaledWidth = this->width * Scale::ratio;
-	this->scaledHeight = this->height * Scale::ratio;
-	this->scaledMargin = this->margin * Scale::ratio;
+	this->scaledWidth = this->width * Scale::scaleFraction;
+	this->scaledHeight = this->height * Scale::scaleFraction;
+	this->scaledMargin = this->margin * Scale::scaleFraction;
 	
 	
-	QSize scaledSize(image.width() * Scale::ratio, image.height() * Scale::ratio);
+	QSize scaledSize(image.width() * Scale::scaleFraction, image.height() * Scale::scaleFraction);
 	
 	this->scaledBuffer = image.scaled( scaledSize, Qt::KeepAspectRatio, Qt::SmoothTransformation);
 		

@@ -158,16 +158,13 @@ end
 
 
 function events(event, id, trait, key, value)
-
-	--print('doing '..event..' on '..id)
 	
-	--- new move, delete next moves on stack
+	-- new move, delete next moves on stack
 	State:deleteNextStages()
-	
 	
 	 
 	if event == 'movetrigger' then
-		--- find key 'movetrigger' for counter 'id' and call its function	
+		-- find key 'movetrigger' for counter 'id' and call its function	
 		local traits = getTraits("Map", id)
 		triggerEvent(id, traits, event)		
 	end
@@ -218,7 +215,7 @@ Rotate.increment = 45
 -- create Luau and C++ counter
 
 function copyCounter(fromId, toId, zorder, x, y)
-	local images, imageIndex = Image:getImages(fromId)	
+	local images, imageIndex = Image:getImages(fromId)
 	Counter[toId] = Counter:new(images, imageIndex, zorder, x, y)
 	create_class_copy(Counter, toId)
 end
@@ -238,6 +235,9 @@ function updatePos(id, x, y)
 	Counter[id]["y"] = y
 end
 
+function updateMoved(id, moved)
+	Counter:markMoved (id, moved)
+end
 
 
 

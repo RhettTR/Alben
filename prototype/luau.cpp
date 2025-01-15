@@ -14,6 +14,7 @@
 #include "counter.h"
 #include "window.h"
 #include "overlay.h"
+#include "toolbar.h"
  
 
 
@@ -31,6 +32,7 @@ typedef struct std::vector<aScript> Scripts;
 
 
 extern CentralFrame *mapFrame;
+extern ToolBar *mainToolBar;
 
 
 
@@ -483,6 +485,24 @@ extern "C" {
 		return 0;
 	}
 	
+	static int toolbar_enable(lua_State *L)
+	{		
+		const char *id = lua_tostring(L, -1); 	
+		lua_pop(L, 1);	
+		mainToolBar->enable(id);
+		
+		return 0;
+	}
+	
+	static int toolbar_disable(lua_State *L)
+	{		
+		const char *id = lua_tostring(L, -1); 	
+		lua_pop(L, 1);	
+		mainToolBar->disable(id);
+		
+		return 0;
+	}
+	
 	
 	
 	
@@ -802,6 +822,15 @@ void Luau::updatePos(const char *id, int x, int y)
 }
 
 
+void Luau::updateMoved(const char *id, bool moved)
+{
+	lua_getglobal(L, "updateMoved");
+	lua_pushstring(L, id);
+	lua_pushboolean(L, (moved == true ? 1 : 0));
+	lua_pcall(L, 2, 0, 0);
+}
+
+
 
 void Luau::startVM()
 {
@@ -888,7 +917,13 @@ void Luau::startVM()
 	lua_pushcfunction(L, toggle_select_status, "toggle_select_status");
 	lua_setglobal(L, "toggle_select_status");
 	
+	// toolbar
 	
+	lua_pushcfunction(L, toolbar_enable, "toolbar_enable");
+	lua_setglobal(L, "toolbar_enable");
+	
+	lua_pushcfunction(L, toolbar_disable, "toolbar_disable");
+	lua_setglobal(L, "toolbar_disable");
 	
 	
 	lua_getglobal(L, "module");

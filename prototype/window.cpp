@@ -143,7 +143,7 @@ Window::Window(QWidget *parent) : QMainWindow(parent, Qt::Window | Qt::WindowMin
 	this->setPalette(palette);	
 	setAutoFillBackground(true);
 	
-    this->move(100, 100);
+    this->move(70, 100);
     this->resize(400, 250); 
     repositoryFrame->resize(400, 250);  
     

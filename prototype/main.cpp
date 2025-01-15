@@ -12,6 +12,9 @@
 #include "overlay.h"
 #include "window.h"
 #include "io.h"
+#include "toolbar.h"
+#include "settings.h"
+
 
 
 
@@ -20,13 +23,14 @@
 Luau l;
 
 
-
 CentralFrame *mapFrame;
 CentralFrame *repositoryFrame;
 IO *io;
 Scale *scaled;
+ToolBar *mainToolBar;
 
-
+class MainWindow;
+MainWindow *window;
 Window *repositoryWindow;
 
 
@@ -63,6 +67,16 @@ void redo ()
 	Luau::redo();
 }
 
+void clearMoved ()
+{
+	Counter::clearMoved();
+}
+
+void settings () 
+{
+	Settings *dialog = new Settings((QWidget *)window);
+	dialog->show();
+}
 
 void cancel ()
 {
@@ -83,11 +97,8 @@ class MainWindow : public QMainWindow
 			setCentralWidget(scrollArea);
 		}
 		
+		
 	protected:
-		void resizeEvent(QResizeEvent* event)
-		{
-		   QMainWindow::resizeEvent(event);    
-		}
 		void keyPressEvent(QKeyEvent *e)
 		{
 			if (e->modifiers() == Qt::ControlModifier)
@@ -107,8 +118,7 @@ class MainWindow : public QMainWindow
 					default: break;
 				}
 			
-		}
-		
+		}		
 };
 
 
@@ -118,21 +128,21 @@ int main(int argc, char *argv[])
 {
     QApplication app(argc, argv);
 
-    MainWindow window;
+    window = new MainWindow();
     
+
     
-    
-    window.setWindowTitle("Window");
+    window->setWindowTitle("Window");
 	
 	
-	QMenuBar *menuBar = window.menuBar();
+	QMenuBar *menuBar = window->menuBar();
 	
     menuBar->setStyleSheet("QMenuBar {background-color: gainsboro}");
     menuBar->setFixedHeight(20);
  
     
     QMenu *fileMenu = menuBar->addMenu("&File");
-       
+         
     QAction *reloadAction = new QAction("Reload");
     reloadAction->setShortcut(QKeySequence("Ctrl+R"));
     QObject::connect(reloadAction, &QAction::triggered, &reload);
@@ -149,8 +159,15 @@ int main(int argc, char *argv[])
     fileMenu->addAction(reloadAction);
     
     
-    window.move(500, 150);
-	window.resize(600, 400 + menuBar->height());
+    QMenu *editMenu = menuBar->addMenu("&Edit");
+    QAction *settingsAction = new QAction("Setti&ngs");
+    QObject::connect(settingsAction, &QAction::triggered, &settings);
+    editMenu->addAction(settingsAction);
+    
+    
+    window->move(500, 150);
+	window->resize(600, 400 + menuBar->height());
+	
 	
 	
 	// load resources
@@ -161,19 +178,19 @@ int main(int argc, char *argv[])
 	
 	
 	
-	QWidget *container = new QWidget(&window);
+	container = new QWidget(window);
 	container->setAcceptDrops(true);
 		
-	window.scrollArea->setWidget(container);
+	window->scrollArea->setWidget(container);
 	
 	
-    mapFrame = new CentralFrame(container, "Map", window.scrollArea);
+    mapFrame = new CentralFrame(container, "Map", window->scrollArea);
     mapFrame->setObjectName("centralFrame");
 	
 	
 	
 	
-	Overlay *overlay = new Overlay(container, window.scrollArea);
+	Overlay *overlay = new Overlay(container, window->scrollArea);
 	Overlay::overlay = overlay;
 	
 	overlay->raise();
@@ -183,11 +200,29 @@ int main(int argc, char *argv[])
 	Overlay::openView = new Overlay::StackOpen(overlay);
 	
 	
+	// tool bar
+	
+	mainToolBar = new ToolBar(window, window->scrollArea);
+	window->addToolBar(Qt::TopToolBarArea, mainToolBar);
+	mainToolBar->setIconSize(QSize(32, 24));
+
+	
+	mainToolBar->addImageButton("__undo", "Undo last move", &undo);
+	mainToolBar->addImageButton("__redo", "Redo next move", &redo);
+	mainToolBar->addSeparator();
+	mainToolBar->addImageButton("__pluss", "Zoom in", [=]()->void{ mainToolBar->zoomIn(); });	
+	mainToolBar->addSizeComboBox();	
+	mainToolBar->addImageButton("__minus", "Zoom out", [=]()->void{ mainToolBar->zoomOut(); });	
+	mainToolBar->enable("__pluss");
+	mainToolBar->enable("__minus");
+	mainToolBar->addSeparator();
+	mainToolBar->addImageButton("__movedicon", "Delete all moved-makers", &clearMoved);
+	mainToolBar->enable("__movedicon");
 	
 	
 	
 	
-	window.show();
+	window->show();
 	
 	
 	
@@ -197,7 +232,7 @@ int main(int argc, char *argv[])
 	
     repositoryFrame = new CentralFrame(repositoryWindow, "Repository");
     
-    repositoryWindow = new Window(&window);
+    repositoryWindow = new Window(window);
     repositoryWindow->setCentralWidget((QWidget *)repositoryFrame);
     
     
@@ -211,10 +246,7 @@ int main(int argc, char *argv[])
     
     
     scaled->resourceScaleRotate(CentralFrame::backgroundID);
-    container->setFixedSize(scaled->getScaledSize(CentralFrame::backgroundID));
-    mapFrame->setFixedSize(scaled->getScaledSize(CentralFrame::backgroundID));
-    overlay->setFixedSize(scaled->getScaledSize(CentralFrame::backgroundID));
-    scaled->coordinatesScaleRotate();	
+	
     
       
     int res = app.exec();   

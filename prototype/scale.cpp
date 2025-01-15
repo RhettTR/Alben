@@ -1,17 +1,22 @@
-//#include <math.h>
-
 #include "counter.h"
+#include "overlay.h"
 #include "scale.h"
 #include "io.h"
 
 
 extern IO *io;
+extern QWidget *container;
+extern CentralFrame *mapFrame;
+
+
+
+float Scale::scaleFraction = 1.0;
+int Scale::rotation = 0;
 
 
 
 Scale::Scale()
 {
-	
 }
 
 
@@ -27,91 +32,178 @@ QSize Scale::getScaledSize(std::string str)
 }
 
 
+void Scale::rotate(Counter *counter, int degree, int &x, int &y)
+{
+	
+	
+	float rad = degree * (M_PI/180);
+				
+	float s = sin(rad);
+	float c = cos(rad);
+
+	
+	QSize baseSize = io->getSize(CentralFrame::backgroundID);
+
+	
+	baseSize *= Scale::scaleFraction;
+	
+
+	int cx = std::round((float)baseSize.width() / 2.0);
+	int cy = std::round((float)baseSize.height() / 2.0);
+	
+	
+	
+	x = x - cx;
+	y = y - cy;
+	
+	
+	
+	x += counter->scaledBuffer.width() / 2.0;
+	y += counter->scaledBuffer.height() / 2.0;
+	
+
+	
+	
+	float nx = x * c - y * s;
+	float ny = x * s + y * c;
+	
+	
+	
+	QSize size = getScaledSize(CentralFrame::backgroundID);
+	
+	cx = std::round((float)size.width() / 2.0);
+	cy = std::round((float)size.height() / 2.0); 
+	 
+	
+	x = nx + cx;
+	y = ny + cy;
+	
+	
+	
+	x -= counter->scaledBuffer.width() / 2.0;
+	y -= counter->scaledBuffer.height() / 2.0;
+	
+	
+}
+
+
+void Scale::unrotate(Counter *counter, int degree, int &x, int &y)
+{
+	
+	
+	float rad = degree * (M_PI/180);
+				
+	float s = sin(rad);
+	float c = cos(rad);
+
+
+	
+	
+	QSize size = getScaledSize(CentralFrame::backgroundID);
+	
+			   
+	int cx = std::round((float)size.width() / 2.0);
+	int cy = std::round((float)size.height() / 2.0);
+
+	x = x - cx;
+	y = y - cy;
+	
+	
+	
+	x += counter->scaledBuffer.width() / 2.0;
+	y += counter->scaledBuffer.height() / 2.0;
+
+	
+
+	
+	float nx = x * c - y * s;
+	float ny = x * s + y * c;
+	
+	
+	QSize baseSize = io->getSize(CentralFrame::backgroundID);
+
+	
+	baseSize *= Scale::scaleFraction;
+	
+
+	cx = std::round((float)baseSize.width() / 2.0);
+	cy = std::round((float)baseSize.height() / 2.0);
+	
+	
+	
+	x = nx + cx;
+	y = ny + cy;
+	
+	
+	x -= counter->scaledBuffer.width() / 2.0;
+	y -= counter->scaledBuffer.height() / 2.0;
+	
+	
+}
+
+
+void Scale::turn(int degree, int &x, int &y)
+{
+	
+	float rad = degree * (M_PI/180);
+				
+	float s = sin(rad);
+	float c = cos(rad);
+	
+	
+	float nx = x * c - y * s;
+	float ny = x * s + y * c;
+	
+
+	
+	x = nx;
+	y = ny;
+	
+}
+
+
+CentralFrame::Point Scale::getScaleRotateCoordinate(Counter *counter, int x, int y)
+{
+	
+	CentralFrame::Point point = {x, y};
+	
+	point = point * Scale::scaleFraction;
+	
+	if (Scale::rotation != 0)
+		rotate(counter, Scale::rotation, point.x, point.y);
+		
+	
+	return point;
+}
+
 
 void Scale::resourceScaleRotate(std::string name)
 {
 	
 	QImage image = io->getImage(name);	
-	QImage scaled;
+	QImage imageScaled;
+	QPixmap overlayScaled;
 	
 	
     if (Scale::rotation != 0)
 		image = image.transformed(QTransform().rotate(Scale::rotation));
 	
 	
-	QSize size(image.width() * Scale::ratio, image.height() * Scale::ratio);
+	QSize size(std::round(image.width() * Scale::scaleFraction), 
+			   std::round(image.height() * Scale::scaleFraction));
 	
-	scaled = image.scaled( size, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+	imageScaled = image.scaled( size, Qt::KeepAspectRatio, Qt::SmoothTransformation);
 	
-	_scaledResources[name].image = scaled;
-	_scaledResources[name].size = QSize(scaled.width(), scaled.height());
-	
-}
 
-
-
-void Scale::coordinatesScaleRotate()
-{
 	
-	for (auto obj = Counter::counters.begin(); obj !=Counter::counters.end(); ++obj)
-	{
-		
-		int x = obj->second->state.x * Scale::ratio;
-		int y = obj->second->state.y * Scale::ratio;
-		
-		
-		if (Scale::rotation != 0)
-		{
-			
-			float rad = Scale::rotation * (M_PI/180);		
-			
-			
-			
-			QSize oldSize = io->getSize(CentralFrame::backgroundID);
-			
-			
-			oldSize *= Scale::ratio;
-			
-			int cx = oldSize.width() / 2.0;
-			int cy = oldSize.height() / 2.0;
-			
-			
-			x += obj->second->scaledBuffer.width() / 2.0;
-			y += obj->second->scaledBuffer.height() / 2.0;
-			
-			
-			float r = sqrt( pow(abs(cx - x), 2) + pow(abs(cy - y), 2) );
-			
-			
-			float angle = acos( (float)abs(cx - x) / r);
-			
-			
-			
-			QSize mapSize = getScaledSize(CentralFrame::backgroundID);
-			
-			cx = mapSize.width() / 2.0;
-			cy = mapSize.height() / 2.0;
-				
-			
-			angle = M_PI - (angle + rad);
-			
-			
-			
-			
-			x = cx + r * cos(angle) - (obj->second->scaledBuffer.width() / 2.0);
-			y = cy - r * sin(angle) - (obj->second->scaledBuffer.height() / 2.0);
-			
-		
-		}
-		
-		
-        obj->second->state.x = x;
-        obj->second->state.y = y;
-        
-		
-		
-	}
+	_scaledResources[name].image = imageScaled;
+	_scaledResources[name].size = QSize(imageScaled.width(), imageScaled.height());
 	
-	Counter::setGUI();
+	
+	
+	container->setFixedSize(getScaledSize(CentralFrame::backgroundID));
+	mapFrame->setFixedSize(getScaledSize(CentralFrame::backgroundID));
+	Overlay::overlay->setFixedSize(getScaledSize(CentralFrame::backgroundID));
+	
 	
 }

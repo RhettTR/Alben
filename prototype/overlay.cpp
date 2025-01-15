@@ -1,6 +1,9 @@
 #include "overlay.h"
 #include "luau.h"
+#include "scale.h"
 
+
+extern Scale *scaled;
 
 
 int Overlay::border = 9;
@@ -724,10 +727,23 @@ void Overlay::setMasks()
 				
 				auto *top = prev(stack.end())->second;
 				
-				QRect rectangle = QRect(top->state.x + top->margin + top->width - 8, 
-										top->state.y + 1, // margin 9
-										16, 
-										16);
+				
+				int x = std::round(top->state.x * Scale::scaleFraction);
+				int y = std::round(top->state.y * Scale::scaleFraction);
+				
+				
+				if (Scale::rotation != 0)
+					scaled->rotate(top, Scale::rotation, x, y);
+					
+						
+				
+				// margin is 9
+				QRect rectangle = 
+					QRect(x + top->scaledMargin + top->scaledWidth - 8, 
+						  y + 1, 
+						  16, 
+						  16);
+						  
 										
 				overlayMask = overlayMask.united(rectangle);
 									
@@ -768,7 +784,7 @@ void Overlay::paintEvent(QPaintEvent *e)
 		painter.setRenderHint(QPainter::TextAntialiasing);
 		painter.setRenderHint(QPainter::SmoothPixmapTransform);
 		
-		painter.setFont(QFont("Arial", 10, QFont::Bold));	
+			
 		
 		for (auto obj = Counter::counters.begin(); obj != Counter::counters.end(); ++obj)
 		{
@@ -793,6 +809,9 @@ void Overlay::paintEvent(QPaintEvent *e)
 		
 		// render stack size numbers
 		
+		painter.setFont(QFont("Arial", 10, QFont::Bold));
+		
+		
 		for (auto const& [point, stack] : stacks)	
 		{	
 		
@@ -803,25 +822,42 @@ void Overlay::paintEvent(QPaintEvent *e)
 				
 				auto *top = prev(stack.end())->second;
 				
-				QRect rectangle = QRect(top->state.x + top->margin + top->width - 8, 
-										top->state.y + 1, // margin 9
-										16, 
-										16);
+				
+				int x = std::round(top->state.x * Scale::scaleFraction);
+				int y = std::round(top->state.y * Scale::scaleFraction);
+				
+				
+				if (Scale::rotation != 0)
+					scaled->rotate(top, Scale::rotation, x, y);
+					
+						
+				
+				// margin is 9
+				QRect rectangle = 
+					QRect(x + top->scaledMargin + top->scaledWidth - 8, 
+						  y + 1, 
+						  16, 
+						  16);
+					
+				
 										
 				
-									
-				painter.setPen(QPen(QColor("#000000")));
+						
+				painter.setPen(Qt::NoPen);
 				painter.setBrush(QBrush(Qt::black));
 				painter.drawEllipse(rectangle);				
 								
 				painter.setPen(QPen(QColor("#ffffff")));
 				QString str = QString::fromUtf8(std::to_string(stackSize).c_str());
-				painter.drawText(rectangle, Qt::AlignHCenter, str);	
-
-			}
+				painter.drawText(rectangle, Qt::AlignHCenter, str);								
 				
+				
+				
+			}			
 					
 		}
+		
+		
 	}
 	
 	

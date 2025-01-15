@@ -25,6 +25,7 @@ class Luau
 		static void redo();
 		static void copyCounter(const char *fromId, const char *toId, int zorder, int x, int y);
 		static void updatePos(const char *id, int x, int y);
+		static void updateMoved(const char *id, bool moved);
 		
 		
 		Luau();

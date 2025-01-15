@@ -170,7 +170,7 @@ function MarkMoved:new ()
 	o.moved = false 	
 	o.menuname = "Moved"
 	o.menuclick = "actionMoved"
-	o.movetrigger = function(id) Counter:markMoved(id) end	
+	o.movetrigger = function(id) Counter:markMoved(id, true) end	
 	return o
 end
 

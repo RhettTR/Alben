@@ -37,6 +37,7 @@ class CentralFrame : public QFrame
 		
 		static std::string backgroundID;
 		static bool openStackoffset;
+		static bool facingMatters;
 		
 		
 		static QScrollArea *buttonParent;
@@ -56,6 +57,13 @@ class CentralFrame : public QFrame
 			bool operator ==(const pt &p) const
 			{
 				return (x == p.x) && (y == p.y);
+			}
+			struct pt operator *(const float &f) const
+			{
+				struct pt point;
+				point.x = std::round((float)x * f);
+				point.y = std::round((float)y * f);
+				return point;
 			}
 			friend QDataStream& operator <<(QDataStream& stream, const pt &p) 
 			{
@@ -81,8 +89,10 @@ class CentralFrame : public QFrame
 		virtual void mousePressEvent(QMouseEvent *event);
 		virtual void dragEnterEvent(QDragEnterEvent *event);
 		virtual void dropEvent(QDropEvent *event);
-		virtual void dragMoveEvent(QDragMoveEvent *event);		
+		virtual void dragMoveEvent(QDragMoveEvent *event);
+		virtual void wheelEvent(QWheelEvent *event);	
 		virtual void paintEvent (QPaintEvent *e);
+		
 		
 		
 	private:

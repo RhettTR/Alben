@@ -28,6 +28,8 @@ end
 function State:addStage ()
 	State.stagePointer = State.stagePointer + 1
 	State.stageStack[State.stagePointer] = {id = "end"}
+	
+	toolbar_enable('__undo')
 end
 
 
@@ -56,6 +58,9 @@ function State:deleteNextStages()
 	for i = start, upto do
 		State.stageStack[i] = nil
 	end
+	
+	
+	toolbar_disable('__redo')
 	
 end
 
@@ -154,8 +159,14 @@ end
 
 
 function State:undo()
+
+	
+	if #State.stageStack > 0 then
+		toolbar_enable('__redo')
+	end
 	
 	local i = State:findLastStage ()
+	
 	
 	State:reset()			-- reset Counter with saved State	
 	
@@ -164,12 +175,22 @@ function State:undo()
 	
 	Counter:generateGUI()
 	
+	
+	if i == 0 then
+		toolbar_disable('__undo')
+	end
+	
 end
 
 
 
 
 function State:redo()
+	
+	
+	if #State.stageStack > 0 then
+		toolbar_enable('__undo')
+	end
 
 	local i = State:findNextStage ()
 	
@@ -178,6 +199,11 @@ function State:redo()
 	State:executeUntil(i)	-- execute moves up to next stage
 		
 	Counter:generateGUI()
+	
+	
+	if i == #State.stageStack then
+		toolbar_disable('__redo')
+	end
 	
 end
 
