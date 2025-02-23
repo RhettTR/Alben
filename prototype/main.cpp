@@ -85,6 +85,17 @@ void cancel ()
 	mapFrame->closeAllOpenStacks();
 }
 
+void load ()
+{
+	io->loadGame();
+}
+
+void save ()
+{
+	io->saveGame();
+}
+
+
 
 
 class MainWindow : public QMainWindow
@@ -142,6 +153,15 @@ int main(int argc, char *argv[])
  
     
     QMenu *fileMenu = menuBar->addMenu("&File");
+         
+    
+    QAction *loadAction = new QAction("&Load Game...");
+    QObject::connect(loadAction, &QAction::triggered, &load);
+    fileMenu->addAction(loadAction);
+    
+    QAction *saveAction = new QAction("S&ave Game As...");
+    QObject::connect(saveAction, &QAction::triggered, &save);
+    fileMenu->addAction(saveAction);         
          
     QAction *reloadAction = new QAction("Reload");
     reloadAction->setShortcut(QKeySequence("Ctrl+R"));
@@ -219,6 +239,11 @@ int main(int argc, char *argv[])
 	mainToolBar->addImageButton("__movedicon", "Delete all moved-makers", &clearMoved);
 	mainToolBar->enable("__movedicon");
 	
+	
+	
+	// default rights table
+	
+	Settings::myOwnershipRights = {0b1, 0b1, 0b1, 0b1, 0b1, 0b1, 0b1, 0b0, 0b0};
 	
 	
 	

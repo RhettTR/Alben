@@ -33,7 +33,7 @@ class CentralFrame : public QFrame
 		bool anySelected(Counter *counter, Counter *&selected);
 		void toggleOpenStack(Counter *counter, int sign);
 		void closeAllOpenStacks();
-		void selectCounter(Counter *counter);	
+		void selectCounter(Counter *counter);
 		
 		static std::string backgroundID;
 		static bool openStackoffset;

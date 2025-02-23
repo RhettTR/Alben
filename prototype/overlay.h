@@ -102,8 +102,6 @@ class Overlay : public QFrame
 		
 		QScrollArea *scrollArea;
 		
-		void setMasks();
-		
 		static Overlay *overlay;
 		
 		QRegion overlayMask;

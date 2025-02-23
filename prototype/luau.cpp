@@ -11,7 +11,6 @@
 
 
 #include "luau.h"
-#include "counter.h"
 #include "window.h"
 #include "overlay.h"
 #include "toolbar.h"
@@ -356,7 +355,8 @@ extern "C" {
 		else
 			printf("error\n");
 			
-		Overlay::overlay->repaint();
+		// force redraw of mask layer
+		Overlay::overlay->clearMask();
 			
 		
 		return 0;
@@ -565,8 +565,14 @@ Counter::Table getTable()
 					right = n;
 				}
 				else
-					if (lua_istable(L, -1))
-						right = getTable();
+					if (lua_isfunction (L, -1))
+					{
+						lua_pop(L, 1);
+						continue;
+					}
+					else
+						if (lua_istable(L, -1))
+							right = getTable();
 
 
 
@@ -691,6 +697,30 @@ Luau::PopupEntries Luau::getTraits(const char *window, const char *id)
 
 
 
+
+Counter::Table Luau::getTraits(const char *window, int id)
+{
+	
+	lua_getglobal(L, "getTraits");
+	lua_pushstring(L, window);
+	lua_pushstring(L, std::to_string(id).c_str());
+	lua_pcall(L, 2, 1, 0);
+	
+	
+	Counter::Table state = getTable();
+	
+	lua_pop(L, 1);
+	
+	
+	
+	return state;
+	
+}
+
+
+
+
+
 void Luau::doAction(const char *window, const char *id, const char *name)
 {
 	
@@ -811,6 +841,54 @@ void Luau::copyCounter(const char *fromId, const char *toId, int zorder, int x, 
 }
 
 
+void stackTable(Counter::Table table)
+{
+	lua_newtable(L);
+	
+	for (auto obj = table.begin(); obj != table.end(); ++obj)
+	{
+		std::visit(
+			Overload{
+				[] (int k) { lua_pushnumber(L, k); },
+				[] (std::string k) { lua_pushstring(L, k.c_str()); }
+			},
+			obj->first
+		);
+		std::visit(
+			Overload{
+				[] (double k) { lua_pushnumber(L, k);  },
+				[] (bool k) { lua_pushboolean(L, (int)k); },				
+				[] (std::string k) { lua_pushstring(L, k.c_str()); },
+				[&] (Counter::Table k) { stackTable(k); }
+			},
+			obj->second
+		);
+		lua_settable(L, -3);	
+	}
+}
+
+
+
+int Luau::loadCounter(Counter::Table table)
+{
+	lua_getglobal(L, "loadCounter");
+	
+	stackTable(table);
+
+	lua_pcall(L, 1, 1, 0);
+	
+	
+	//const char *id = lua_tostring(L, -1);
+	int id = lua_tointeger(L, -1); 		
+	
+	lua_pop(L, 1);
+	
+	
+	return id;
+	
+}
+
+
 
 void Luau::updatePos(const char *id, int x, int y)
 {
@@ -828,6 +906,21 @@ void Luau::updateMoved(const char *id, bool moved)
 	lua_pushstring(L, id);
 	lua_pushboolean(L, (moved == true ? 1 : 0));
 	lua_pcall(L, 2, 0, 0);
+}
+
+
+void Luau::updateSide(const char *side)
+{
+	lua_getglobal(L, "updateSide");
+	lua_pushstring(L, side);
+	lua_pcall(L, 1, 0, 0);
+}
+
+
+void Luau::test()
+{
+	lua_getglobal(L, "removeAllMoved");
+	lua_pcall(L, 0, 0, 0);
 }
 
 

@@ -69,6 +69,14 @@ function Counter:new (images, imageIndex, zorder, x, y)
 	return o
 end
 
+function Counter:load (table)
+	local o = Counter:duplicate(Repository[table.Image.images[1]])
+	o = Counter:merge(o, table)	
+	setmetatable(o, Counter)
+	Counter.__index = Counter	
+	return o
+end
+
 function Counter:clone (id, zorder)	
 	local o = Counter:duplicate(Counter[id])	
 	setmetatable(o, Counter)
@@ -143,7 +151,7 @@ end
 
 
 function Counter:duplicate(o)
-	local res = {};
+	local res = {}
 	for k, v in pairs(o) do
 		if type(v) == "table" then
 			res[k] = Counter:duplicate(v)
@@ -151,8 +159,20 @@ function Counter:duplicate(o)
 			res[k] = v;
 		end
 	end
-	return res;
+	return res
 end
+
+function Counter:merge(o, n)
+    for k, v in pairs(n) do
+        if type(v) == "table" and type(o[k] or false) == "table" then
+			o[k] = Counter:merge(o[k], v)
+		else
+			o[k] = v;
+		end
+    end
+    return o
+end
+
 
 
 function Counter:generateGUI()

@@ -81,6 +81,17 @@ Counter::QtCounter::~QtCounter()
 void Counter::QtCounter::showRightClickMenu(QtCounter *counter)
 {
 	
+	
+	// check ownership and ability	
+	if (counter->owner->getOwnershipField() != 0 && counter->owner->getOwnershipField() % IO::getKey() != 0)
+	{
+		Settings::OwnershipRights rights = counter->owner->getRights();
+		
+		if (rights.NoMenu)
+			return;
+	}
+	
+	
 	QMenu MyMenu(counter);
 		
 	if (counter->actions().isEmpty())
@@ -241,9 +252,10 @@ void Counter::QtCounter::hooverAction()
 	
 	
 	
-	
+	// Overlay::border is the additional space to show around the counter
 	int box = source.height() + 2*Overlay::border;
 	
+	// 2 is the border height of the hoover view
 	Overlay::hooverView->grid->move(box, 2);
 	
 	
@@ -259,10 +271,10 @@ void Counter::QtCounter::hooverAction()
    
    
 	Overlay::hooverView->grid->resize(size.width(), size.height());
-		
+	
 
 	
-	
+	// 4 is double the hoover view border height
 	int heightBox = box > size.height() + 4 ? box : size.height() + 4;
 	
 	Overlay::hooverView->resize(box + size.width(), heightBox);
@@ -273,12 +285,13 @@ void Counter::QtCounter::hooverAction()
 	QPoint pnt = this->popupPoint + this->pos();
 	
 	Overlay::hooverView->moveThis(pnt, 
-								  box + Overlay::border + size.width(), 
-								  heightBox);	
+								  Overlay::hooverView->width(), 
+								  Overlay::hooverView->height());	
 	
 	
 	Overlay::hooverView->setVisible(true);
-	Overlay::overlay->setMasks();	
+	// force redraw of mask layer
+	Overlay::overlay->clearMask();	
 	
 	
 }
@@ -289,8 +302,6 @@ void Counter::QtCounter::mouseMoveEvent (QMouseEvent * e)
 {
 	if (((CentralFrame *)this->owner->parentFrame)->name == "Map")
 	{	
-		Overlay::hooverView->setVisible(false);
-		Overlay::overlay->setMasks();
 		popupPoint = e->position().toPoint();		
 		timer->start(1000);
 	}
@@ -302,8 +313,11 @@ void Counter::QtCounter::leaveEvent (QEvent *e)
 {	
 	if (((CentralFrame *)this->owner->parentFrame)->name == "Map")
 	{	
-		Overlay::hooverView->setVisible(false);
-		Overlay::overlay->setMasks();	
+		if (Overlay::hooverView->isVisible())
+		{
+			Overlay::hooverView->setVisible(false);
+			//Overlay::overlay->setMasks();
+		}	
 		timer->stop();
 	}
 }
@@ -518,6 +532,27 @@ Counter::Counter(int id, Table *state)
 	this->disabled = false;
 	
 	
+	if ((*state).find("Side") != (*state).end())
+	{
+		if (std::get<std::string>((*state)["Side"]) == Settings::playerSide)
+		{
+			// NOTE!! the factor 0xef06eea1 should not be a constant but generated and then discarded
+			this->_ownershipField = IO::getKey() * 0xef06eea1;
+			this->_ownershipRights = Settings::myOwnershipRights;
+		}
+		else
+		{
+			this->_ownershipField = 0;
+			// default rights same as own
+			this->_ownershipRights = Settings::myOwnershipRights;
+		}
+	}
+	else
+		// no owner
+		this->_ownershipField = 0;
+	
+	
+	
 	this->parentFrame = mapFrame;
 	
 	
@@ -664,6 +699,7 @@ void Counter::toggleSelect(const char *name)
 
 void Counter::clearMoved()
 {
+	
 	bool atLeastOne = false;
 	
 	for (auto obj = counters.begin(); obj != counters.end(); ++obj)
@@ -674,7 +710,8 @@ void Counter::clearMoved()
 		}
 	
 	if (atLeastOne)
-		Luau::doEvent("end", "", "", "", 0);	
+		Luau::doEvent("end", "", "", "", 0);
+	
 }
 
 
@@ -969,6 +1006,35 @@ void Counter::setImage()
 
 
 
+void Counter::setPos(int x, int y)
+{
+	if (!(x == this->counter->pos().x() && y == this->counter->pos().y()))
+		this->counter->move(x, y);
+}
+
+
+unsigned long long Counter::getOwnershipField()
+{
+	return this->_ownershipField;
+}
+
+void Counter::setOwnershipField(unsigned long long field)
+{
+	this->_ownershipField = field;
+}
+
+Settings::OwnershipRights Counter::getRights()
+{
+	return this->_ownershipRights;
+}
+
+void Counter::setRights(Settings::OwnershipRights rights)
+{
+	this->_ownershipRights = rights;
+}
+
+
+
 void Counter::setGUI()
 {
 	
@@ -993,6 +1059,7 @@ void Counter::setGUI()
 			stacks[p] = stack;
 		}	
 	}
+	
 	
 	
 	for (auto const& [point, stack] : stacks)	

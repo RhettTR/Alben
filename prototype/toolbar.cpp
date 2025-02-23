@@ -270,8 +270,9 @@ void ToolBar::zoom(float fraction)
 	
 	Counter::setGUI();
 	
-	Overlay::overlay->setMasks();
 	mapFrame->repaint();
+	// force redraw of mask layer
+	Overlay::overlay->clearMask();
 	
 }
 
@@ -323,8 +324,10 @@ void ToolBar::zoomCoordinates(QPoint point, float newFraction)
 		
 	Counter::setGUI();
 	
-	Overlay::overlay->setMasks();
+	
 	mapFrame->repaint();
+	// force redraw of mask layer
+	Overlay::overlay->clearMask();
 	
 }
 
@@ -386,9 +389,10 @@ void ToolBar::zoomMiddle(float newFraction)
 		
 	Counter::setGUI();
 	
-	Overlay::overlay->setMasks();
-	mapFrame->repaint();
 	
+	mapFrame->repaint();
+	// force redraw of mask layer
+	Overlay::overlay->clearMask();
 			
 }
 

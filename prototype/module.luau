@@ -230,6 +230,14 @@ function setCounter(id, table)
 	create_class_copy(Counter, id)
 end
 
+function loadCounter(table)
+	id = next_id()
+	Counter[id] = Counter:load(table)
+	create_class_copy(Counter, id)
+	create(id, "Create")
+	return id
+end
+
 function updatePos(id, x, y)
 	Counter[id]["x"] = x
 	Counter[id]["y"] = y
@@ -238,6 +246,11 @@ end
 function updateMoved(id, moved)
 	Counter:markMoved (id, moved)
 end
+
+function updateSide(side)
+	PlayerSide = side
+end
+
 
 
 
@@ -304,6 +317,28 @@ function afterDrag(id, x, y)
 	return true, x , y
 	
 end
+
+
+function removeAllMoved()
+ 
+	for k, v in pairs(Counter) do
+		
+		if type(k) == "string" and k ~= '__index' and type(v) ~= 'function' then
+			
+			if Counter[k].MarkMoved ~= nil then
+				Counter[k].MarkMoved.moved = false
+			end						
+			
+		end
+		
+	end
+	
+	Counter:generateGUI()
+
+end
+
+
+
 
 
 

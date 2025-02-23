@@ -231,7 +231,6 @@ function Base:new ()
 	setmetatable(o, self)
 	self.__index = self
 	o.Delete = Delete
-	o.Side = ""
 	return o
 end
 

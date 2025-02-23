@@ -1,9 +1,14 @@
 #include <iostream>
 #include <filesystem>
+#include <sstream>
+#include <fstream>
 
 
 #include "io.h"
 #include "scale.h"
+#include "luau.h"
+#include "settings.h"
+
 
 
 
@@ -11,9 +16,191 @@ using namespace std;
 using namespace std::filesystem;
 
 
+std::fstream IO::fs;
+
+ 
+unsigned long long IO::_ownershipKey;
+
 
 
 	
+	
+IO::LoadGame::LoadGame(std::string fileName)
+{	
+	
+	try
+	{
+		fs.exceptions(std::ios_base::badbit);
+				
+		fs.open(fileName, ios::binary | ios::in);
+	
+		if (fs.is_open()) 
+		{
+			
+			
+					
+			// read file build table
+			while (fs)
+			{	
+				
+				// read key "counter"
+				std::string key;
+							
+				if (!std::getline(fs, key, '\0'))
+					break;
+					
+				if (key == "counter")
+				{	
+										
+					// read number of keys in this table
+					std::size_t size; 
+					
+					fs.read(reinterpret_cast<char*>(&size), sizeof size);
+					
+					// read ownershipField
+					unsigned long long f;
+					
+					fs.read(reinterpret_cast<char*>(&f), sizeof f);
+					
+					// read rights
+					Settings::OwnershipRights r;
+					
+					fs.read(reinterpret_cast<char*>(&r), sizeof r); 
+					
+					
+					if (size > 0)
+					{	
+					
+						// read table
+						Counter::Table table = loadTable(size);
+					
+					
+						int id = Luau::loadCounter(table);
+						
+						Counter::counters[id]->setOwnershipField(f);
+						Counter::counters[id]->setRights(r);
+						
+					}
+					
+				}
+				
+				
+			}
+				
+
+			Luau::doEvent("end", "", "", "", 0);
+			
+			
+			if (Settings::playerSide == "")
+			{
+				Settings::playerSide == findSide();
+				Luau::updateSide(Settings::playerSide.c_str());
+			}
+				
+				
+				
+			// note: close stream is done in the destructor
+			
+			
+		}
+			
+	}
+	catch (const ifstream::failure& e)
+	{
+		std::cout << e.what() << std::endl;
+	}
+
+}
+
+
+
+Counter::Table IO::LoadGame::loadTable(std::size_t keys)
+{
+	
+	
+	Counter::Leftside left;
+	Counter::Rightside right;
+	Counter::Table table;
+	
+	
+	
+	
+	for (std::size_t i = 0; i < keys; i++)
+	{
+		// key
+		
+		char type;
+	
+		if (!fs.read(reinterpret_cast<char*>(&type), 1))
+			return table;
+		
+			
+		if ((int)type == stringType)
+		{
+			std::string key;
+			std::getline(fs, key, '\0');
+			left = key;
+		}
+		else
+			if ((int)type == intType)
+			{
+				int key;
+				fs.read(reinterpret_cast<char*>(&key), sizeof(key));			
+				left = key;
+			}
+			
+		
+		
+		
+		// value
+		
+		fs.read(reinterpret_cast<char*>(&type), 1);
+		
+		
+		if ((int)type == boolType)
+		{
+			char value;
+			fs.read(reinterpret_cast<char*>(&value), 1);
+			if ((bool)value)
+				right = true; 	
+			else
+				right = false; 
+		}
+		else
+			if ((int)type == stringType)
+			{
+				std::string value;
+				std::getline(fs, value, '\0');
+				right = value;
+			}
+			else
+				if ((int)type == doubleType)				
+				{
+					double value;
+					fs.read(reinterpret_cast<char*>(&value), sizeof value);
+					right = value;
+				}
+				else
+					if ((int)type == tableType)
+					{
+						std::size_t s;
+						fs.read(reinterpret_cast<char*>(&s), sizeof s);	
+						right = loadTable(s);
+					}
+
+
+		
+		table[left] = right;
+	
+	}
+	
+	
+	return table;
+	
+	
+}
+
+
 
 
 IO::IO()		
@@ -21,6 +208,15 @@ IO::IO()
 	
 	load_resources("./__images");
 	load_resources("./images");
+	
+	
+	// NOTE!! _ownershipKey must be loaded from a user profile, not set like this
+	
+	_ownershipKey = 0xc2158b49;		// 32-bit prime
+									// openssl prime -generate -bits 32 -hex
+									
+	//_ownershipKey = 0xddb49da1;
+									
 	
 }
 
@@ -37,6 +233,40 @@ QSize IO::getSize(string str)
 	return _resources[str].size;
 }
 
+
+unsigned long long IO::getKey()
+{
+	return _ownershipKey;
+}
+
+
+std::string IO::findSide()
+{
+	
+	std::string side = "";
+	
+	for (auto obj = Counter::counters.begin(); obj != Counter::counters.end(); ++obj)
+	{
+		Counter *counter = obj->second;
+		Counter::Table table = obj->second->table;
+		
+		if (table.find("Side") != table.end())
+		{
+			unsigned long long field = counter->getOwnershipField();
+			
+			if (field != 0)
+				if (field % getKey() == 0)
+				{
+					side = std::get<std::string>(table["Side"]);
+					return side;
+				}
+		}
+		
+	}
+	
+	return side;
+	
+}
 
 
 
@@ -80,4 +310,150 @@ void IO::load_resources(string directory)
 		std::cout << e.what() << '\n';
 	}
 			
+}
+
+
+
+QString activeDirectory = QDir::homePath() + "/Documents";
+
+
+
+void IO::saveTable(Counter::Table table)
+{
+	for (auto obj = table.begin(); obj != table.end(); ++obj)
+	{
+		std::visit(
+			Overload{
+				[] (int k) { fs.write(reinterpret_cast<const char*>(&intType), 1);
+							 fs.write(reinterpret_cast<const char*>(&k), sizeof k); },
+				[] (std::string k) { fs.write(reinterpret_cast<const char*>(&stringType), 1);
+								     fs.write(k.c_str(), k.size() + 1); }
+			},
+			obj->first
+		);
+		std::visit(
+			Overload{
+				[] (double k) { fs.write(reinterpret_cast<const char*>(&doubleType), 1);
+								fs.write(reinterpret_cast<const char*>(&k), sizeof k); },
+				[] (bool k) { fs.write(reinterpret_cast<const char*>(&boolType), 1);
+							  fs.write(reinterpret_cast<const char*>(&k), 1); },				
+				[] (std::string k) { fs.write(reinterpret_cast<const char*>(&stringType), 1);
+									 fs.write(k.c_str(), k.size() + 1); },
+				[&] (Counter::Table k) { fs.write(reinterpret_cast<const char*>(&tableType), 1);
+									     std::size_t s = k.size();
+										 fs.write(reinterpret_cast<const char*>(&s), sizeof s);
+										 saveTable(k); }
+			},
+			obj->second
+		);	
+	}
+}
+
+
+
+
+void IO::saveGame()
+{
+	
+	QFileDialog dialog = QFileDialog(nullptr, "Save Game As",
+									 activeDirectory,
+									 "Save Files (*.vsav *.vlog);;All Files(*.*)");
+										 
+	dialog.setDefaultSuffix("vsav");
+	dialog.setAcceptMode(QFileDialog::AcceptSave);
+										 
+	QStringList fileNames;
+	
+	if (dialog.exec() == QFileDialog::Accepted)
+	{
+		
+		fileNames = dialog.selectedFiles();
+		
+		if (fileNames.count() == 0)
+			return;
+		
+		
+		QFileInfo fileInfo(fileNames[0]);
+		
+		QDir dir = fileInfo.absoluteDir();
+		
+		activeDirectory = dir.absolutePath();
+		
+		
+		
+		
+		fs.open(fileNames[0].toStdString(), ios::binary | ios::out);
+        
+		
+		
+	
+		
+		for (auto obj = Counter::counters.begin(); obj != Counter::counters.end(); ++obj)
+		{
+			
+			decltype(obj->second) counter = obj->second;
+			
+			
+			std::string key = "counter";
+			fs.write(key.c_str(), key.size() + 1);
+		
+			
+			Counter::Table table = Luau::getTraits("Map", counter->id);
+			
+			// save top level table size
+			std::size_t s = table.size();
+			fs.write(reinterpret_cast<const char*>(&s), sizeof s);
+			
+			// save the ownershipField
+			unsigned long long f = counter->getOwnershipField();
+			Settings::OwnershipRights r = counter->getRights();
+			
+			// case where opponent has dragged your conter on board
+			// set your getOwnershipField and rights
+			if (f == 0)
+				if (table.find("Side") != table.end())
+					if (std::get<std::string>(table["Side"]) == Settings::playerSide)
+					{
+						counter->setOwnershipField(IO::getKey() * 0xef06eea1);
+						f = counter->getOwnershipField();
+						r = Settings::myOwnershipRights;
+					}
+			fs.write(reinterpret_cast<const char*>(&f), sizeof f);
+			
+			// save rights			
+			fs.write(reinterpret_cast<const char*>(&r), sizeof r); 
+			
+			
+			saveTable(table);						
+				
+		}
+		
+		
+		
+		fs.close();
+		
+		
+	}										
+			
+}
+
+
+
+void IO::loadGame()
+{
+	
+	// no undo
+	
+	QString fileName = QFileDialog::getOpenFileName(nullptr, "Open Game",
+													activeDirectory,
+													"Load Files (*.vsav *.vlog);;All Files(*.*)");
+	
+	
+	if (!fileName.isNull())
+	{
+		LoadGame *load = new LoadGame(fileName.toStdString());
+		delete load;
+	}
+	
+	
 }

@@ -252,14 +252,15 @@ void Overlay::StackFrame::moveThis(QPoint hotspot, int w, int h)
 		hotspot += QPoint(0, -h);
 	else
 		hotspot += QPoint(0, -h + std::abs(hotspot.y() - h));
-	
+		
 	
 	
 	int width = Overlay::overlay->scrollArea->horizontalScrollBar()->width();
 	int scroll = Overlay::overlay->scrollArea->horizontalScrollBar()->value();
 		
 	if (hotspot.x() + w > scroll + width)
-		hotspot -= QPoint(std::abs((hotspot.x() + w) - (scroll + width)), 0);			
+		hotspot -= QPoint(std::abs((hotspot.x() + w) - (scroll + width)), 0);
+		
 	 
 	this->move(hotspot);
 	
@@ -301,7 +302,6 @@ void Overlay::StackFrame::setImages(CentralFrame::Stack stack)
 		
 	}
 	
-	((Overlay *)this->parent())->setMasks(); 
 	
 }
 
@@ -511,20 +511,20 @@ void Overlay::StackOpen::open(Counter *counter, QPoint pos)
 
 		
 	this->moveThis(pos, size.width(), size.height());
-	
-    ((Overlay *)this->parent())->setMasks();    
+	    
     this->showStack();
 }
 
 
 
 void Overlay::StackOpen::moveThis(QPoint hotspot, int w, int h)
-{
+{	
+	
 	if (hotspot.y() - h > 0)
 		hotspot += QPoint(0, -h);
 	else
 		hotspot += QPoint(0, -h + std::abs(hotspot.y() - h));
-	
+			
 	
 	
 	int width = Overlay::overlay->scrollArea->horizontalScrollBar()->width();
@@ -629,7 +629,8 @@ void Overlay::StackOpen::showStack()
 		return;
 	
 	this->setVisible(true);
-	Overlay::overlay->setMasks();
+	// force redraw of mask layer
+	Overlay::overlay->clearMask();
 }
 
 
@@ -651,8 +652,9 @@ void Overlay::StackOpen::hideStack()
 	}
 	
 	
+	// force redraw of mask layer
+	Overlay::overlay->clearMask();
 	
-	Overlay::overlay->setMasks();
 }
 
 
@@ -675,104 +677,17 @@ Overlay::Overlay(QWidget *parent, QScrollArea *scrollArea) : QFrame(parent)
 	setMask(overlayMask);
 	
 }
-
-
-	
-void Overlay::setMasks()
-{
-	
-	
-	clearMask();
-	
-	overlayMask = QRegion(0, 0, 1, 1);
-	
-	
-	
-	if (!Counter::haveOffset)
-	{
-		
-		CentralFrame::Stacks stacks;
-		
-			
-		
-		for (auto obj = Counter::counters.begin(); obj != Counter::counters.end(); ++obj)
-		{
-			CentralFrame::Point p = (CentralFrame::Point){.x = obj->second->state.x, .y = obj->second->state.y};
-			
-			if (stacks.find( p ) == stacks.end()) 
-			{
-				// not found
-				CentralFrame::Stack stack = {{obj->second->state.zorder, obj->second}};
-				stacks[p] = stack;
-			} 
-			else 
-			{
-				// found			
-				CentralFrame::Stack stack = stacks.at( p );
-				stack[obj->second->state.zorder] = obj->second;
-				stacks[p] = stack;
-			}	
-		}
-		
-		
-	
-		
-		for (auto const& [point, stack] : stacks)	
-		{	
-	
-			int stackSize = (int)stack.size();
-					
-			if (stackSize > 1)
-			{		
-				
-				auto *top = prev(stack.end())->second;
-				
-				
-				int x = std::round(top->state.x * Scale::scaleFraction);
-				int y = std::round(top->state.y * Scale::scaleFraction);
-				
-				
-				if (Scale::rotation != 0)
-					scaled->rotate(top, Scale::rotation, x, y);
-					
-						
-				
-				// margin is 9
-				QRect rectangle = 
-					QRect(x + top->scaledMargin + top->scaledWidth - 8, 
-						  y + 1, 
-						  16, 
-						  16);
-						  
-										
-				overlayMask = overlayMask.united(rectangle);
-									
-			}
-							
-		}
-	}
-	
-	
-	
-	if (openView->isVisible())
-		overlayMask = overlayMask.united(openView->geometry());
-	
-	if (hooverView->isVisible())
-		overlayMask = overlayMask.united(hooverView->geometry());
-		
-		
-		
-	setMask(overlayMask);
-		
-}	
-	
 	
 	
 	
 void Overlay::paintEvent(QPaintEvent *e)
 {
-	
+		
 	QPainter painter(this);
+	
+	clearMask();
+	
+	overlayMask = QRegion(0, 0, 1, 1);
 	
 	
 	
@@ -830,7 +745,7 @@ void Overlay::paintEvent(QPaintEvent *e)
 				if (Scale::rotation != 0)
 					scaled->rotate(top, Scale::rotation, x, y);
 					
-						
+					
 				
 				// margin is 9
 				QRect rectangle = 
@@ -839,7 +754,7 @@ void Overlay::paintEvent(QPaintEvent *e)
 						  16, 
 						  16);
 					
-				
+			
 										
 				
 						
@@ -852,6 +767,7 @@ void Overlay::paintEvent(QPaintEvent *e)
 				painter.drawText(rectangle, Qt::AlignHCenter, str);								
 				
 				
+				overlayMask = overlayMask.united(rectangle);
 				
 			}			
 					
@@ -861,5 +777,14 @@ void Overlay::paintEvent(QPaintEvent *e)
 	}
 	
 	
+	if (openView->isVisible())
+		overlayMask = overlayMask.united(openView->geometry());
+	
+	if (hooverView->isVisible())
+		overlayMask = overlayMask.united(hooverView->geometry());
+		
+		
+		
+	setMask(overlayMask);
 	
 }

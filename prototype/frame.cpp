@@ -651,7 +651,7 @@ void CentralFrame::dropEvent(QDropEvent *event)
 			droppedX = std::round((float)droppedX / Scale::scaleFraction);
 			droppedY = std::round((float)droppedY / Scale::scaleFraction);
 			
-			
+		
 			
 			
 			// find if dropped on a counter
@@ -726,8 +726,8 @@ void CentralFrame::dropEvent(QDropEvent *event)
 		
 		
 	repaint();
-	Overlay::overlay->setMasks();	
-	Overlay::overlay->update();	
+	// force redraw of mask layer
+	Overlay::overlay->clearMask();
 	
 	
 				
@@ -1071,14 +1071,16 @@ void CentralFrame::toggleOpenStack(Counter *counter, int sign)
 	}
 	
 	repaint();
+	
 }
 
 
 void CentralFrame::closeAllOpenStacks()
 {
 	stackOpen.clear();
-	repaint();		
+	repaint();	
 }
+
 
 
 
@@ -1111,7 +1113,7 @@ void CentralFrame::paintEvent(QPaintEvent *e)
 		
 	QPainter painter(this);
 		
-	
+
 				
 	std::map<Point, Stack> stacks;
 
@@ -1200,6 +1202,7 @@ void CentralFrame::paintEvent(QPaintEvent *e)
 	
 	// render all "stacks" with 1 or more counters
 	
+	
 	for (auto const& [point, stack] : stacks)	
 	{	
 
@@ -1271,12 +1274,12 @@ void CentralFrame::paintEvent(QPaintEvent *e)
 			
 			
 					
-			obj->second->counter->move(x, y);
+			obj->second->setPos(x, y);
 			
 				
 		}
 			
 	}
-	
+
 	
 }

@@ -1,6 +1,9 @@
 #include <string>
 #include <vector>
 
+#include "counter.h"
+
+
 class Luau
 {
 
@@ -15,6 +18,7 @@ class Luau
 		typedef struct std::vector<Popupentry> PopupEntries;
 	
 		static PopupEntries getTraits(const char *window, const char *id);
+		static Counter::Table getTraits(const char *window, int id);
 		static void doAction(const char *window, const char *id, const char *name);
 		static void doEvent(const char *eventName, const char *id, const char *trait, const char *key, int value);
 		static void doCreate(const char *fromId, const char *trait);
@@ -24,8 +28,11 @@ class Luau
 		static void undo();
 		static void redo();
 		static void copyCounter(const char *fromId, const char *toId, int zorder, int x, int y);
+		static int  loadCounter(Counter::Table table);
 		static void updatePos(const char *id, int x, int y);
 		static void updateMoved(const char *id, bool moved);
+		static void updateSide(const char *side);
+		static void test();
 		
 		
 		Luau();

@@ -8,6 +8,7 @@
 #include <map>
 
 #include "frame.h"
+#include "settings.h"
 
 #include <QtWidgets>
 
@@ -130,6 +131,14 @@ class Counter
 		static void clearMoved();
 		
 		void setImage();
+		void setPos(int x, int y);
+				
+		unsigned long long getOwnershipField();
+		void setOwnershipField(unsigned long long field);
+		
+		Settings::OwnershipRights getRights();	
+		void setRights(Settings::OwnershipRights rights);
+		
 		static void setGUI();
 		
 		int incrementDegrees(); 
@@ -165,7 +174,10 @@ class Counter
 		static int _id;			// id of latest counter	
 		
 		static int _lastZorder;	// the number itself is not important, 
-								// only its relative value to other counters in a stack	
+								// only its relative value to other counters in a stack
+								
+		unsigned long long _ownershipField;			// holds a 64-bit number
+		Settings::OwnershipRights _ownershipRights;	// bitfield of rights					
 		
 		
 };
