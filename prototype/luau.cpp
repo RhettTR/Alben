@@ -14,6 +14,7 @@
 #include "window.h"
 #include "overlay.h"
 #include "toolbar.h"
+#include "io.h"
  
 
 
@@ -489,7 +490,7 @@ extern "C" {
 	{		
 		const char *id = lua_tostring(L, -1); 	
 		lua_pop(L, 1);	
-		mainToolBar->enable(id);
+		mainToolBar->enabled(id, true);
 		
 		return 0;
 	}
@@ -498,11 +499,34 @@ extern "C" {
 	{		
 		const char *id = lua_tostring(L, -1); 	
 		lua_pop(L, 1);	
-		mainToolBar->disable(id);
+		mainToolBar->enabled(id, false);
 		
 		return 0;
 	}
 	
+	static int disable_all(lua_State *L)
+	{
+		Counter::setDisabled(true);
+		
+		return 0;
+	}
+	
+	static int stop_stepping(lua_State *L)
+	{
+		IO::stepping = false;
+		Counter::setDisabled(false);
+		Counter::resetId();
+		Counter::resetZorder();
+		
+		return 0;
+	}
+	
+	static int not_recording(lua_State *L)
+	{
+		lua_pushboolean(L, (int)!IO::recording);
+				
+		return 1;
+	}
 	
 	
 	
@@ -703,7 +727,10 @@ Counter::Table Luau::getTraits(const char *window, int id)
 	
 	lua_getglobal(L, "getTraits");
 	lua_pushstring(L, window);
-	lua_pushstring(L, std::to_string(id).c_str());
+	if (strcmp(window, "State") == 0)
+		lua_pushnumber(L, id);
+	else
+		lua_pushstring(L, std::to_string(id).c_str());
 	lua_pcall(L, 2, 1, 0);
 	
 	
@@ -878,7 +905,6 @@ int Luau::loadCounter(Counter::Table table)
 	lua_pcall(L, 1, 1, 0);
 	
 	
-	//const char *id = lua_tostring(L, -1);
 	int id = lua_tointeger(L, -1); 		
 	
 	lua_pop(L, 1);
@@ -886,6 +912,17 @@ int Luau::loadCounter(Counter::Table table)
 	
 	return id;
 	
+}
+
+
+
+void Luau::loadLog(Counter::Table table)
+{
+	lua_getglobal(L, "loadLog");
+	
+	stackTable(table);
+
+	lua_pcall(L, 1, 0, 0);	
 }
 
 
@@ -917,10 +954,56 @@ void Luau::updateSide(const char *side)
 }
 
 
-void Luau::test()
+void Luau::saveStage()
 {
-	lua_getglobal(L, "removeAllMoved");
+	lua_getglobal(L, "saveStage");
 	lua_pcall(L, 0, 0, 0);
+}
+
+
+void Luau::deleteAll()
+{
+	lua_getglobal(L, "deleteAll");
+	lua_pcall(L, 0, 0, 0);
+}
+
+
+void Luau::resetState()
+{
+	lua_getglobal(L, "resetState");
+	lua_pcall(L, 0, 0, 0);
+}
+
+
+void Luau::getRange(int &savedPointer, int &stagePointer)
+{
+	lua_getglobal(L, "getRange");
+	lua_pcall(L, 0, 2, 0);
+	
+	savedPointer = lua_tointeger(L, -1);
+	stagePointer = lua_tointeger(L, -2); 		
+	
+	lua_pop(L, 2);	
+}
+
+
+void Luau::logReset()
+{
+	lua_getglobal(L, "logReset");
+	lua_pcall(L, 0, 0, 0);	
+}
+
+void Luau::logStep(bool oneStep)
+{
+	lua_getglobal(L, "logStep");
+	lua_pushboolean(L, (int)oneStep);
+	lua_pcall(L, 1, 0, 0);	
+}
+
+void Luau::logAbort()
+{
+	lua_getglobal(L, "logAbort");
+	lua_pcall(L, 0, 0, 0);	
 }
 
 
@@ -1009,6 +1092,12 @@ void Luau::startVM()
 	
 	lua_pushcfunction(L, toggle_select_status, "toggle_select_status");
 	lua_setglobal(L, "toggle_select_status");
+		
+	lua_pushcfunction(L, disable_all, "disable_all");
+	lua_setglobal(L, "disable_all");
+	
+	lua_pushcfunction(L, stop_stepping, "stop_stepping");
+	lua_setglobal(L, "stop_stepping");
 	
 	// toolbar
 	
@@ -1017,6 +1106,10 @@ void Luau::startVM()
 	
 	lua_pushcfunction(L, toolbar_disable, "toolbar_disable");
 	lua_setglobal(L, "toolbar_disable");
+	
+	lua_pushcfunction(L, not_recording, "not_recording");
+	lua_setglobal(L, "not_recording");
+	
 	
 	
 	lua_getglobal(L, "module");

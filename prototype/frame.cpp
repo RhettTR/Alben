@@ -122,6 +122,9 @@ void CentralFrame::mousePressEvent(QMouseEvent *event)
 			
 			if (child->owner->disabled)
 				return;
+				
+			if (IO::stepping)
+				return;
 		
 			if (!Luau::beforeDrag(child->owner->name.c_str()))
 				return;

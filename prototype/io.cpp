@@ -8,9 +8,10 @@
 #include "scale.h"
 #include "luau.h"
 #include "settings.h"
+#include "toolbar.h"
 
 
-
+extern ToolBar *mainToolBar;
 
 using namespace std;
 using namespace std::filesystem;
@@ -20,13 +21,28 @@ std::fstream IO::fs;
 
  
 unsigned long long IO::_ownershipKey;
+bool IO::stepping;
+bool IO::recording;
 
 
 
+	
+void IO::close()
+{
+	Luau::deleteAll();
+	Luau::resetState();
+	Luau::logReset();
+	
+	mainToolBar->enabled("__forward", false);
+	mainToolBar->enabled("__end", false);
+}
 	
 	
 IO::LoadGame::LoadGame(std::string fileName)
 {	
+	
+	bool logfile = false;
+	
 	
 	try
 	{
@@ -43,7 +59,7 @@ IO::LoadGame::LoadGame(std::string fileName)
 			while (fs)
 			{	
 				
-				// read key "counter"
+				// read key
 				std::string key;
 							
 				if (!std::getline(fs, key, '\0'))
@@ -56,7 +72,7 @@ IO::LoadGame::LoadGame(std::string fileName)
 					std::size_t size; 
 					
 					fs.read(reinterpret_cast<char*>(&size), sizeof size);
-					
+				
 					// read ownershipField
 					unsigned long long f;
 					
@@ -77,6 +93,7 @@ IO::LoadGame::LoadGame(std::string fileName)
 					
 						int id = Luau::loadCounter(table);
 						
+						
 						Counter::counters[id]->setOwnershipField(f);
 						Counter::counters[id]->setRights(r);
 						
@@ -84,17 +101,54 @@ IO::LoadGame::LoadGame(std::string fileName)
 					
 				}
 				
+				else
+				
+				// read log (if any)
+				if (key == "log")				
+				{
+					
+					// this is a log file
+					logfile = true;
+					
+					
+					std::size_t size;
+					fs.read(reinterpret_cast<char*>(&size), sizeof size);
+					
+					
+					if (size > 0)
+					{	
+					
+						// read table
+						Counter::Table table = loadTable(size);
+					
+						Luau::loadLog(table);
+						
+					}
+				}
+				
 				
 			}
 				
 
-			Luau::doEvent("end", "", "", "", 0);
+			//Luau::doEvent("end", "", "", "", 0);
 			
+			
+	
 			
 			if (Settings::playerSide == "")
 			{
 				Settings::playerSide == findSide();
 				Luau::updateSide(Settings::playerSide.c_str());
+			}
+			
+			
+			if (logfile)
+			{
+				mainToolBar->enabled("__forward", true);
+				mainToolBar->enabled("__end", true);
+				mainToolBar->enabled("__abort", true);
+				Counter::setDisabled(true);
+				IO::stepping = true;				
 			}
 				
 				
@@ -203,11 +257,46 @@ Counter::Table IO::LoadGame::loadTable(std::size_t keys)
 
 
 
+QString activeDirectory = QDir::homePath() + "/Documents";
+
+
+void IO::loadGame()
+{
+	
+	// no undo
+	
+	QString fileName = QFileDialog::getOpenFileName(nullptr, "Open Game",
+													activeDirectory,
+													"Load Files (*.vsav *.vlog);;All Files(*.*)");
+	
+	
+	if (!fileName.isNull())
+	{
+		close();		
+		
+		LoadGame *load = new LoadGame(fileName.toStdString());	
+		delete load;
+		
+		Counter::resetId();
+		Counter::resetZorder();
+		
+	}
+	
+	
+}
+
+
+
+
+
 IO::IO()		
 {
 	
 	load_resources("./__images");
 	load_resources("./images");
+	
+	IO::stepping = false;
+	IO::recording = false;
 	
 	
 	// NOTE!! _ownershipKey must be loaded from a user profile, not set like this
@@ -314,8 +403,6 @@ void IO::load_resources(string directory)
 
 
 
-QString activeDirectory = QDir::homePath() + "/Documents";
-
 
 
 void IO::saveTable(Counter::Table table)
@@ -352,14 +439,14 @@ void IO::saveTable(Counter::Table table)
 
 
 
-void IO::saveGame()
+QString IO::saveGame(QString saveAs, QString saveTo, QString suffix)
 {
 	
-	QFileDialog dialog = QFileDialog(nullptr, "Save Game As",
+	QFileDialog dialog = QFileDialog(nullptr, saveAs,
 									 activeDirectory,
-									 "Save Files (*.vsav *.vlog);;All Files(*.*)");
+									 saveTo);
 										 
-	dialog.setDefaultSuffix("vsav");
+	dialog.setDefaultSuffix(suffix);
 	dialog.setAcceptMode(QFileDialog::AcceptSave);
 										 
 	QStringList fileNames;
@@ -370,7 +457,7 @@ void IO::saveGame()
 		fileNames = dialog.selectedFiles();
 		
 		if (fileNames.count() == 0)
-			return;
+			return "";
 		
 		
 		QFileInfo fileInfo(fileNames[0]);
@@ -406,17 +493,16 @@ void IO::saveGame()
 			
 			// save the ownershipField
 			unsigned long long f = counter->getOwnershipField();
-			Settings::OwnershipRights r = counter->getRights();
+			Settings::OwnershipRights r = Settings::myOwnershipRights;
 			
 			// case where opponent has dragged your conter on board
-			// set your getOwnershipField and rights
+			// set your OwnershipField and rights
 			if (f == 0)
 				if (table.find("Side") != table.end())
 					if (std::get<std::string>(table["Side"]) == Settings::playerSide)
 					{
 						counter->setOwnershipField(IO::getKey() * 0xef06eea1);
-						f = counter->getOwnershipField();
-						r = Settings::myOwnershipRights;
+						f = counter->getOwnershipField();						
 					}
 			fs.write(reinterpret_cast<const char*>(&f), sizeof f);
 			
@@ -432,28 +518,52 @@ void IO::saveGame()
 		
 		fs.close();
 		
+		return fileNames[0];
 		
-	}										
+	}
+	
+	
+	return nullptr;										
 			
 }
 
 
 
-void IO::loadGame()
+
+void IO::saveLog(QString file)
 {
 	
-	// no undo
+	if (file.isNull() || file.isEmpty())
+		return;
+		
+	// append
+	fs.open(file.toStdString(), ios::binary | ios::out | ios::app);
 	
-	QString fileName = QFileDialog::getOpenFileName(nullptr, "Open Game",
-													activeDirectory,
-													"Load Files (*.vsav *.vlog);;All Files(*.*)");
+	
+	// get log range
+	int savedPointer = 0, stagePointer = 0;
+	
+	Luau::getRange(savedPointer, stagePointer);
 	
 	
-	if (!fileName.isNull())
+	
+	for (int i = savedPointer; i < stagePointer; i++)
 	{
-		LoadGame *load = new LoadGame(fileName.toStdString());
-		delete load;
+		
+		std::string key = "log";
+		fs.write(key.c_str(), key.size() + 1);
+		
+		
+		Counter::Table table = Luau::getTraits("State", i+1);
+	
+		// save top level table size
+		std::size_t s = table.size();
+		fs.write(reinterpret_cast<const char*>(&s), sizeof s);
+		
+		
+		saveTable(table);
 	}
 	
+	fs.close();
 	
 }

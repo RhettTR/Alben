@@ -29,10 +29,17 @@ class Luau
 		static void redo();
 		static void copyCounter(const char *fromId, const char *toId, int zorder, int x, int y);
 		static int  loadCounter(Counter::Table table);
+		static void loadLog(Counter::Table table);
 		static void updatePos(const char *id, int x, int y);
 		static void updateMoved(const char *id, bool moved);
 		static void updateSide(const char *side);
-		static void test();
+		static void saveStage();
+		static void deleteAll();
+		static void resetState();
+		static void getRange(int &savedPointer, int &stagePointer);
+		static void logReset();
+		static void logStep(bool oneStep);
+		static void logAbort();
 		
 		
 		Luau();

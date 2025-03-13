@@ -33,6 +33,19 @@ ToolBar::ButtonAction::ButtonAction(std::string resourceName, const QString tool
 }
 
 
+ToolBar::Label::Label(std::string resourceName, const QString toolTip)
+{
+	QPixmap pix(32, 24);
+	(void)pix.convertFromImage(io->getImage(resourceName));
+	this->setPixmap(pix);
+	
+	this->setToolTip(toolTip);
+	this->setEnabled(false);
+	this->id = resourceName;
+	
+}
+
+
 
 ToolBar::MapSizeComboBox::MapSizeComboBox(ToolBar *parent) : QComboBox((QWidget *)parent)
 {
@@ -229,6 +242,14 @@ void ToolBar::addImageButton(std::string resourceName, const QString toolTip, st
 }
 
 
+void ToolBar::addLabel(std::string resourceName, const QString toolTip)
+{
+	Label *label = new Label(resourceName, toolTip);
+	label->setParent(this);	
+	this->addWidget(label);
+}
+
+
 void ToolBar::addSizeComboBox()
 {
 		
@@ -241,21 +262,28 @@ void ToolBar::addSizeComboBox()
 }
 
 
-void ToolBar::enable(std::string id)
+void ToolBar::enabled(std::string id, bool value)
 {
+	
 	foreach (QAction *action, this->actions())
 		if (typeid(*action) == typeid(ButtonAction))
 			if (((ButtonAction *)action)->id == id)
-				action->setEnabled(true);
-}
-
-
-void ToolBar::disable(std::string id)
-{
-	foreach (QAction *action, this->actions())
-		if (typeid(*action) == typeid(ButtonAction))
-			if (((ButtonAction *)action)->id == id)
-				action->setEnabled(false);
+			{
+				action->setEnabled(value);
+				return;
+			}
+		
+	
+	QObjectList children = this->children();
+	
+    for (int i = 0; i < children.length(); i++)
+    {	
+		Label *label = dynamic_cast<Label *>(children[i]);
+		if (label != nullptr)
+			if (label->id == id)
+				label->setEnabled(value);
+	}
+	
 }
 
 

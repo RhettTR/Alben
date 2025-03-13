@@ -21,6 +21,13 @@ class ToolBar : public QToolBar
 				ButtonAction(std::string resourceName, const QString toolTip, std::function<void(void)>);	
 		};
 		
+		class Label : public QLabel
+		{
+			public:
+				std::string id;		
+				Label(std::string resourceName, const QString toolTip);	
+		};
+		
 		class MapSizeComboBox : public QComboBox
 		{
 			public:
@@ -45,6 +52,7 @@ class ToolBar : public QToolBar
 		ToolBar(QWidget *parent, QScrollArea *scrollArea);
 		~ToolBar();
 		void addImageButton(std::string resourceName, const QString toolTip, std::function<void(void)>);
+		void addLabel(std::string resourceName, const QString toolTip);
 		void addSizeComboBox();
 			
 		void zoomIn();
@@ -53,8 +61,7 @@ class ToolBar : public QToolBar
 		void wheelIn(QPoint point);
 		void wheelOut(QPoint point);
 		
-		void enable(std::string id);
-		void disable(std::string id);
+		void enabled(std::string id, bool value);
 		
 		static MapSizeComboBox *sizeBox;
 	

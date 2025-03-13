@@ -23,6 +23,9 @@ class IO
         static constexpr int doubleType = 4;
         static constexpr int tableType = 5;
         
+        static bool stepping;
+        static bool recording;
+        
         
         typedef std::variant<int, std::string, bool, double, Counter::Table> Variant;
         
@@ -36,7 +39,7 @@ class IO
 				virtual ~LoadGame() 
 				{
 					fs.close();
-				}				
+				}	
 		};
 			
 							      
@@ -51,6 +54,7 @@ class IO
 			QSize  size;	
 		}; 
 		
+		void close();
 		
 		// getters for resources
 		QImage& getImage(std::string str);
@@ -60,10 +64,21 @@ class IO
 		static unsigned long long getKey();
 		
 		void saveTable(Counter::Table table);
-		void saveGame();
+		QString saveGame(QString saveAs, QString saveTo, QString suffix);
+		void saveLog(QString file);
 		void loadGame();
 		
 		static std::string findSide();
+		
+		
+		
+		// define State stack
+		typedef std::string Leftside;
+		typedef Counter::Rightside Rightside;
+
+		class Stage : public std::map<Leftside, Rightside> {};
+		class Stack : public std::map<int, Stage> {};
+		
 		
 		
 	protected:

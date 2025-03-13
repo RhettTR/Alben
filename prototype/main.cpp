@@ -27,7 +27,7 @@ CentralFrame *mapFrame;
 CentralFrame *repositoryFrame;
 IO *io;
 Scale *scaled;
-ToolBar *mainToolBar;
+
 
 class MainWindow;
 MainWindow *window;
@@ -35,6 +35,10 @@ Window *repositoryWindow;
 
 
 QWidget *container;
+
+ToolBar *mainToolBar;
+QAction *beginLogAction;
+QAction *endLogAction;
 
 
 
@@ -85,6 +89,11 @@ void cancel ()
 	mapFrame->closeAllOpenStacks();
 }
 
+void close ()
+{
+	io->close();
+}
+
 void load ()
 {
 	io->loadGame();
@@ -92,10 +101,53 @@ void load ()
 
 void save ()
 {
-	io->saveGame();
+	io->saveGame("Save Game As", "Save Files (*.vsav);;All Files(*.*)", "vsav");
 }
 
 
+
+QString file = nullptr;
+
+void beginLog ()
+{
+	if (IO::stepping)
+		return;
+	
+	file = io->saveGame("Save Log As", "Save Files (*.vlog);;All Files(*.*)", "vlog");	
+	if (file.isNull() || file.isEmpty())
+		return; 
+	beginLogAction->setEnabled(false);
+	IO::recording = true;
+	endLogAction->setEnabled(true);
+	mainToolBar->enabled("__record", true);
+	mainToolBar->enabled("__undo", false);
+	mainToolBar->enabled("__redo", false);
+	Luau::saveStage();
+}
+
+void endLog ()
+{
+	beginLogAction->setEnabled(true);
+	IO::recording = false;
+	endLogAction->setEnabled(false);
+	mainToolBar->enabled("__record", false);
+	io->saveLog(file);	
+}
+
+void step()
+{
+	Luau::logStep(true);
+}
+
+void gotoEnd()
+{
+	Luau::logStep(false);
+}
+
+void abortLog()
+{
+	Luau::logAbort();
+}
 
 
 class MainWindow : public QMainWindow
@@ -155,13 +207,30 @@ int main(int argc, char *argv[])
     QMenu *fileMenu = menuBar->addMenu("&File");
          
     
-    QAction *loadAction = new QAction("&Load Game...");
+    QAction *loadAction = new QAction("&Load Game or Log...");
     QObject::connect(loadAction, &QAction::triggered, &load);
     fileMenu->addAction(loadAction);
     
     QAction *saveAction = new QAction("S&ave Game As...");
     QObject::connect(saveAction, &QAction::triggered, &save);
-    fileMenu->addAction(saveAction);         
+    fileMenu->addAction(saveAction);
+    
+    QAction *closeAction = new QAction("&Close Game");
+    QObject::connect(closeAction, &QAction::triggered, &close);
+    fileMenu->addAction(closeAction);
+    
+    fileMenu->addSeparator();
+    
+    beginLogAction = new QAction("&Begin logfile...");
+    QObject::connect(beginLogAction, &QAction::triggered, &beginLog);
+    fileMenu->addAction(beginLogAction);
+    
+    endLogAction = new QAction("&End logfile");
+    QObject::connect(endLogAction, &QAction::triggered, &endLog);
+    endLogAction->setEnabled(false);
+    fileMenu->addAction(endLogAction);
+    
+    fileMenu->addSeparator();         
          
     QAction *reloadAction = new QAction("Reload");
     reloadAction->setShortcut(QKeySequence("Ctrl+R"));
@@ -230,14 +299,19 @@ int main(int argc, char *argv[])
 	mainToolBar->addImageButton("__undo", "Undo last move", &undo);
 	mainToolBar->addImageButton("__redo", "Redo next move", &redo);
 	mainToolBar->addSeparator();
+	mainToolBar->addImageButton("__forward", "Logfile step forward", &step);
+	mainToolBar->addImageButton("__end", "Logfile go to end", &gotoEnd);
+	mainToolBar->addImageButton("__abort", "Abort logfile", &abortLog);
+	mainToolBar->addLabel("__record", "Logfile recording");
+	mainToolBar->addSeparator();
 	mainToolBar->addImageButton("__pluss", "Zoom in", [=]()->void{ mainToolBar->zoomIn(); });	
 	mainToolBar->addSizeComboBox();	
 	mainToolBar->addImageButton("__minus", "Zoom out", [=]()->void{ mainToolBar->zoomOut(); });	
-	mainToolBar->enable("__pluss");
-	mainToolBar->enable("__minus");
+	mainToolBar->enabled("__pluss", true);
+	mainToolBar->enabled("__minus", true);
 	mainToolBar->addSeparator();
 	mainToolBar->addImageButton("__movedicon", "Delete all moved-makers", &clearMoved);
-	mainToolBar->enable("__movedicon");
+	mainToolBar->enabled("__movedicon", true);
 	
 	
 	

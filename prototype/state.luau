@@ -3,16 +3,14 @@
 
 State = {
 
+baseState = {},
 stageStack = {},
-stagePointer = 0
+stagePointer = 0,
+-- used for saving logfile
+savedPointer = 0
 
 }
 
-
-function State:add (id, o)
-	State[id] = o
-	print('added'..id)
-end
 
 
 function State:addMove (id, trait, key, value)
@@ -22,15 +20,17 @@ end
 
 function State:addCreate (id, trait)
 	State.stagePointer = State.stagePointer + 1
-	State.stageStack[State.stagePointer] = { id = id, trait = trait, table = Counter:set(Counter[id]) }
+	State.stageStack[State.stagePointer] = { id = id, trait = trait, table = Counter:load(Counter[id]) }
 end
 
 function State:addStage ()
 	State.stagePointer = State.stagePointer + 1
 	State.stageStack[State.stagePointer] = {id = "end"}
-	
-	toolbar_enable('__undo')
+	if not_recording() then
+		toolbar_enable('__undo')
+	end
 end
+
 
 
 function State:findLastStage ()
@@ -80,72 +80,81 @@ function State:findNextStage ()
 end
 
 
-function State:reset()
+function State:resetState()
+
+	toolbar_disable('__undo')
+	toolbar_disable('__redo')
 	
 	
-	-- remove all Counter not in State
+	State.stageStack = nil
+	State.stageStack = {}
 	
+	
+	State.stagePointer = 0 
+	
+	State.baseState = nil
+	State.baseState = {}
+	
+end
+
+
+function State:reset()	
+	
+	-- reset map to empty
+		
 	for key, value in pairs(Counter) do
+			
+		if type(key) == "string" and type(value) ~= 'function' and key ~= '__index' then
 		
-		if type(value) ~= 'function' and key ~= '__index' then			
-			if State[key] == nil then
-				Counter[key] = nil			
-				delete_class(key)
-			end
-		end
-	end
-	
-	
-	-- reset Counter
-		
-	for key, value in pairs(State) do
-		
-		if type(value) ~= 'function' and key ~= 'stageStack' and key ~= 'stagePointer' then
-			if Counter[key] == nil then
-				Counter[key] = Counter:duplicate(value)
-			end
-		end
+			Counter[key] = nil
+			delete_class(key)
+			
+			if State.baseState[key] ~= nil then
+				setCounter(key, State.baseState[key])
+			end	
+			
+		end	
 	end
 	
 end
 
 
-function State:executeUntil(stage)
+function State:executeUntil(stack, from, to)
 	
-	for i = 1, stage do
+	for i = from, to do
 		
 		
-		local trait = State.stageStack[i].trait
-		local id = State.stageStack[i].id
+		local trait = stack[i].trait
+		local id = stack[i].id
 		local key
 		local value
 		
 		
 		if (trait ~= 'Create') then
-			key = State.stageStack[i].key
-			value = State.stageStack[i].value	
+			key = stack[i].key
+			value = stack[i].value	
 		end
 		
 			
 		
 		if trait == 'Counter' then
-			Counter[id][key] = value		 
+			Counter[id][key] = value
 		end
 		
 		if trait == 'Rotate' then		
-			Counter[id][trait][key] = value		 
+			Counter[id][trait][key] = value	 
 		end
 		
 		if trait == 'MarkMoved' then
-			Counter[id][trait][key] = value		 
+			Counter[id][trait][key] = value
 		end
 		
 		if trait == 'Image' then
-			Counter[id][trait][key] = value 
+			Counter[id][trait][key] = value
 		end
 		
 		if trait == 'Create' then
-			setCounter(id, State.stageStack[i].table)			
+			setCounter(id, stack[i].table)
 		end
 		
 		if trait == 'Delete' then			
@@ -162,15 +171,19 @@ function State:undo()
 
 	
 	if #State.stageStack > 0 then
-		toolbar_enable('__redo')
+		if not_recording() then		
+			toolbar_enable('__redo')
+		end
 	end
 	
+			
 	local i = State:findLastStage ()
 	
+	-- reset counters to base state
+	State:reset()								
 	
-	State:reset()			-- reset Counter with saved State	
-	
-	State:executeUntil(i)	-- execute moves up to last stage
+	-- execute moves up to last stage
+	State:executeUntil(State.stageStack, 1, i)	
 	
 	
 	Counter:generateGUI()
@@ -189,20 +202,96 @@ function State:redo()
 	
 	
 	if #State.stageStack > 0 then
-		toolbar_enable('__undo')
+		if not_recording() then	
+			toolbar_enable('__undo')
+		end
 	end
-
+	
+	
 	local i = State:findNextStage ()
 	
-	State:reset()			-- reset Counter with saved State
+	-- reset counters to base state
+	State:reset()								
 	
-	State:executeUntil(i)	-- execute moves up to next stage
+	-- execute moves up to next stage
+	State:executeUntil(State.stageStack, 1, i)	
+		
 		
 	Counter:generateGUI()
 	
 	
 	if i == #State.stageStack then
 		toolbar_disable('__redo')
+	end
+	
+end
+
+
+
+
+Log = {
+	stageStack = {},
+	stagePointer = 0,
+	stepPointer = 1
+}
+
+
+function Log:reset()
+	Log.stageStack = nil
+	Log.stageStack = {}
+	Log.stagePointer = 0
+	Log.stepPointer = 1
+end
+
+
+function Log:add(table)
+	Log.stagePointer = Log.stagePointer + 1
+	Log.stageStack[Log.stagePointer] = Counter:duplicate(table)
+end
+
+
+function Log:step(oneStep)
+
+	local from = Log.stepPointer
+	
+	for i = Log.stepPointer + 1, #Log.stageStack do	
+		value = Log.stageStack[i]
+		if value.id == 'end' then
+			Log.stepPointer = i
+			if oneStep then
+				break
+			end
+		end
+	end
+	
+	State:executeUntil(Log.stageStack, from, Log.stepPointer)
+	
+	disable_all()
+	
+	-- if stepping done
+	if  Log.stepPointer ==  #Log.stageStack then
+		Log:abort()
+	end
+	
+	Counter:generateGUI()
+	
+end
+
+
+function Log:abort()
+
+	toolbar_disable('__forward')
+	toolbar_disable('__end')
+	toolbar_disable('__abort')
+	
+	stop_stepping()
+	
+	State:resetState()
+	
+	for id, v in pairs(Counter) do
+		if type(id) == "string" and id ~= '__index' and type(v) ~= 'function' then
+			State.baseState[id] = Counter:duplicate(v)
+		end		
 	end
 	
 end

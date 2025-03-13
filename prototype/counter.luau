@@ -58,14 +58,15 @@ end
 Counter = {}
 
 
-function Counter:new (images, imageIndex, zorder, x, y)	
+function Counter:new (id, images, imageIndex, zorder, x, y)	
 	local o = Counter:duplicate(Repository[images[1]])	
 	setmetatable(o, Counter)
 	Counter.__index = Counter
 	o.Image.imageIndex = imageIndex
+	o.id = id
 	o.x = x
 	o.y = y
-	o.zorder = zorder	
+	o.zorder = zorder
 	return o
 end
 
@@ -73,7 +74,7 @@ function Counter:load (table)
 	local o = Counter:duplicate(Repository[table.Image.images[1]])
 	o = Counter:merge(o, table)	
 	setmetatable(o, Counter)
-	Counter.__index = Counter	
+	Counter.__index = Counter
 	return o
 end
 
@@ -86,12 +87,12 @@ function Counter:clone (id, zorder)
 end
 
 
-function Counter:set (table)	
-	local o = Counter:duplicate(table)	
-	setmetatable(o, Counter)
-	Counter.__index = Counter
-	return o
-end
+--function Counter:set (table)	
+--	local o = Counter:duplicate(table)	
+--	setmetatable(o, Counter)
+--	Counter.__index = Counter
+--	return o
+--end
 
 
 function Counter:delete (id)

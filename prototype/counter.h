@@ -125,10 +125,13 @@ class Counter
 		
 		static int nextId();
 		static int topZorder();
+		static void resetId();
+		static void resetZorder();
 		static Counter* findObj(const char *name);
 		static bool snaptoDefaultGrid (Counter *counter, int &x, int &y);
 		static void toggleSelect(const char *name);
 		static void clearMoved();
+		static void setDisabled(bool disable);
 		
 		void setImage();
 		void setPos(int x, int y);

@@ -127,8 +127,12 @@ function getTraits(window, id)
 	
 	if window == 'Repository' then
 		return Repository[id]
-	else
+	elseif window == 'Map' then
 		return Counter[id]
+	elseif window == 'State' then
+		return State.stageStack[id]
+	else
+		return {}
 	end	
 
 end
@@ -216,7 +220,7 @@ Rotate.increment = 45
 
 function copyCounter(fromId, toId, zorder, x, y)
 	local images, imageIndex = Image:getImages(fromId)
-	Counter[toId] = Counter:new(images, imageIndex, zorder, x, y)
+	Counter[toId] = Counter:new(toId, images, imageIndex, zorder, x, y)
 	create_class_copy(Counter, toId)
 end
 
@@ -226,17 +230,33 @@ function cloneCounter(fromId, toId, zorder)
 end
 
 function setCounter(id, table)
-	Counter[id] = Counter:set(table)
+	Counter[id] = Counter:load(table)
 	create_class_copy(Counter, id)
 end
 
 function loadCounter(table)
-	id = next_id()
+	id = table.id
 	Counter[id] = Counter:load(table)
 	create_class_copy(Counter, id)
-	create(id, "Create")
+	State.baseState[id] = Counter:duplicate(Counter[id])
 	return id
 end
+
+function logReset()
+	Log:reset()
+end
+
+function loadLog(table)
+	Log:add(table)
+end
+
+function logStep(oneStep)
+	Log:step(oneStep)
+end
+
+function logAbort()
+	Log:abort()
+end	
 
 function updatePos(id, x, y)
 	Counter[id]["x"] = x
@@ -251,8 +271,26 @@ function updateSide(side)
 	PlayerSide = side
 end
 
+function saveStage()
+	State.savedPointer = State.stagePointer
+end
 
+function deleteAll()
+	for id, v in pairs(Counter) do
+		if type(id) == "string" and id ~= '__index' and type(v) ~= 'function' then
+			Counter:delete(id)
+			delete_class(id)
+		end
+	end
+end
 
+function resetState()
+	State:resetState()
+end
+
+function getRange()
+	return State.stagePointer, State.savedPointer
+end
 
 
 -- event hooks

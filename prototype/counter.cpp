@@ -592,13 +592,11 @@ void Counter::deleteAll()
 {
 	
 	for (auto &&entry : repository) 
-		//entry.second->counter->close();
 		delete entry.second->counter;
 		 
 	repository.clear();
 	
 	for (auto &&entry : counters) 
-		//entry.second->counter->close();
 		delete entry.second->counter;
 		 
 	counters.clear();
@@ -612,7 +610,7 @@ void Counter::deleteAll()
 int Counter::nextId()
 {
 	
-	return Counter::_id++;
+	return ++Counter::_id;
 	
 }
 
@@ -620,8 +618,35 @@ int Counter::nextId()
 int Counter::topZorder()
 {
 	
-	return Counter::_lastZorder++;
+	return ++Counter::_lastZorder;
 	
+}
+
+
+void Counter::resetId()
+{
+	int max = 0;
+	
+	for ( auto obj = counters.begin(); obj != counters.end(); ++obj  )
+		if (obj->second->id > max) 
+			max = obj->second->id;
+		
+	Counter::_id = max;
+}
+
+
+void Counter::resetZorder()
+{
+	// find highest zorder in loaded game
+	// set _lastZorder to greater than highest
+	
+	int max = 0;
+	
+	for ( auto obj = counters.begin(); obj != counters.end(); ++obj  )
+		if (obj->second->state.zorder > max) 
+			max = obj->second->state.zorder;
+		
+	Counter::_lastZorder = max;	
 }
 
 
@@ -712,6 +737,14 @@ void Counter::clearMoved()
 	if (atLeastOne)
 		Luau::doEvent("end", "", "", "", 0);
 	
+}
+
+
+
+void Counter::setDisabled(bool disable)
+{
+	for (auto obj = counters.begin(); obj != counters.end(); ++obj)
+		obj->second->disabled = disable;
 }
 
 
