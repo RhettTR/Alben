@@ -106,7 +106,6 @@ function State:reset()
 			
 		if type(key) == "string" and type(value) ~= 'function' and key ~= '__index' then
 		
-			Counter[key] = nil
 			delete_class(key)
 			
 			if State.baseState[key] ~= nil then
@@ -138,7 +137,7 @@ function State:executeUntil(stack, from, to)
 			
 		
 		if trait == 'Counter' then
-			Counter[id][key] = value
+			Counter[id][key] = value 
 		end
 		
 		if trait == 'Rotate' then		
@@ -155,14 +154,14 @@ function State:executeUntil(stack, from, to)
 		
 		if trait == 'Create' then
 			setCounter(id, stack[i].table)
+			dropped("Map", stack[i].table.Image.images[1], id, stack[i].table.x, stack[i].table.y)
 		end
 		
-		if trait == 'Delete' then			
-			Counter[id] = nil			
+		if trait == 'Delete' then		
 			delete_class(id)
 		end
 		
-	end
+	end	
 	
 end
 
@@ -301,6 +300,9 @@ end
 function undo()
 
 	State:undo()
+	
+	-- hook
+	undohook()
 	
 end
 

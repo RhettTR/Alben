@@ -408,6 +408,7 @@ void Overlay::StackOpen::mousePressEvent(QMouseEvent *event)
 		
 		
 		QDrag *drag = new QDrag(this);
+		drag->deleteLater();
 		drag->setMimeData(mimeData);
 		drag->setPixmap(img);
 		drag->setHotSpot(event->position().toPoint() - child->pos());

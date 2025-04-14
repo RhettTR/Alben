@@ -4,7 +4,7 @@
 #include "frame.h"
 #include "overlay.h"
 #include "luau.h"
-#include "window.h"
+#include "repository.h"
 #include "io.h"
 #include "scale.h"
 #include "toolbar.h"
@@ -582,7 +582,8 @@ void CentralFrame::dropEvent(QDropEvent *event)
 					Luau::doEvent("move", obj->second->name.c_str(), "Counter", "x", obj->second->state.x);
 					Luau::doEvent("move", obj->second->name.c_str(), "Counter", "y", obj->second->state.y);
 		
-					
+					// hook
+					Luau::moved(this->name.c_str(), obj->second->name.c_str(), obj->second->state.x, obj->second->state.y);
 					
 				}
 				
@@ -642,19 +643,17 @@ void CentralFrame::dropEvent(QDropEvent *event)
 				
 			}			
 			
-					
 			
-					
+			droppedX = std::round((float)droppedX / Scale::scaleFraction);
+			droppedY = std::round((float)droppedY / Scale::scaleFraction);
+			
+			
+			// hook
 			if (!Luau::afterDrag(counter->name.c_str(), droppedX, droppedY))
 			{
 				event->acceptProposedAction();
 				return;
 			}
-			
-			droppedX = std::round((float)droppedX / Scale::scaleFraction);
-			droppedY = std::round((float)droppedY / Scale::scaleFraction);
-			
-		
 			
 			
 			// find if dropped on a counter
@@ -680,6 +679,9 @@ void CentralFrame::dropEvent(QDropEvent *event)
 			// add counter to undo stack
 			Luau::doCreate(toId, "Create");
 			Luau::doEvent("end", "", "", "", 0);
+			
+			// hook
+			Luau::dropped(this->name.c_str(), fromId, toId, droppedX, droppedY);
 			
 			
 			

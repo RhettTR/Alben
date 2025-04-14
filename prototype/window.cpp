@@ -1,542 +1,418 @@
-#include "frame.h"
 #include "window.h"
-#include "overlay.h"
+#include "io.h"
+#include "luau.h"
+
+
+extern IO *io;
+
+
+Window::Frame *Window::frame;
+Window *getInstance(const char *instance);
+std::map<std::string, Window *> Window::instances;
 
 
 
 
-
-extern CentralFrame *repositoryFrame;
-
-
-
-
-std::stack<std::any> Window::panes;
-
-
-QList<Window::Pane*> Window::paneList;
-
-		
-
-
-
-
-Window::Pane::Pane(QWidget *parent) : QLabel(parent)
+Window::Window(QWidget *parent, QString title, std::string name, std::string background) : QMainWindow(parent)
 {
 	
-	QPalette palette = this->palette();
-	palette.setColor(QPalette::Window, Qt::white);
-	this->setPalette(palette);	
-	setAutoFillBackground(true);
-	
-	setContentsMargins(0, 0, 0, 0);
-	
-}
+	this->setWindowTitle(title);
 	
 	
-void Window::Pane::resizeEvent(QResizeEvent* event)
-{
-   QLabel::resizeEvent(event);
-}
-
-
-
-Window::ListBox::ListBox(QWidget *parent) : QListWidget(parent)
-{
-	QObject::connect(this, &QListWidget::itemClicked, 
-					 this, [=]()->void{ itemClicked((ListItem *)this->selectedItems().at(0)); });
-					 
-	QObject::connect(this, &QListWidget::itemSelectionChanged, 
-					 this, [=]()->void{ itemSelectionChanged(); });
-}
-
-
-void Window::ListBox::itemClicked(ListItem *item)
-{	
-	for (int i = 0; i < item->listWidget()->count(); ++i)
-	{
-		ListItem* lt = (ListItem *)item->listWidget()->item(i);
-		lt->pane->setVisible(false);
-	}
-	
-	item->pane->setVisible(true);	
-}
-
-
-void Window::ListBox::itemSelectionChanged()
-{	
-	
-	ListItem *item = (ListItem *)this->selectedItems().at(0);
-	
-	for (int i = 0; i < item->listWidget()->count(); ++i)
-	{
-		ListItem* lt = (ListItem *)item->listWidget()->item(i);
-		lt->pane->setVisible(false);
-	}
-	
-	item->pane->setVisible(true);	
-}
-
-
-
-Window::ListItem::ListItem(const QString &text, ListBox *parent, Pane *paneParent, int type) : 
-										QListWidgetItem(text, (QListWidget *)parent, type)
-{
-	Pane *pane = new Pane(paneParent);
-	
-	pane->setVisible(false);
-	paneParent->layout()->addWidget(pane);
-	
-	
-	this->pane = pane;
+    this->move(200, 40);
     
-    parent->addItem(this);
+    frame = new Frame(this, background);
     
-    parent->setCurrentItem(parent->item(0));
-    ((ListItem *)parent->currentItem())->pane->setVisible(true);
- 
-
-}
-
-
-
-Window::ComboBox::ComboBox(QWidget *parent) : QComboBox(parent)
-{
-	QObject::connect(this, &QComboBox::activated, 
-					 this, [=]()->void{ activated(this->currentIndex()); });
-}
-
-void Window::ComboBox::activated(int index)
-{	
-	
-	for (int i = 0; i < this->count(); ++i)
-	{
-		QVariant variant = this->itemData(i);
-		Pane *pane = variant.value<Pane*>();
-		
-		pane->setVisible(false);
-	}
-	
-	
-	
-	QVariant variant = this->itemData(index);
-	
-	
-	if ( strcmp(variant.typeName(), "Window::Pane*") == 0 )
-	{
-		Pane *pane = variant.value<Pane*>();		
-		pane->setVisible(true); 
-	}
-		
-}
-
-
-Window::Window(QWidget *parent) : QMainWindow(parent, Qt::Window | Qt::WindowMinimizeButtonHint)
-{	
-	
-	this->reset();
-	
-	this->setWindowTitle("Counters");
-	
-	QPalette palette = this->palette();
-	palette.setColor(QPalette::Window, Qt::white);
-	this->setPalette(palette);	
-	setAutoFillBackground(true);
-	
-    this->move(70, 100);
-    this->resize(400, 250); 
-    repositoryFrame->resize(400, 250);  
+    this->setCentralWidget((QWidget *)frame);
     
-	
-	this->show();
-}
-
-
-
-void Window::resizeEvent(QResizeEvent* event)
-{
-	QMainWindow::resizeEvent(event);
-	 
-	QLayoutItem *item = repositoryFrame->layout()->itemAt(0);
-	
-	if (item != nullptr)
-	{	
-		QWidget *widget = item->widget();	
-		widget->resize(event->size());
-	}		
-}
-	
-	
-
-
-		
-Window::Pane* Window::getParent()
-{
-
-	// return current top pane
-	
-
-    Pane **pane = std::any_cast<Pane*>(&panes.top());  
+    this->instances[name] = this;
+    this->name = name;
   
-	assert( pane != nullptr );
-	
-	
-	
-	if ((*pane)->layout() == nullptr)
-	{
-		(*pane)->setLayout(new Overlay::FlowLayout(*pane));
-		(*pane)->layout()->setContentsMargins(0, 0, 0, 0);
-	}
-
-
-	return *pane;
-	
-}
-
-
-
-int lastLevel = 0;
-
-
-
-void Window::root(int level)
-{	
-	
-	Pane *pane = new Pane(repositoryFrame);
-	
-	paneList.append(pane);
-	
-	
-	repositoryFrame->layout()->addWidget(pane);
-	
-	pane->resize(repositoryFrame->size());
-	
-	
-	lastLevel = level;
-	
-	
-	panes.push(pane);
-	
-}
-
-
-
-
-void Window::tabs(int level)
-{
-	
-	QTabWidget *w;
-	
-	
-	
-	Pane **parent = (Pane **)std::any_cast<Pane*>(&panes.top());
-	
-	assert( parent != nullptr );
-	
-	
-	
-	(*parent)->setLayout(new QVBoxLayout((*parent)));	
-	(*parent)->layout()->setContentsMargins(QMargins());
-	(*parent)->layout()->setSpacing(0);	
-	
-	
-	
-	
-	w = new QTabWidget(*parent);
-	
-	
-	(*parent)->layout()->addWidget(w);	
-	w->resize((*parent)->size());
-	
-	
-	lastLevel = level;
-	
-    panes.push(w);
-  
-}
-
-
-void Window::tab(int level, std::string text)
-{
-	
-	if (level == lastLevel)
-		panes.pop();
-	
-		
-	if (level < lastLevel) 			
-		for (int i = 0; i <= lastLevel - level; i++)
-			panes.pop();
-	
-	
-	Pane **parent1 = std::any_cast<Pane*>(&panes.top());		
-	QTabWidget **parent2 = std::any_cast<QTabWidget*>(&panes.top());
-	
-	assert( parent1 != nullptr || parent2 != nullptr );
-	
-	
-	
-	
-	if (parent1 != nullptr)
-	{
-		
-	}
-	
-	else
-	
-	{
-		
-		Pane *pane = new Pane(*parent2); 
-		
-		paneList.append(pane); 
     
-		// IMPORTANT: you can not presume anything about what follows a tab;
-		// therefore you can not set its layout here
-		
+	setAcceptDrops(true); 
+	
+}
 
-		(void)(*parent2)->addTab(pane, QString::fromStdString(text));
+
+
+
+Window::Token::Token(int counterId, Counter::Table *table) : QLabel((QWidget *)frame)
+{	
 		
+	this->setStyleSheet("border-style: none");
+	this->baseWidth = 72;
+	this->baseHeight = 72;
+	this->resize(baseWidth, baseHeight);
+	this->counterId	= counterId;
+	this->setVisible(true);
+	
+	this->margin = 18;
+		
+		
+	try
+    {
+		Counter::Table images = std::get<Counter::Table>(std::get<Counter::Table>((*table)["Image"])["images"]);	
+		this->state.image = std::get<std::string>(images[1]);
+		this->state.id = counterId;
+		
+		frame->tokens[this->state.id] = this;
+		
+		this->state.x = (int)std::get<double>((*table)["x"]);	 	
+		this->state.y = (int)std::get<double>((*table)["y"]);		
 	   
-		pane->resize( ((QWidget*)(*parent2)->parent())->size() );
-		
-		panes.push(pane);
-		
-	}
-	
-	
-		
-	lastLevel = level;
-    
-
-}
-
-
-
-void Window::listBox(int level)
-{
-	
-    
-	Pane **parent = (Pane **)std::any_cast<Pane*>(&panes.top());
-		
-	assert( parent != nullptr );
-	
-	
-	
-	(*parent)->setLayout(new QVBoxLayout((*parent)));	
-	(*parent)->layout()->setContentsMargins(QMargins());
-	(*parent)->layout()->setSpacing(0);		
-	
-   
-
-	
-	
-	QSplitter *splitter = new QSplitter(Qt::Horizontal, *parent);
-	
-	splitter->setStyleSheet("QSplitter::handle{ background:gainsboro }");
-	splitter->setHandleWidth(3);
-	
-		
-	(*parent)->layout()->addWidget(splitter);
-	
-	
-	
-	
-     
-	ListBox *listWidget = new ListBox(splitter);
-	
-	
-	
-	listWidget->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-	listWidget->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
-	
-	
-	Pane *pane = new Pane(splitter);
-	
-	paneList.append(pane);
-	
-	pane->setLayout(new QVBoxLayout());
-	pane->layout()->setContentsMargins(QMargins());
-	
-    
-	splitter->addWidget(pane);
-	splitter->addWidget(listWidget);
-
-	QList<int> sizes;
-    sizes.append(0.8 * splitter->sizeHint().width());
-    sizes.append(0.2 * splitter->sizeHint().width());
-    splitter->setSizes(sizes);
-    
-    
-    lastLevel = level;
-    
-	panes.push(splitter);
-
-	
-}
-
-
-void Window::listItem(int level, std::string text)
-{
-
-	if (level == lastLevel)
-		panes.pop();
-	
-		
-	if (level < lastLevel) 			
-		for (int i = 0; i <= lastLevel - level; i++)
-			panes.pop();
-	
-	
-	Pane **parent1 = std::any_cast<Pane*>(&panes.top());		
-	QSplitter **parent2 = std::any_cast<QSplitter*>(&panes.top());
-	
-	assert( parent1 != nullptr || parent2 != nullptr );
-	
-	
-	
-	if (parent1 != nullptr)
-	{
-		
-	}
-	
-	else
-	
-	{
+	    
+		if ((*table).find("Overlays") != (*table).end())		
+		{	
+			Counter::Table *overlays = new Counter::Table();
+				
+			(*overlays) = std::get<Counter::Table>((*table)["Overlays"]);
+			this->overlays = overlays;
+		}
+		else
+			this->overlays = nullptr;
 			
-		ListItem *item = new ListItem(QString::fromStdString(text), 
-									 (ListBox *)(*parent2)->widget(1), 
-									 (Pane *)(*parent2)->widget(0));
-    
-		panes.push(item->pane);
-	}
-
-
-    lastLevel = level;
-    
-    
-}
-
-
-	
-void Window::comboBox(int level)
-{
-	
-	
-	Pane **parent = (Pane **)std::any_cast<Pane*>(&panes.top());
-	
-	
-	assert( parent != nullptr );
-	
-	
-	(*parent)->setLayout(new QVBoxLayout((*parent)));	
-	(*parent)->layout()->setContentsMargins(QMargins());
-	(*parent)->layout()->setSpacing(0);	
-			
-   
-	
-	
-	
-	Pane *pane = new Pane(*parent);
-	
-	paneList.append(pane);
-	
-	pane->setLayout(new QVBoxLayout(pane));
-	pane->layout()->setContentsMargins(QMargins());
-	pane->layout()->setSpacing(0);
-	
-	pane->resize( (*parent)->size() );
-	
-	
-	(*parent)->layout()->addWidget(pane);
-
-	
-	
-	ComboBox *c = new ComboBox(pane);
-
-	
-	pane->layout()->addWidget(c);	
-	
-	
-	
-	lastLevel = level;
-	
-    
-	panes.push(c);
-	
-}
-
-
-
-void Window::comboItem(int level, std::string text)
-{
-	
-	if (level == lastLevel)
-		panes.pop();
-	
-		
-	if (level < lastLevel) 			
-		for (int i = 0; i <= lastLevel - level; i++)
-			panes.pop();
-	
-	
-	Pane **parent1 = std::any_cast<Pane*>(&panes.top());		
-	ComboBox **parent2 = std::any_cast<ComboBox*>(&panes.top());
-	
-	
-	assert( parent1 != nullptr || parent2 != nullptr );
-	
-	
-	
-	
-	if (parent1 != nullptr)
-	{
-		
-	}
-	
-	else
-	{
-	
-		(*parent2)->addItem(QString::fromStdString(text)); 
-	
-		Pane *pane = new Pane((Pane *)(*parent2)->parent());
-		
-		paneList.append(pane);
-		
-		pane->setVisible(false);
-		
-		(*parent2)->setItemData((*parent2)->count() - 1, QVariant::fromValue(pane), Qt::UserRole);
-	
-		((Pane *)(*parent2)->parent())->layout()->addWidget(pane);
-		
-		(*parent2)->activated(0);
-		
-		
-		
-		panes.push(pane);
 			
 	}
-
-
-	lastLevel = level;
+	catch (std::bad_variant_access const& e)
+    {
+        std::cout << e.what() << std::endl;
+    }
+    
+    
 	
 
+	this->setImage(state.image);	
+	this->move(state.x - (this->width() / 2), state.y - (this->height() / 2));
+	
+	
 }
+
+
+Window::Token::~Token() 
+{	
+	std::map<int, Token *>::iterator iter = frame->tokens.find(this->state.id);
 	
+	if (iter != frame->tokens.end() )
+		frame->tokens.erase(iter);
+}
+
+
+
+
+
+
+
+void Window::Token::setImage(std::string name)
+{
+		
+	int w = baseWidth + 2*margin;
+	int h = baseHeight + 2*margin;
+	
+	
+	this->resize(w,h);
+	
+	QImage baseImage = io->getImage(name);
+	
+	
+	QImage image = QImage(w, h, QImage::Format_ARGB32_Premultiplied);
+		
+	image.fill(Qt::transparent);
+	
+	QPainter *paint = new QPainter(&image);			
+	paint->drawImage(margin, margin, baseImage);						
+	delete paint;
+	
+	
+	if (overlays != nullptr)		
+	{	
+		
+		for (auto const &label : (*overlays))
+		{
+			
+			Counter::Table trait = std::get<Counter::Table>(label.second);
+		
+			
+			try
+			{
+				if (std::get<bool>(trait["apply"]))
+				{
+					int x = (int)std::get<double>(trait["x"]);
+					int y = (int)std::get<double>(trait["y"]);
+					
+					QFont font;
+					font.setFamily(QString::fromStdString(std::get<std::string>(trait["font"])));
+					font.setPixelSize((int)std::get<double>(trait["size"]));
+					font.setWeight(QFont::Bold);
+					
+					std::string color = std::get<std::string>(trait["color"]);
+
+
+					const QString text = QString::fromStdString(std::get<std::string>(trait["text"]));
+					
+					QPainter *paint = new QPainter(&image);
+					paint->setFont(font);
+					paint->setPen(QString::fromStdString(color));
+					paint->drawText(x, y, width(), margin, Qt::AlignVCenter | Qt::AlignHCenter, text);
+					delete paint;
+				}
+				
+			}
+			catch (std::bad_variant_access const& e)
+			{
+				std::cout << e.what() << std::endl;
+			}	
+			
+		}
+				
+	}
 	
 
-void Window::reset()
+	this->setPixmap(QPixmap::fromImage(image));
+	
+}
+
+
+void Window::Token::set(std::string text)
+{
+	this->setText(QString::fromStdString(text));
+}
+
+
+Window *Window::getInstance(const char *instance)
 {
 	
-	//  the code here is not finished !!!
+	std::string name = std::string(instance);
 	
+	for ( auto obj = Window::instances.begin(); obj != Window::instances.end(); ++obj  )
 	
-	QMutableListIterator<Pane*> p(paneList);
+		if (obj->first == name)
+			return obj->second;
+			
+	return nullptr;
 	
-	if (p.hasNext())
-		delete p.next();
-	
-	
-	paneList.clear();
-	paneList.squeeze();
+}
 
-    
+
+
+Window::Frame::Coordiantes coordinates;
+
+
+Window::Frame::Frame(Window *parent, std::string background) : QFrame((QWidget *)parent)
+{
+	setAcceptDrops(true);
+	
+	backgroundImage = io->getImage(background);
+	((Window *)this->parent())->resize(backgroundImage.size()); 
+}
+
+
+void Window::Frame::addtoGrid(int x, int y)
+{
+	coordinates.push_back({x, y});
+}
+
+ 
+ 
+inline Window::Token *dragged = nullptr;
+
+ 
+ 
+void Window::Frame::mousePressEvent(QMouseEvent *event)
+{
+	
+	
+	if (event->button() == Qt::LeftButton)
+	{
+		
+		Token *child = 
+			static_cast<Token*>(childAt(event->position().toPoint()));
+	
+			
+		if (child == nullptr)
+			return;			
+				
+
+		dragged = child;
+		
+		
+	
+		
+		QImage image = child->pixmap().toImage();
+		
+		
+			
+		QPixmap img(image.size());
+		
+		img.fill(Qt::transparent);		
+		QPainter painter;
+		painter.begin(&img);
+		painter.drawImage(0, 0, image); 				
+		painter.end();
+		
+		
+		QByteArray itemData;
+		QDataStream dataStream(&itemData, QIODevice::WriteOnly);
+		
+		
+		
+		QPoint counterOffset = event->position().toPoint() - child->pos();		
+		dataStream << counterOffset;
+
+		QMimeData *mimeData = new QMimeData;
+		mimeData->setData("application/x-alben-window", itemData);
+			
+		
+		QDrag *drag = new QDrag(this);
+		drag->deleteLater();
+		drag->setMimeData(mimeData);
+		drag->setPixmap(img);
+		drag->setHotSpot(counterOffset);
+		
+		
+		
+		drag->exec(Qt::MoveAction);
+		
+		
+	}
+	
+	
+	
+}
+
+
+void Window::Frame::dragEnterEvent(QDragEnterEvent *event)
+{	
+	if (event->mimeData()->hasFormat("application/x-alben-window")) 	
+		event->acceptProposedAction();
+}
+
+
+void Window::Frame::dropEvent(QDropEvent *event)
+{
+	
+	if (event->mimeData()->hasFormat("application/x-alben-window"))
+	{
+		
+		QPoint counterOffset;
+		
+		QByteArray itemData = event->mimeData()->data("application/x-alben-window");
+		QDataStream dataStream(&itemData, QIODevice::ReadOnly);
+			
+		dataStream >> counterOffset; 
+		
+		
+		int x = event->position().toPoint().x();
+		int y = event->position().toPoint().y();
+	
+		
+		
+		
+		if (coordinates.empty())
+			dragged->move(x - counterOffset.x(), y - counterOffset.y());
+		else
+		{
+			Coordinate coordinate;	
+			snaptoGrid (x, y, dragged, coordinate);
+			dragged->move(coordinate.x - (int)(dragged->width() / 2), 
+						  coordinate.y - (int)(dragged->height() / 2));
+			Luau::moved(((Window *)this->parent())->name.c_str(), 
+						std::to_string(dragged->state.id).c_str(), 
+						coordinate.x, 
+						coordinate.y);
+		}
+			
+		event->acceptProposedAction();				
+	}
+	
+}
+
+
+
+void Window::Frame::snaptoGrid (int x, int y, Token *dragged, Coordinate &coordinate)
+{
+	
+
+	int minimum_distance = std::numeric_limits<int>::max();
+	
+	Coordinate minimum;
+		
+	for (auto i : coordinates)
+	{
+		// simplification of sqr(dx² + dy²)
+		int sum = abs(x - i.x) + abs(y -i.y);
+		
+		if (sum < minimum_distance)
+		{
+			minimum_distance = sum;
+			minimum.x = i.x;
+			minimum.y = i.y;
+			
+		}
+	}
+	
+	
+	if (minimum_distance < std::numeric_limits<int>::max())
+	{
+		coordinate.x = minimum.x;
+		coordinate.y = minimum.y;
+	}
+	
+}
+
+
+
+void Window::Frame::paintEvent(QPaintEvent *event)
+{
+	
+	QPainter painter(this);
+	
+	painter.drawImage(0,0,backgroundImage);
+	
+}
+
+
+
+
+Window::Label::Label(std::string id, Frame *parent, int x, int y, int w, int h, QString styleSheet) : QLabel((QWidget *)parent->parent())
+{
+	parent->labels[id] = this;
+	
+	setStyleSheet(styleSheet);
+	setFixedSize(w, h);
+	setVisible(true);
+	
+	move(x, y);
+}
+
+
+void Window::Label::set(std::string text)
+{
+	this->setText(QString::fromStdString(text));
+}
+
+
+std::string Window::Label::get()
+{
+	return this->text().toStdString();
+}
+
+
+
+Window::CheckBox::CheckBox(std::string id, Window *parent, int x, int y, int w, int h, QString text, std::string luaScript, QString styleSheet) : QCheckBox(text, (QWidget *)parent)
+{
+	parent->frame->checkboxes[id] = this;
+	
+	setStyleSheet(styleSheet);
+	setFixedSize(w, h);
+	setVisible(true);
+	
+	move(x, y);
+	
+	QObject::connect( this, &QAbstractButton::clicked, [=]()->void{ Luau::callbackScript(luaScript); });
+	
+}
+
+bool Window::CheckBox::get()
+{
+	return this->isChecked();
 }

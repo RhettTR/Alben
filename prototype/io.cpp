@@ -11,6 +11,7 @@
 #include "toolbar.h"
 
 
+extern CentralFrame *mapFrame;
 extern ToolBar *mainToolBar;
 
 using namespace std;
@@ -32,6 +33,7 @@ void IO::close()
 	Luau::deleteAll();
 	Luau::resetState();
 	Luau::logReset();
+	mapFrame->closeAllOpenStacks();
 	
 	mainToolBar->enabled("__forward", false);
 	mainToolBar->enabled("__end", false);

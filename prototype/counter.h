@@ -167,7 +167,7 @@ class Counter
 				
 		static std::map<int, Counter *> counters;
 		
-		static std::map<int, Counter *> repository;
+		static std::map<std::string, Counter *> repository;
 		
 		static std::map<std::string, Counter::SystemMask *> masks;
 		

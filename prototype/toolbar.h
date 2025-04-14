@@ -17,8 +17,8 @@ class ToolBar : public QToolBar
 		class ButtonAction : public QAction
 		{
 			public:
-				std::string id;		
-				ButtonAction(std::string resourceName, const QString toolTip, std::function<void(void)>);	
+				std::string id;
+				ButtonAction(std::string resourceName, const QString toolTip, std::function<void(void)>, const std::string);
 		};
 		
 		class Label : public QLabel
@@ -51,7 +51,7 @@ class ToolBar : public QToolBar
 	
 		ToolBar(QWidget *parent, QScrollArea *scrollArea);
 		~ToolBar();
-		void addImageButton(std::string resourceName, const QString toolTip, std::function<void(void)>);
+		void addImageButton(std::string resourceName, const QString toolTip, std::function<void(void)>, std::string = "");
 		void addLabel(std::string resourceName, const QString toolTip);
 		void addSizeComboBox();
 			
@@ -64,6 +64,7 @@ class ToolBar : public QToolBar
 		void enabled(std::string id, bool value);
 		
 		static MapSizeComboBox *sizeBox;
+
 	
 		
 	private:

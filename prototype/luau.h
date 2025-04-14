@@ -24,6 +24,10 @@ class Luau
 		static void doCreate(const char *fromId, const char *trait);
 		static bool beforeDrag(const char *id);
 		static bool afterDrag(const char *id, int &x, int &y);
+		static void dropped(const char *name, const char *fromid, const char *toid, int x, int y);
+		static void moved(const char *name, const char *toid, int x, int y);
+		static void deleted(const char *id);
+		static void flipped(const char *id, const char *image);
 		static void handlers(const char *id, const char *func);
 		static void undo();
 		static void redo();
@@ -42,11 +46,14 @@ class Luau
 		static void logAbort();
 		
 		
+		
 		Luau();
 		
 		
 		
 		void compileScript();
+		static void callbackScript(std::string script);
+		
 		void startVM();
 		void closeVM();
 		

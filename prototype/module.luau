@@ -198,6 +198,7 @@ local Counter = counter()
 local Traits = traits()
 local State = state()
 local Repository = repository()
+local Token = dev()
 
 
 
@@ -278,7 +279,6 @@ end
 function deleteAll()
 	for id, v in pairs(Counter) do
 		if type(id) == "string" and id ~= '__index' and type(v) ~= 'function' then
-			Counter:delete(id)
 			delete_class(id)
 		end
 	end
@@ -293,23 +293,40 @@ function getRange()
 end
 
 
+
+function runScript(func)
+
+	_G[func]()
+	
+end
+
+
+
 -- event hooks
 
 function beforeDrag(id)
 
-	--local counter
+	local counter
 	
-	--if Counter[id] ~= nil then
-	--	counter = Counter[id]
-	--else
-	--	counter = Repository[id]
-	--end
+	if Counter[id] ~= nil then
+		counter = Counter[id]
+	else
+		counter = Repository[id]
+	end
 	
-	--if counter["Side"] == PlayerSide or counter["Side"] == "" then
-		return true
-	--else
-	--	return false
-	--end
+	
+	if counter[id]['OnlyOneInstance'] ~= nil then
+		-- check if counter already exists
+		for k, v in pairs(Counter) do		
+			if type(k) == "string" and k ~= '__index' and type(v) ~= 'function' then
+				if v.Image.images[1] == id and Counter[k].OnlyOneInstance ~= nil then
+					return false
+				end
+			end
+		end
+	end
+	
+	return true
 	
 end
 
@@ -350,31 +367,104 @@ function afterDrag(id, x, y)
 			end	 
 		end	
 	end
-			
+		
 	
 	return true, x , y
 	
 end
 
 
-function removeAllMoved()
- 
-	for k, v in pairs(Counter) do
+
+function dropped(name, fromid, toid, x, y)
 		
-		if type(k) == "string" and k ~= '__index' and type(v) ~= 'function' then
-			
-			if Counter[k].MarkMoved ~= nil then
-				Counter[k].MarkMoved.moved = false
-			end						
-			
-		end
-		
+	local image = Counter[toid].Image.images[1]
+	
+	-- create new artillery token
+
+	if string.find(image, 'German/Artillery') then
+		Token[toid] = Token:new(fromid, toid)	
+		create_token(Token, toid)		
+		Token[toid].Overlays[1]:setText(printCoordinates(x, y))
+		updateGUI(toid)	
 	end
 	
-	Counter:generateGUI()
+	moved(name, toid, x, y)
+	
+end
+
+
+function moved(name, toid, x, y)
+	
+	local image = Counter[toid].Image.images[1]
+	
+	
+	-- draw coordinate if target
+	
+	if image == string.match(image, '.+GermanTarget%d') then
+		local number = string.match(image, '%d$')
+		set_label_text('coor' .. number, printCoordinates(x, y))
+		setTarget(tonumber(number), xyCoordinates(x, y))
+	end
+	
+	if name == "Map" then
+		if string.find(image, 'German/Artillery') then
+			Token[toid].Overlays[1]:setText(printCoordinates(x, y))
+			Token:pos (toid, xyCoordinates(x, y))
+			updateGUI(toid)					
+		end
+	end
+	
+	if name == "artillery-window" then
+		Token[toid].x = x
+		Token[toid].y = y
+	end
+	
+	recalculate()
+	
+	
+end
+
+
+function deleted(id)
+
+	local image = Counter[id].Image.images[1]
+	
+	if image == string.match(image, '.+GermanTarget%d') then
+		set_label_text('coor' .. string.match(image, '%d$'), '---')
+		set_label_text('valu' .. string.match(image, '%d$'), '0')
+	end
+	
+	if string.find(image, 'German/Artillery') then
+		delete_window("artillery-window", id)		
+	end
+
+
+	Counter[id] = nil
 
 end
 
+
+function flipped(id, name)
+	
+	if string.find(name, 'German/Artillery') then	
+		Token[id].FullStrength = not Token[id].FullStrength
+		image = Token:flip (id)	
+		set_token_image(id, image)		
+	end
+	
+	recalculate()
+	
+end
+
+
+function undohook()
+
+	resetValues()
+	
+end
+
+
+------
 
 
 
@@ -428,7 +518,6 @@ end
 
 --create_button("button 1", "button 1", "buttonHandler", 100, 100, 70, 30)
 --create_button("button 2", "button 2", "buttonHandler2", 200, 100, 70, 30)
-
 
 
 

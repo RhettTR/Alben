@@ -8,17 +8,22 @@
 #include "toolbar.h"
 
 
+extern Luau l;
 extern QWidget *container;
 extern CentralFrame *mapFrame;
 extern IO *io;
 extern Scale *scaled;
 
 
+
+
 ToolBar::MapSizeComboBox *ToolBar::sizeBox = nullptr;
 
 
 
-ToolBar::ButtonAction::ButtonAction(std::string resourceName, const QString toolTip, std::function<void(void)> f)
+
+
+ToolBar::ButtonAction::ButtonAction(std::string resourceName, const QString toolTip, std::function<void(void)> f, std::string luaScript)
 {
 	QPixmap pixmap;
 	(void)pixmap.convertFromImage(io->getImage(resourceName));
@@ -28,8 +33,13 @@ ToolBar::ButtonAction::ButtonAction(std::string resourceName, const QString tool
 	this->setToolTip(toolTip);
 	this->setEnabled(false);
 	this->id = resourceName;
+
 	
-	QObject::connect( this, &QAction::triggered, this, [=]()->void{ f(); } );
+	if (luaScript.empty())		
+		QObject::connect(this, &QAction::triggered, this, [=]()->void{ f(); });	
+	else
+		QObject::connect(this, &QAction::triggered, this, [=](){ Luau::callbackScript(luaScript); });
+	
 }
 
 
@@ -235,9 +245,9 @@ ToolBar::~ToolBar()
 
 
 
-void ToolBar::addImageButton(std::string resourceName, const QString toolTip, std::function<void(void)> func)
+void ToolBar::addImageButton(std::string resourceName, const QString toolTip, std::function<void(void)> func, std::string luaScript)
 {
-	ButtonAction *action = new ButtonAction(resourceName, toolTip, func);
+	ButtonAction *action = new ButtonAction(resourceName, toolTip, func, luaScript);
 	this->addAction(action);
 }
 

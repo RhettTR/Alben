@@ -1,81 +1,113 @@
-#include <stack>
-#include <any>
-
 #include <QtWidgets>
+#include <map>
+
+#include "counter.h"
 
 		
 		
 class Window : public QMainWindow
 {
-
+	
 	public:
+		
+		class Token;
+		class Label;
+		class CheckBox;
+		
+		class Frame : public QFrame
+		{
+			public:
+				struct Coordinate 
+				{ 
+					int x; 
+					int y; 
+				};
+				typedef typename std::vector<Coordinate> Coordiantes;
+							
+				Frame(Window *parent, std::string background);
 	
-		class Pane : public QLabel
-		{
-			public:
-				Pane(QWidget *parent = nullptr);
-			protected:
-				virtual void resizeEvent(QResizeEvent* e);
-		};
-		
-		
-		class ListItem;
-		
-		class ListBox : public QListWidget
-		{
-			public:
-				ListBox(QWidget *parent);				
+				void snaptoGrid (int x, int y, Token *dragged, Coordinate &coordinate);
+				void addtoGrid(int x, int y);
+				
+				std::map<std::string, Label *> labels;
+				std::map<std::string, CheckBox *> checkboxes;
+				std::map<int, Token *> tokens;
+				
+			protected:	
+				virtual void mousePressEvent(QMouseEvent *event);
+				virtual void dragEnterEvent(QDragEnterEvent *event);
+				virtual void dropEvent(QDropEvent *event);
+				virtual void paintEvent (QPaintEvent *event);
+				
 			private:
-				void itemClicked(ListItem *item);
-				void itemSelectionChanged();
+				QImage backgroundImage;	
+				
 		};
 		
-		class ListItem : public QListWidgetItem
+		class Token : public QLabel
 		{
 			public:
-				ListItem(const QString &text, ListBox *parent, Pane *paneParent, int type = Type);
-				Pane *pane;
 			
+				struct State				
+				{
+					int id;
+					int x;					
+					int y;										
+					std::string image;			// name of current (flipped) image					
+				};
+				
+				Token(int counterId, Counter::Table *table);
+				~Token(); 
+				
+				int margin;	// the area around the counter for rendering masks
+				
+				void setImage(std::string name);
+				
+				State state;
+				
+				int baseWidth;
+				int baseHeight;
+				int counterId;
+				
+				Counter::Table *overlays;
+				
+				void set(std::string text);
+				
+				
 		};
 		
-		class ComboBox : public QComboBox
+		
+		class Label : public QLabel
 		{
 			public:
-				ComboBox(QWidget *parent = nullptr);
-				void activated(int index);
-				
-		};		
+				Label(std::string id, Frame *parent, int x, int y, int w, int h, QString styleSheet);
+							
+				void set(std::string text);	
+				std::string get();	
+		};
 		
 		
-		Window(QWidget *parent);
-		
-
-		Pane* getParent();
-		
-		
-		static void root(int level);
-		static void tabs(int level);
-		static void tab(int level, std::string text);
-		static void listBox(int level);
-		static void listItem(int level, std::string text);
-		static void comboBox(int level);
-		static void comboItem(int level, std::string text);
+		class CheckBox : public QCheckBox
+		{
+			public:
+				CheckBox(std::string id, Window *parent, int x, int y, int w, int h, QString text, std::string luaScript, QString styleSheet);
+					
+				bool get();	
+		};
 		
 		
-		static QList<Pane*> paneList;
 		
+		Window(QWidget *parent, QString title, std::string name, std::string background);
 		
-		void reset();
+		std::string name;
 		
+		static Frame *frame;
 		
-	protected:
+		static Window *getInstance(const char *instance);
+		
 	
-		virtual void resizeEvent(QResizeEvent* event);
-		
-		
 	private:
-				
-		static std::stack<std::any> panes;
-		
+	
+		static std::map<std::string, Window *> instances;
 		
 };

@@ -6,7 +6,7 @@
 #include "counter.h"
 #include "overlay.h"
 #include "luau.h"
-#include "window.h"
+#include "repository.h"
 	
 #include "io.h"
 #include "scale.h"
@@ -19,8 +19,9 @@ using namespace std;
 int Counter::_id = 0;
 int Counter::_lastZorder = 0;
 
-map<int, Counter *> Counter::repository;
+
 map<int, Counter *> Counter::counters;
+map<string, Counter *> Counter::repository;
 map<string, Counter::SystemMask *> Counter::masks;
 
 
@@ -38,7 +39,7 @@ QString Counter::selectionColor = QString("#bc145e");
 
 extern CentralFrame *mapFrame;
 extern CentralFrame *repositoryFrame;
-extern Window *repositoryWindow;
+extern Repository *repositoryWindow;
 extern IO *io;
 extern Scale *scaled;
 
@@ -381,7 +382,9 @@ void Counter::QtCounter::do_activate (QAction *action)
 		// else do action on unselected this
 				
 		Luau::doAction(window, this->owner->name.c_str(), entryaction);
-		Luau::doAction("", "", "actionEnd");
+		
+		if (strcmp(window, "Map") == 0)  // oh oh
+			Luau::doAction("", "", "actionEnd");
 	}
 					
 }
@@ -412,10 +415,12 @@ Counter::Counter(Table *state)
 	
 	this->id = Counter::nextId();
 	
-	Counter::repository[this->id] = this;
+	//Counter::repository[this->id] = this;
 	
 
 	this->name = std::get<std::string>(std::get<Table>(std::get<Table>((*state)["Image"])["images"])[1]);
+	
+	Counter::repository[this->name] = this;
 	
 	this->state.x = 0;
 	this->state.y = 0;
@@ -436,7 +441,7 @@ Counter::Counter(Table *state)
 	
 	
 	
-	Window::Pane *pane = repositoryWindow->getParent();
+	Repository::Pane *pane = repositoryWindow->getParent();
 	
 	
 	
@@ -573,6 +578,9 @@ Counter::Counter(int id, Table *state)
 Counter::~Counter() 
 {
 		
+	// hook
+	Luau::deleted(this->name.c_str());
+	
 	if (this->state.overlays != nullptr)
 		delete this->state.overlays;
 	
@@ -581,6 +589,8 @@ Counter::~Counter()
 	Overlay::hooverView->setVisible(false);
 	
 	Counter::counters.erase(this->id);
+	
+	
 	
 	mapFrame->repaint();
 	

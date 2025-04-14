@@ -49,14 +49,14 @@ end
 
 Masks = {}
 
-Masks["MovedMarker"] = {
-	mask = "__moved", 
+Masks['MovedMarker'] = {
+	mask = '__moved', 
 	x = 72, 
 	y = 15
 }
 
 
-create_mask("MovedMarker", "__moved", 72, 15)
+create_mask('MovedMarker', '__moved', 72, 15)
 
 
 
@@ -71,8 +71,8 @@ function Overlays:new ()
 end
 
 
-function Overlays:add (value, apply)
-	value["apply"] = apply
+function Overlays:add (value)
+	value["apply"] = value.test(value)
 	table.insert(self, value)
 end
 
@@ -80,20 +80,20 @@ end
 
 Mask = {}
 
-function Mask:new (mask, x, y)
+function Mask:new (mask, x, y, func)
 	local o = {}
 	setmetatable(o, self)
 	self.__index = self
 	o.mask = mask
 	o.x = x
 	o.y = y	
-	o.apply = true	
+	o.test = func
 	return o
 end
 
 Label = {}
 
-function Label:new (text, font, size, color, x, y)
+function Label:new (text, font, size, color, x, y, func)
 	local o = {}
 	setmetatable(o, self)
 	self.__index = self
@@ -103,8 +103,13 @@ function Label:new (text, font, size, color, x, y)
 	o.color = color
 	o.x = x
 	o.y = y
-	o.apply = true
+	o.test = func
 	return o
+end
+
+function Label:setText (value)
+	self.text = value
+	self.apply = self.test(self)
 end
 
 
@@ -176,7 +181,7 @@ end
 
 
 
---- since basic Rotate, Delete and DoesNotStack have the same function everywhere only one instance need exist
+--- Rotate,Delete,DoesNotStack,OnlyOneInstance have the same function everywhere so only one instance need exist
 
 
 RotateCW = {	
@@ -199,6 +204,10 @@ Delete = {
 
 
 DoesNotStack = {
+}
+
+
+OnlyOneInstance = {
 }
 
 
@@ -255,8 +264,8 @@ function German:new()
 	self.__index = self
 	o.Side = "German"
 	o.Overlays = Overlays:new ()
-	o.Overlays:add(Mask:new("German/Mask", 46, 44), (o.Side ~= PlayerSide))
-	o.Overlays:add(Label:new("7", "times", 28, "white", 45, 63), (o.Side ~= PlayerSide))
+	o.Overlays:add(Mask:new("German/Mask", 46, 44, function(o) return o.Side ~= PlayerSide end))
+	o.Overlays:add(Label:new("7", "times", 28, "white", 45, 63, function(o) return o.Side ~= PlayerSide end))
 	return o   	
 end  
 
@@ -269,10 +278,11 @@ function French:new()
 	self.__index = self
 	o.Side = "French"
 	o.Overlays = Overlays:new ()
-	o.Overlays:add(Mask:new("French/Mask", 46, 45), (o.Side ~= PlayerSide))
-	o.Overlays:add(Label:new("R", "times", 24, "black", 45, 64), (o.Side ~= PlayerSide))
+	o.Overlays:add(Mask:new("French/Mask", 46, 45, function(o) return o.Side ~= PlayerSide end))
+	o.Overlays:add(Label:new("R", "times", 24, "black", 45, 64, function(o) return o.Side ~= PlayerSide end))
 	return o   	
 end 
+
 
 
 

@@ -86,18 +86,8 @@ function Counter:clone (id, zorder)
 	return o
 end
 
-
---function Counter:set (table)	
---	local o = Counter:duplicate(table)	
---	setmetatable(o, Counter)
---	Counter.__index = Counter
---	return o
---end
-
-
 function Counter:delete (id)
 	State:addMove (id, "Delete", "", 0)	
-	Counter[id] = nil
 end
 
 
@@ -205,6 +195,8 @@ function Counter:generateGUI()
 						opacity,
 						Counter[k],
 						'Overlays')
+						
+			moved("Map", k, Counter[k].x, Counter[k].y)
 			
 		end
 	end

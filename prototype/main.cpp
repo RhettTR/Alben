@@ -10,10 +10,11 @@
 #include "counter.h"
 #include "scale.h"
 #include "overlay.h"
-#include "window.h"
+#include "repository.h"
 #include "io.h"
 #include "toolbar.h"
 #include "settings.h"
+#include "window.h"
 
 
 
@@ -31,7 +32,11 @@ Scale *scaled;
 
 class MainWindow;
 MainWindow *window;
-Window *repositoryWindow;
+Repository *repositoryWindow;
+Window *artilleryWindow;
+
+void createWindow(QString, std::string, std::string);
+void show();
 
 
 QWidget *container;
@@ -148,6 +153,21 @@ void abortLog()
 {
 	Luau::logAbort();
 }
+
+void createWindow(QString title, std::string name, std::string background)
+{
+	artilleryWindow = new Window((QWidget *)window, title, name, background);
+}
+
+
+void show()
+{	
+	if (artilleryWindow->isHidden())
+		artilleryWindow->show();
+	else
+		artilleryWindow->hide();
+}
+
 
 
 class MainWindow : public QMainWindow
@@ -312,6 +332,7 @@ int main(int argc, char *argv[])
 	mainToolBar->addSeparator();
 	mainToolBar->addImageButton("__movedicon", "Delete all moved-makers", &clearMoved);
 	mainToolBar->enabled("__movedicon", true);
+	mainToolBar->addSeparator();
 	
 	
 	
@@ -331,11 +352,10 @@ int main(int argc, char *argv[])
 	
     repositoryFrame = new CentralFrame(repositoryWindow, "Repository");
     
-    repositoryWindow = new Window(window);
+    repositoryWindow = new Repository(window);
     repositoryWindow->setCentralWidget((QWidget *)repositoryFrame);
     
     
-	
     
     
     
