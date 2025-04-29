@@ -221,7 +221,7 @@ int main(int argc, char *argv[])
 	QMenuBar *menuBar = window->menuBar();
 	
     menuBar->setStyleSheet("QMenuBar {background-color: gainsboro}");
-    menuBar->setFixedHeight(20);
+    menuBar->setFixedHeight(22);
  
     
     QMenu *fileMenu = menuBar->addMenu("&File");

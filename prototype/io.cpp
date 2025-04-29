@@ -139,7 +139,7 @@ IO::LoadGame::LoadGame(std::string fileName)
 			
 			if (Settings::playerSide == "")
 			{
-				Settings::playerSide == findSide();
+				Settings::playerSide = findSide();
 				Luau::updateSide(Settings::playerSide.c_str());
 			}
 			
@@ -371,13 +371,20 @@ void IO::load_resources(string directory)
 		{		 
 			if (!is_directory(i->path()))
 			{
-				string str = i->path().parent_path().string() + "/" + i->path().stem().string();
+				string str = i->path().parent_path().string();
+				
+				// convert back-slashes to fore-slashes
+				std::replace(str.begin(), str.end(), '\\', '/');
+				
+				str = str + "/" + i->path().stem().string();
 				
 				string base = directory + "/";
 				string substr = str.substr(base.length());
 				printf("loaded %s\n", substr.c_str());
 				
-				string filename{i->path().relative_path()};
+				//string filename{i->path().relative_path()};
+				string filename = string(i->path().relative_path().generic_string());
+	
 				
 				
 				QImageReader reader(QString::fromStdString(filename));
@@ -388,7 +395,7 @@ void IO::load_resources(string directory)
 				
 	
 				QImage image = reader.read();
-								
+
 				_resources[substr].image = image;
 				
 			}

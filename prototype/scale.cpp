@@ -180,7 +180,7 @@ CentralFrame::Point Scale::getScaleRotateCoordinate(Counter *counter, int x, int
 void Scale::resourceScaleRotate(std::string name)
 {
 	
-	QImage image = io->getImage(name);	
+	QImage image = io->getImage(name);
 	QImage imageScaled;
 	QPixmap overlayScaled;
 	
