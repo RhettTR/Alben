@@ -52,6 +52,8 @@ class Repository : public QMainWindow
 
 		Pane* getParent();
 		
+		void visibility(bool value);
+		
 		
 		static void root(int level);
 		static void tabs(int level);

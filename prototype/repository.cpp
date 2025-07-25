@@ -144,8 +144,8 @@ Repository::Repository(QWidget *parent) : QMainWindow(parent, Qt::Window | Qt::W
 	setAutoFillBackground(true);
 	
     this->move(70, 100);
-    this->resize(400, 250); 
-    repositoryFrame->resize(400, 250);  
+    this->resize(400, 300); 
+    repositoryFrame->resize(400, 300);  
     
 	
 	this->show();
@@ -192,6 +192,15 @@ Repository::Pane* Repository::getParent()
 	return *pane;
 	
 }
+
+
+
+void Repository::visibility(bool value)
+{
+	this->setVisible(value);	
+}
+
+
 
 
 

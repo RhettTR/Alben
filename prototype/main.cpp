@@ -33,10 +33,7 @@ Scale *scaled;
 class MainWindow;
 MainWindow *window;
 Repository *repositoryWindow;
-Window *artilleryWindow;
 
-void createWindow(QString, std::string, std::string);
-void show();
 
 
 QWidget *container;
@@ -111,6 +108,8 @@ void save ()
 
 
 
+
+
 QString file = nullptr;
 
 void beginLog ()
@@ -154,29 +153,16 @@ void abortLog()
 	Luau::logAbort();
 }
 
-void createWindow(QString title, std::string name, std::string background)
-{
-	artilleryWindow = new Window((QWidget *)window, title, name, background);
-}
-
-
-void show()
-{	
-	if (artilleryWindow->isHidden())
-		artilleryWindow->show();
-	else
-		artilleryWindow->hide();
-}
 
 
 
-class MainWindow : public QMainWindow
+class MainWindow : public Window
 {
 	public:
-		QScrollArea *scrollArea;
 		
-		MainWindow() : scrollArea(new QScrollArea)
+		MainWindow() : Window(nullptr, "Window", "main")
 		{
+			this->scrollArea = new QScrollArea;
 			setCentralWidget(scrollArea);
 		}
 		
@@ -213,9 +199,6 @@ int main(int argc, char *argv[])
 
     window = new MainWindow();
     
-
-    
-    window->setWindowTitle("Window");
 	
 	
 	QMenuBar *menuBar = window->menuBar();
@@ -293,9 +276,9 @@ int main(int argc, char *argv[])
 	window->scrollArea->setWidget(container);
 	
 	
-    mapFrame = new CentralFrame(container, "Map", window->scrollArea);
-    mapFrame->setObjectName("centralFrame");
-	
+    window->frame = new CentralFrame(container, "Map", (Window *)window, window->scrollArea);
+    window->frame->setObjectName("centralFrame");
+	mapFrame = (CentralFrame *)Window::getInstance("main")->frame;
 	
 	
 	
@@ -332,7 +315,6 @@ int main(int argc, char *argv[])
 	mainToolBar->addSeparator();
 	mainToolBar->addImageButton("__movedicon", "Delete all moved-makers", &clearMoved);
 	mainToolBar->enabled("__movedicon", true);
-	mainToolBar->addSeparator();
 	
 	
 	
@@ -350,7 +332,7 @@ int main(int argc, char *argv[])
    
 	// create repository window
 	
-    repositoryFrame = new CentralFrame(repositoryWindow, "Repository");
+    repositoryFrame = new CentralFrame(repositoryWindow, "Repository", (Window *)window);
     
     repositoryWindow = new Repository(window);
     repositoryWindow->setCentralWidget((QWidget *)repositoryFrame);

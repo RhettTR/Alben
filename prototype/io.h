@@ -59,6 +59,7 @@ class IO
 		// getters for resources
 		QImage& getImage(std::string str);
 		QSize getSize(std::string str);
+		bool isResource(std::string str);
 		
 		// getter for ownership key
 		static unsigned long long getKey();
@@ -67,6 +68,7 @@ class IO
 		QString saveGame(QString saveAs, QString saveTo, QString suffix);
 		void saveLog(QString file);
 		void loadGame();
+		void loadSetUp(std::string filename);
 		
 		static std::string findSide();
 		

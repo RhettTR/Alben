@@ -100,7 +100,7 @@ end
 
 function State:reset()	
 	
-	-- reset map to empty
+	-- reset map to state before stack was made 
 		
 	for key, value in pairs(Counter) do
 			
@@ -121,8 +121,7 @@ end
 function State:executeUntil(stack, from, to)
 	
 	for i = from, to do
-		
-		
+				
 		local trait = stack[i].trait
 		local id = stack[i].id
 		local key
@@ -136,8 +135,8 @@ function State:executeUntil(stack, from, to)
 		
 			
 		
-		if trait == 'Counter' then
-			Counter[id][key] = value 
+		if trait == 'Counter' then	
+			Counter[id][key] = value
 		end
 		
 		if trait == 'Rotate' then		
@@ -160,8 +159,10 @@ function State:executeUntil(stack, from, to)
 		if trait == 'Delete' then		
 			delete_class(id)
 		end
+
 		
 	end	
+
 	
 end
 
@@ -184,7 +185,7 @@ function State:undo()
 	-- execute moves up to last stage
 	State:executeUntil(State.stageStack, 1, i)	
 	
-	
+
 	Counter:generateGUI()
 	
 	
@@ -198,7 +199,6 @@ end
 
 
 function State:redo()
-	
 	
 	if #State.stageStack > 0 then
 		if not_recording() then	
@@ -221,7 +221,7 @@ function State:redo()
 	
 	if i == #State.stageStack then
 		toolbar_disable('__redo')
-	end
+	end	
 	
 end
 

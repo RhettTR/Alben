@@ -47,16 +47,8 @@ end
 
 
 
-Masks = {}
 
-Masks['MovedMarker'] = {
-	mask = '__moved', 
-	x = 72, 
-	y = 15
-}
-
-
-create_mask('MovedMarker', '__moved', 72, 15)
+create_mask('MovedMarker', '__moved', 'left', 'hcenter')
 
 
 
@@ -181,7 +173,48 @@ end
 
 
 
---- Rotate,Delete,DoesNotStack,OnlyOneInstance have the same function everywhere so only one instance need exist
+
+WhenMoved = {}
+
+
+function WhenMoved:new()
+	local o = {}
+	setmetatable(o, self)
+	self.__index = self
+	o.action = 
+		function()
+			local ap = Counter:findId("Markers/warstatus_ap")
+			local cp = Counter:findId("Markers/warstatus_cp")
+			local combined = Counter:findId("Markers/warstatus_combined")
+		
+			if not ap or not cp or not combined then
+				return
+			end
+			-- find turn for warstatus_ap and warstatus_cp
+			local n = tonumber(Zones:getPlace(Counter[ap].x, Counter[ap].y)) 		
+			if n == nil then
+				return
+			end									
+			local m = tonumber(Zones:getPlace(Counter[cp].x, Counter[cp].y)) 
+			if m == nil then
+				return
+			end				
+			-- find position for sum
+			local x, y = Zones:getCoordinates("grt", n + m)
+			if x == -1 then
+				return
+			end
+			-- move warstatus_combined			
+			Counter:move(combined, x, y)
+		end
+	o.movetrigger = function(id) Counter[id].WhenMoved.action() end
+	return o
+end
+
+
+
+
+-- Rotate,Delete,DoesNotStack,OnlyOneInstance have the same function everywhere so only one instance need exist
 
 
 RotateCW = {	
@@ -211,6 +244,20 @@ OnlyOneInstance = {
 }
 
 
+CantBeMoved = {
+}
+
+--[[
+AllCards = {
+	hooverstack = false,           
+	openstack = false,              
+	offsetlessNumber = false,       
+	offsetMax = 3,				    
+	offsetAmount = 3,              							 
+	faceupIndex = 1,              
+	faceDownAlwaysShuffled = true   
+}
+--]]
 
 
 --- define the rotation trait of one particular counter
@@ -230,28 +277,70 @@ end
 
 
 
+Global = {}	
+
+function Global:addTrait (key, trait)
+	Global[key] = trait
+end
 
 
+Area = {
+	menuDelete = {menuname = "Delete all markers here", menuclick = "actionDeleteAll"},
+	menuATrench = {menuname = "Place AP Trench", menuid = "Allied/ap_trench1"}
+}
 
-Base = {}
 
-function Base:new ()
+Marker = {}
+
+function Marker:new(name, dx, dy, side)
 	local o = {}
-	setmetatable(o, self)
-	self.__index = self
+	o.marker = name
+	o.renderOffset = {dx = dx, dy = dy}
+	o.Side = side
 	o.Delete = Delete
+	o.CantBeMoved = CantBeMoved
 	return o
 end
+
+
+Move = {}
+
+function Move:new(name, point)
+	local o = {}
+	o.x = point.x
+	o.y = point.y
+	o.menuname = name
+	o.menuclick = "actionMove"
+	return o
+end
+
+
+MoveAll = {}
+
+function MoveAll:new(zone, name)
+	local o = {}
+	o.zoneTag = zone	
+	o.menuname = name
+	o.menuclick = "actionMoveAll"
+	return o
+end
+
+
+
+
+
+
+
+--- define counter and card playing pieces
 
 
 Piece = {}
 
 function Piece:new ()
-	local o = Base:new ()
-	setmetatable(self, {__index = Base})
+	local o = {}
+	setmetatable(self, self)
 	self.__index = self 
 	o.MarkMoved = MarkMoved:new()
-	o.Rotate = Rotate:new()
 	return o
 end
 
@@ -262,10 +351,7 @@ function German:new()
 	local o = Piece:new ()
 	setmetatable(self, {__index = Piece})
 	self.__index = self
-	o.Side = "German"
-	o.Overlays = Overlays:new ()
-	o.Overlays:add(Mask:new("German/Mask", 46, 44, function(o) return o.Side ~= PlayerSide end))
-	o.Overlays:add(Label:new("7", "times", 28, "white", 45, 63, function(o) return o.Side ~= PlayerSide end))
+	o.Side = "Central"
 	return o   	
 end  
 
@@ -276,12 +362,25 @@ function French:new()
 	local o = Piece:new ()
 	setmetatable(self, {__index = Piece})
 	self.__index = self
-	o.Side = "French"
-	o.Overlays = Overlays:new ()
-	o.Overlays:add(Mask:new("French/Mask", 46, 45, function(o) return o.Side ~= PlayerSide end))
-	o.Overlays:add(Label:new("R", "times", 24, "black", 45, 64, function(o) return o.Side ~= PlayerSide end))
+	o.Side = "Allied"
 	return o   	
 end 
+
+British = {}
+
+function British:new()
+	local o = Piece:new ()
+	setmetatable(self, {__index = Piece})
+	self.__index = self
+	o.Side = "Allied"
+	return o   	
+end
+
+
+
+
+ 
+
 
 
 

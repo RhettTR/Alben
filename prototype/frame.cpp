@@ -8,6 +8,9 @@
 #include "io.h"
 #include "scale.h"
 #include "toolbar.h"
+#include "window.h"
+
+
 
 
 using namespace std;
@@ -27,6 +30,7 @@ string CentralFrame::backgroundID;
 
 bool CentralFrame::openStackoffset = true;	// true = open stack with offset method
 bool CentralFrame::facingMatters = false;	// true = rotate counters when map rotates
+CentralFrame::Area *CentralFrame::area = nullptr;
 
 
 
@@ -36,11 +40,150 @@ CentralFrame::Button::Button(const QString &text, QWidget *parent) : QPushButton
 	
 	
 	
+CentralFrame::Area::Area(QFrame *parent) : QLabel(parent)
+{			
+	this->setContextMenuPolicy(Qt::CustomContextMenu);
+}
+
+
+CentralFrame::Area::~Area()
+{
+}
+
+
+static Luau::PopupEntries popupentries;
+
+
+void CentralFrame::Area::showRightClickMenu(Counter *counter)
+{
 	
-CentralFrame::CentralFrame(QWidget *parent, std::string name, QScrollArea *scrollArea) : QFrame(parent)
+	QMenu myMenu(this);
+	
+	
+	while (this->actions().count() > 0)
+		this->removeAction(this->actions().first());
+	
+	this->counter = counter;
+	
+	
+	popupentries.clear();
+		
+	popupentries = Luau::getTraits("Global", "Area");
+	
+
+	for (auto e : popupentries)
+	{
+		
+		// hook	
+		if (!Luau::menu(this->counter->name.c_str(), e.entryname.c_str(), e.entryid.c_str()))
+			continue;
+		 
+		const QString name = QString::fromStdString(e.entryname);
+		
+		QAction* action = new QAction(name, this);
+				
+		QVariant v;
+		v.setValue(e);
+		
+		action->setData(v);
+			
+	   
+		this->addAction(action);
+		
+		
+		QObject::connect( action, &QAction::triggered, this, [=]()->void{ execute(action); } );
+		
+	}
+
+	
+	myMenu.addActions(this->actions());
+	
+	myMenu.exec(QCursor::pos());
+	
+}
+
+
+void CentralFrame::Area::execute(QAction *action)
+{
+	QVariant v = action->data();
+	Luau::Popupentry e = (Luau::Popupentry) v.value<Luau::Popupentry>();
+	
+	
+	if (!e.entryid.empty())
+	{
+		const char *fromId = e.entryid.c_str();
+		const char *toId = std::to_string(Counter::nextId()).c_str();		
+		int zorder = Counter::bottomZorder();	
+		
+				
+		Luau::copyCounter(fromId, toId, zorder, this->counter->state.x, this->counter->state.y);
+		
+		Luau::doCreate(toId, "Create");
+		Luau::doEvent("end", "", "", "", 0);
+		
+		
+		Counter::counters[atoi(toId)]->counter->lower();
+		// force redraw of mask layer
+		Overlay::overlay->clearMask(); 
+	}
+	
+	if (!e.entryaction.empty())
+	{
+		const char *entryaction = e.entryaction.c_str();
+		QByteArray bb = QString::fromStdString(((CentralFrame *)this->counter->parentFrame)->name).toLocal8Bit();
+		const char *window = bb.data();
+		
+		
+		Luau::doAction(window, this->counter->name.c_str(), entryaction);
+		
+		Luau::doAction("", "", "actionEnd");
+	}
+	
+}
+
+
+bool CentralFrame::Area::findCounter(QPoint point, Counter *&foundCounter)
+{
+	
+	int extra = (int)(15 * Scale::scaleFraction);
+	
+	for ( auto obj = Counter::counters.begin(); obj != Counter::counters.end(); ++obj  )	
+	{
+		// hook - is this a counter with a menu
+		if (!Luau::menucounter(obj->second->name.c_str()))
+			continue;
+		
+		int hx = obj->second->scaledMargin + std::round(obj->second->scaledWidth/2);
+		int hy = obj->second->scaledMargin + std::round(obj->second->scaledHeight/2);
+		
+		int x = std::round(obj->second->state.x * Scale::scaleFraction) + hx;
+		int y = std::round(obj->second->state.y * Scale::scaleFraction) + hy;
+
+		
+		if (abs(x - point.x()) < (hx + extra) && 
+			abs(y - point.y()) < (hy + extra))	
+		{		
+			foundCounter = obj->second;
+			return true;	
+		}
+	}
+	
+	
+	foundCounter = nullptr;
+	return false;
+	
+}
+	
+	
+
+	
+		
+	
+CentralFrame::CentralFrame(QWidget *parent, std::string name, Window *window, QScrollArea *scrollArea) : QFrame(parent)
 {
 	
 	this->name = name;
+	this->window = window;
 	
 	if (name == "Map")
 	{
@@ -69,6 +212,21 @@ void CentralFrame::mousePressEvent(QMouseEvent *event)
 	
 	if (Overlay::hooverView->isVisible())
 		return;
+		
+		
+		
+	if (event->button() == Qt::RightButton)	
+	{
+		if (CentralFrame::area != nullptr)
+		{
+			Counter *counter;
+			
+			if (CentralFrame::area->findCounter(event->position().toPoint(), counter))
+				CentralFrame::area->showRightClickMenu(counter);
+		}
+		
+	}
+	
 	
 	
 	if (event->button() == Qt::LeftButton)
@@ -89,8 +247,8 @@ void CentralFrame::mousePressEvent(QMouseEvent *event)
 		
 		Counter::QtCounter *child = 
 			dynamic_cast<Counter::QtCounter*>(childAt(frameCoordinates));
-			
-			
+		
+		
 		
 		
 		if (child == nullptr)
@@ -215,7 +373,7 @@ void CentralFrame::mousePressEvent(QMouseEvent *event)
 				{		
 					if (stackOpen.count(point))
 					{
-						child->owner->selected = true;
+						child->owner->selected = Luau::selectable(child->owner->name.c_str());
 						child->owner->setImage();
 					}
 					else
@@ -238,7 +396,7 @@ void CentralFrame::mousePressEvent(QMouseEvent *event)
 					if (stackOpen.count(point))
 					{
 						unselect();
-						child->owner->selected = true;
+						child->owner->selected = Luau::selectable(child->owner->name.c_str());
 						child->owner->setImage();
 					}
 					else
@@ -264,7 +422,8 @@ void CentralFrame::dragEnterEvent(QDragEnterEvent *event)
 	this->activateWindow();
 	
 	if (event->mimeData()->hasFormat("application/x-alben-counter") ||
-		event->mimeData()->hasFormat("application/x-alben-drag")) 		
+		event->mimeData()->hasFormat("application/x-alben-drag") ||
+		event->mimeData()->hasFormat("application/x-alben-window")) 		
 		event->acceptProposedAction();		
 	else 
 		event->ignore();
@@ -372,7 +531,8 @@ void CentralFrame::dragMoveEvent(QDragMoveEvent *event)
 	
 		
 	if (event->mimeData()->hasFormat("application/x-alben-counter") ||
-		event->mimeData()->hasFormat("application/x-alben-drag")) 		
+		event->mimeData()->hasFormat("application/x-alben-drag") ||
+		event->mimeData()->hasFormat("application/x-alben-window")) 		
 		event->acceptProposedAction();
 	else 
 		event->ignore();
@@ -402,7 +562,8 @@ void CentralFrame::dropEvent(QDropEvent *event)
 		dataStream >> ghostOrigo;
 		dataStream >> id;
 		
-	
+		
+		
 		
 		int droppedX = event->position().toPoint().x() - counterOffset.x();
 		int droppedY = event->position().toPoint().y() - counterOffset.y();
@@ -503,6 +664,8 @@ void CentralFrame::dropEvent(QDropEvent *event)
 			QPoint delta = target - source;
 			
 			QSize map = scaled->getScaledSize(CentralFrame::backgroundID);
+			
+			int n = 0;
 		
 			
 			for (auto const& [point, stack] : stacks)	
@@ -536,11 +699,15 @@ void CentralFrame::dropEvent(QDropEvent *event)
 						y += obj->second->state.y;	
 						
 					}
-				
+			
 					
-					if (!Luau::afterDrag(obj->second->name.c_str(), x, y))
+					if (!Luau::afterDrag(obj->second->name.c_str(), 
+										 std::round(obj->second->width/2) + obj->second->margin, 
+									     std::round(obj->second->height/2) + obj->second->margin, 
+										 x, 
+										 y))
 						continue;
-					
+				
 					
 					
 					// cant drop outside map
@@ -562,61 +729,67 @@ void CentralFrame::dropEvent(QDropEvent *event)
 					
 							
 					
-					
 							
 					if (!(obj->second->state.x == x && obj->second->state.y == y))
-					{						
-						//stackOpen.erase((Point){.x = obj->second->state.x, .y = obj->second->state.y});
+					{
+						Luau::updatePos(obj->second->name.c_str(), x, y);
 						Luau::doEvent("movetrigger", obj->second->name.c_str(), "", "", 0);
-					}
+					}					
 					
 					
-				
-						
 					obj->second->state.x = x;
 					obj->second->state.y = y;					
 					
 					
-					Luau::updatePos(obj->second->name.c_str(), obj->second->state.x, obj->second->state.y);			
+					Luau::updatePos(obj->second->name.c_str(), obj->second->state.x, obj->second->state.y);
+								
+					
 					
 					Luau::doEvent("move", obj->second->name.c_str(), "Counter", "x", obj->second->state.x);
 					Luau::doEvent("move", obj->second->name.c_str(), "Counter", "y", obj->second->state.y);
+					
+					// increment number of moved
+					n++;
 		
 					// hook
 					Luau::moved(this->name.c_str(), obj->second->name.c_str(), obj->second->state.x, obj->second->state.y);
+						
 					
-				}
+					
+				}	// for
 				
+			}	// for
+			
+			
+			
+			
+			// never add 'end' or new zorder unless at least one moved
+			if (n > 0)
+			{
+				// assign new zorder to all dropped counters
+				
+				for (auto const& [point, stack] : stacks)	
+					for (auto obj = stack.begin(); obj != stack.end(); ++obj)	
+					{
+						obj->second->state.zorder = Counter::topZorder();
+						Luau::doEvent("move", obj->second->name.c_str(), "Counter", "zorder", obj->second->state.zorder);
+						obj->second->counter->raise();
+					}
+				
+				
+				// update drop stack zorders for counters higher than dropped
+						
+				for (auto obj = dropTo.begin(); obj != dropTo.end(); ++obj)	
+					if (obj->second->state.zorder > dropZorder)
+					{
+						obj->second->state.zorder = Counter::topZorder();
+						Luau::doEvent("move", obj->second->name.c_str(), "Counter", "zorder", obj->second->state.zorder);						
+						obj->second->counter->raise();
+					}
+			
+			
+				Luau::doEvent("end", "", "", "", 0);
 			}
-			
-			
-			
-			
-			// assign new zorder to all dropped counters
-			
-			for (auto const& [point, stack] : stacks)	
-				for (auto obj = stack.begin(); obj != stack.end(); ++obj)	
-				{
-					obj->second->state.zorder = Counter::topZorder();						
-					Luau::doEvent("move", obj->second->name.c_str(), "Counter", "zorder", obj->second->state.zorder);
-					obj->second->counter->raise();
-				}
-				
-				
-			// update drop stack zorders for counters higher than dropped
-					
-			for (auto obj = dropTo.begin(); obj != dropTo.end(); ++obj)	
-				if (obj->second->state.zorder > dropZorder)
-				{
-					obj->second->state.zorder = Counter::topZorder();
-					Luau::doEvent("move", obj->second->name.c_str(), "Counter", "zorder", obj->second->state.zorder);						
-					obj->second->counter->raise();
-				}
-			
-
-
-			
-			Luau::doEvent("end", "", "", "", 0);
 			
 			
 		}
@@ -647,9 +820,13 @@ void CentralFrame::dropEvent(QDropEvent *event)
 			droppedX = std::round((float)droppedX / Scale::scaleFraction);
 			droppedY = std::round((float)droppedY / Scale::scaleFraction);
 			
-			
+		
 			// hook
-			if (!Luau::afterDrag(counter->name.c_str(), droppedX, droppedY))
+			if (!Luau::afterDrag(counter->name.c_str(), 
+							     std::round(counter->width/2) + counter->margin, 
+								 std::round(counter->height/2) + counter->margin, 
+								 droppedX, 
+								 droppedY))
 			{
 				event->acceptProposedAction();
 				return;
@@ -723,6 +900,67 @@ void CentralFrame::dropEvent(QDropEvent *event)
 		
 	} 
 	
+	else
+	
+	if (event->mimeData()->hasFormat("application/x-alben-window")) 
+	{
+		
+		QByteArray itemData = event->mimeData()->data("application/x-alben-window");
+		QDataStream dataStream(&itemData, QIODevice::ReadOnly);
+
+		QPoint counterOffset;
+		QString name;
+		int id;
+		int margin;
+				
+			
+		dataStream >> counterOffset;
+		dataStream >> name;
+		dataStream >> id;
+				
+	
+		std::string str = name.toStdString();
+		
+	
+		
+		// scales down to map size
+		counterOffset *= Scale::scaleFraction;
+		
+		
+	
+		
+		
+		int droppedX = event->position().toPoint().x() - counterOffset.x();
+		int droppedY = event->position().toPoint().y() - counterOffset.y();
+		
+		
+		droppedX = std::round((float)droppedX / Scale::scaleFraction);
+		droppedY = std::round((float)droppedY / Scale::scaleFraction);
+						
+			
+			
+		const char *fromId = str.c_str();	
+		const char *toId = std::to_string(Counter::nextId()).c_str();
+		// token id to be deleted
+		const char *oldId = std::to_string(id).c_str();			
+		int zorder = Counter::topZorder();
+			
+		// create Luau representation and C++ representation of counter
+		Luau::copyCard(fromId, toId, oldId, zorder, droppedX, droppedY);
+		
+		
+		
+		
+		// add counter to undo stack
+		Luau::doCreate(toId, "Create");
+		Luau::doEvent("end", "", "", "", 0);
+		
+		
+		event->setDropAction(Qt::MoveAction);
+		event->accept();
+		
+	}
+	
 	else 
 	
 		event->ignore();
@@ -752,7 +990,7 @@ void CentralFrame::selectStack(Counter *counter)
 			
 		if (p == point)
 		{	
-			obj->second->selected = true;
+			obj->second->selected = Luau::selectable(obj->second->name.c_str());
 			obj->second->setImage();
 		}	
 	}	
@@ -778,7 +1016,7 @@ void CentralFrame::selectCounter(Counter *counter)
 			}	
 		}
 
-		counter->selected = true;
+		counter->selected = Luau::selectable(counter->name.c_str());
 		counter->setImage();
 	}
 		
@@ -853,8 +1091,9 @@ QImage CentralFrame::stackGhostImage(Counter *counter, QRect &totalRect)
 		
 		Point p = (Point){.x = obj->second->state.x, .y = obj->second->state.y};
 			
-		if (p == point && obj->second != counter)	
-			stack[obj->second->state.zorder] = obj->second;		
+		if (p == point && obj->second != counter)
+			if (Luau::beforeDrag(obj->second->name.c_str()))
+				stack[obj->second->state.zorder] = obj->second;		
 			
 	}
 	
@@ -1063,6 +1302,9 @@ void CentralFrame::deleteButton(const char *id)
 }
 
 
+
+	
+
 void CentralFrame::toggleOpenStack(Counter *counter, int sign)
 {
 	Point point = (Point){.x = counter->state.x, .y = counter->state.y};
@@ -1087,6 +1329,15 @@ void CentralFrame::closeAllOpenStacks()
 }
 
 
+
+void CentralFrame::resizeEvent(QResizeEvent* event)
+{
+	
+	QFrame::resizeEvent(event);
+	
+	window->setWidgets();
+
+}
 
 
 
@@ -1151,12 +1402,15 @@ void CentralFrame::paintEvent(QPaintEvent *e)
 		}	
 	}
 	
-	
+
 	
 	
 	// draw below counters
 	
-	for (auto const& [point, stack] : stacks)		
+	for (auto const& [point, stack] : stacks)
+	{	
+		
+			
 		for ( auto obj = stack.begin(); obj != stack.end(); ++obj  )
 		{
 			
@@ -1199,10 +1453,10 @@ void CentralFrame::paintEvent(QPaintEvent *e)
 			}
 		}
 	
+	}
 	
 	
-	
-	
+
 		
 	
 	// render all "stacks" with 1 or more counters
@@ -1219,12 +1473,20 @@ void CentralFrame::paintEvent(QPaintEvent *e)
 		
 		int fx = first->state.x;
 		int fy = first->state.y;
-		int openFactor = 1;		
+		int openFactor = 1;
+		
+		
+				
 		
 		if (CentralFrame::openStackoffset && stackOpen.count(point))
-			openFactor = 3 * stackOpen[point]; 
+			openFactor = 3 * stackOpen[point];
 		
 			
+		int top = stack.size();
+		int n = 1;
+		bool cards = stack.begin()->second->table.find("Card") != stack.begin()->second->table.end();
+		
+				
 			
 		for ( auto obj = stack.begin(); obj != stack.end(); ++obj  )
 		{		
@@ -1238,26 +1500,29 @@ void CentralFrame::paintEvent(QPaintEvent *e)
 			
 			
 
-			
-			QRect source(0, 
-						 0, 
-						 obj->second->scaledBuffer.width(), 
-						 obj->second->scaledBuffer.height());
-							
-			QRect dest(x,
-					   y,
-					   obj->second->scaledWidth + 2*obj->second->scaledMargin,					   
-					   obj->second->scaledHeight + 2*obj->second->scaledMargin);
-					   					   
-						
-						  
-			source.moveCenter( dest.center() );
-			
-	
-			
-			x = source.topLeft().x();
-			y = source.topLeft().y();
+			if (obj->second->state.degrees != 0)
+			{
 				
+				QRect source(0, 
+							 0, 
+							 obj->second->scaledBuffer.width(), 
+							 obj->second->scaledBuffer.height());
+								
+				QRect dest(x,
+						   y,
+						   obj->second->scaledWidth + 2*obj->second->scaledMargin,					   
+						   obj->second->scaledHeight + 2*obj->second->scaledMargin);
+											   
+							
+							  
+				source.moveCenter( dest.center() );
+				
+		
+				
+				x = source.topLeft().x();
+				y = source.topLeft().y();
+				
+			}	
 				
 			
 		
@@ -1270,12 +1535,28 @@ void CentralFrame::paintEvent(QPaintEvent *e)
 			// offset is 0, 1, 2 ... the postion in the stack with 0 bottom
 			if (Counter::haveOffset)
 			{
-				x = x + (offsetAmount * offset * openFactor);
-				y = y - (offsetAmount * offset * openFactor);
+				if (obj->second->table.find("Marker") != obj->second->table.end())
+				{
+					Counter::Table table = 
+						std::get<Counter::Table>(std::get<Counter::Table>((obj->second->table)["Marker"])["renderOffset"]);		
+					x += (int)(std::get<double>((table)["dx"]) * Scale::scaleFraction);
+					y += (int)(std::get<double>((table)["dy"]) * Scale::scaleFraction);
+				}	
+				else				
+				{
+					x = x + (offsetAmount * offset * openFactor);
+					y = y - (offsetAmount * offset * openFactor);
+					
+					// 3 is the number of shown cards in a card stack
+					if (!cards || (n > top - 3))
+						offset++;
+						
+					n++;
+				}
 			}
 	
 			
-			offset++;
+			
 			
 			
 					

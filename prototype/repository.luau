@@ -1,72 +1,92 @@
 	
 -- create repository
 	
-	Repository["German/12R-51R"] = Repository:new({"German/12R-51R", "German/12R-51R_f"})
-	Repository["German/38-94"] = Repository:new({"German/38-94", "German/38-94_f"})
-	Repository["German/Artillery/5-77-2"] = Repository:new({"German/Artillery/5-77-2"})
-	Repository["German/Artillery/5-150H"] = Repository:new({"German/Artillery/5-150H", "German/Artillery/5-150H_f"})
-	Repository["German/Artillery/5-420H-6"] = Repository:new({"German/Artillery/5-420H-6", "German/Artillery/5-420H-6_f"})
-	Repository["German/Targets/GermanTarget1"] = Repository:new({"German/Targets/GermanTarget1"})
-	Repository["German/Targets/GermanTarget2"] = Repository:new({"German/Targets/GermanTarget2"})
-	Repository["French/BRIGADE-3"] = Repository:new({"French/BRIGADE-3", "French/BRIGADE-3_f"})	
-	Repository["French/VII-40"] = Repository:new({"French/VII-40", "French/VII-40_f"})
-	Repository["Markers/FLAME"] = Repository:new({"Markers/FLAME"})
-	Repository["Markers/GAS"] = Repository:new({"Markers/GAS"})
+	Repository["German/ge_army01"] = Repository:new({"German/ge_army01", "German/ge_army01_back"})
+	Repository["German/ge_army02"] = Repository:new({"German/ge_army02", "German/ge_army02_back"})
+	Repository["German/ge_army03"] = Repository:new({"German/ge_army03", "German/ge_army03_back"})
+	Repository["French/fr_army03"] = Repository:new({"French/fr_army03", "French/fr_army03_back"})
+	Repository["French/fr_army04"] = Repository:new({"French/fr_army04", "French/fr_army04_back"})
+	Repository["French/fr_army05"] = Repository:new({"French/fr_army05", "French/fr_army05_back"})
+	Repository["British/bef_army"] = Repository:new({"British/bef_army", "British/bef_army_back"})
+
+	Repository["Markers/action_cp1"] = Repository:new({"Markers/action_cp1"})
+	Repository["Markers/action_cp2"] = Repository:new({"Markers/action_cp2"})
+	Repository["Markers/action_cp3"] = Repository:new({"Markers/action_cp3"})
+	Repository["Markers/action_cp4"] = Repository:new({"Markers/action_cp4"})
+	Repository["Markers/action_cp5"] = Repository:new({"Markers/action_cp5"})
+	Repository["Markers/action_cp6"] = Repository:new({"Markers/action_cp6"})
+	
+	Repository["Markers/warstatus_ap"] = Repository:new({"Markers/warstatus_ap"})
+	Repository["Markers/warstatus_cp"] = Repository:new({"Markers/warstatus_cp"})
+	Repository["Markers/warstatus_combined"] = Repository:new({"Markers/warstatus_combined"})
+	
+	Repository["Allied/ap_trench1"] = Repository:new({"Allied/ap_trench1", "Allied/ap_trench2"})
+	
+	
+	Repository["Central/card_cp02"] = Repository:new({"Central/card_cp02", "Central/cardback_cp"})
+	Repository["Central/card_cp03"] = Repository:new({"Central/card_cp03", "Central/cardback_cp"})
+	Repository["Central/card_cp06"] = Repository:new({"Central/card_cp06", "Central/cardback_cp"})
+	Repository["Central/card_cp12"] = Repository:new({"Central/card_cp12", "Central/cardback_cp"})
+	
 	
 	
 -- set traits for all counters
 	
-	Repository:addTraits("German/12R-51R", German:new())
-	Repository:addTraits("German/38-94", German:new())
-	Repository:addTraits("German/Artillery/5-77-2", German:new())
-	Repository:addTraits("German/Artillery/5-150H", German:new())
-	Repository:addTraits("German/Artillery/5-420H-6", German:new())
-	Repository:addTraits("German/Targets/GermanTarget1", Base:new())
-	Repository:addTraits("German/Targets/GermanTarget2", Base:new())
+	Repository:addTraits("German/ge_army01", German:new())
+	Repository:addTraits("German/ge_army02", German:new())
+	Repository:addTraits("German/ge_army03", German:new())
 	
-	Repository:addTraits("French/BRIGADE-3", French:new())
-	Repository:addTraits("French/VII-40", French:new())
+	Repository:addTraits("French/fr_army03", French:new())
+	Repository:addTraits("French/fr_army04", French:new())
+	Repository:addTraits("French/fr_army05", French:new())
 	
-	Repository:addTraits("Markers/FLAME", Base:new())
-	Repository:addTraits("Markers/GAS", Base:new())	
+	Repository:addTraits("British/bef_army", British:new())
+
+	Repository:addTrait("Allied/ap_trench1", "Marker", Marker:new("Allied/ap_trench1", -20, 0, "Allied"))
 	
-	Repository:addTrait("Markers/GAS", "AreaOfEffect", AreaOfEffect:new(0.5, "red", 0.2))
-	Repository:addTrait("German/12R-51R", "Clone", Clone:new())	
-	Repository:addTrait("French/BRIGADE-3", "Select", Select:new())
-	Repository:addTrait("French/VII-40", "DoesNotStack", DoesNotStack)
-	--Repository:addTrait("German/38-94", "Visibility", Visibility:new(0.3))
-	Repository:addTrait("German/Targets/GermanTarget1", "OnlyOneInstance", OnlyOneInstance)
-	Repository:addTrait("German/Targets/GermanTarget2", "OnlyOneInstance", OnlyOneInstance)			 	
+	Repository:addTrait("Markers/warstatus_ap", "WhenMoved", WhenMoved:new())
+	Repository:addTrait("Markers/warstatus_cp", "WhenMoved", WhenMoved:new())
+	Repository:addTrait("Markers/warstatus_combined", "CantBeMoved", CantBeMoved)
 
 	
 		
 -- set the content of the repository window
 
+
 root(0)		
 			
 	tabs(1)
+		tab(2, "British")
+			create_class(Repository, "British/bef_army")
+				
 		tab(2, "German")
-			listbox(3)
-				listitem(4, "Units")
-					create_class(Repository, "German/12R-51R")
-					create_class(Repository, "German/38-94")
-				listitem(4, "Artillery")
-					create_class(Repository, "German/Artillery/5-77-2")
-					create_class(Repository, "German/Artillery/5-150H")
-					create_class(Repository, "German/Artillery/5-420H-6")
-				listitem(4, "Targets")
-					create_class(Repository, "German/Targets/GermanTarget1")
-					create_class(Repository, "German/Targets/GermanTarget2")
+			create_class(Repository, "German/ge_army01")
+			create_class(Repository, "German/ge_army02")
+			create_class(Repository, "German/ge_army03")
 			
 		tab(2, "French")
-			create_class(Repository, "French/BRIGADE-3")
-			create_class(Repository, "French/VII-40")
+			create_class(Repository, "French/fr_army03")
+			create_class(Repository, "French/fr_army04")
+			create_class(Repository, "French/fr_army05")
+			create_class(Repository, "Allied/ap_trench1")
 			
 		tab(2, "Markers")
-			create_class(Repository, "Markers/FLAME")
-			create_class(Repository, "Markers/GAS")
-	
-	
+			create_class(Repository, "Markers/action_cp1")
+			create_class(Repository, "Markers/action_cp2")
+			create_class(Repository, "Markers/action_cp3")
+			create_class(Repository, "Markers/action_cp4")
+			create_class(Repository, "Markers/action_cp5")
+			create_class(Repository, "Markers/action_cp6")
+			
+			create_class(Repository, "Markers/warstatus_ap")
+			create_class(Repository, "Markers/warstatus_cp")
+			create_class(Repository, "Markers/warstatus_combined")
+			
+		tab(2, "Cards")
+			create_class(Repository, "Central/card_cp02")
+			create_class(Repository, "Central/card_cp03")
+			create_class(Repository, "Central/card_cp06")
+			create_class(Repository, "Central/card_cp12")
 	
 
 	

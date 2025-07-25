@@ -66,12 +66,6 @@ ToolBar::MapSizeComboBox::MapSizeComboBox(ToolBar *parent) : QComboBox((QWidget 
 	
 	this->setEditable(true);
 	
-	this->insertItem(findPlace(100), "100%", 100);
-	this->insertItem(findPlace(67), "67%", 67);
-	this->insertItem(findPlace(130), "130%", 130);
-	this->insertItem(findPlace(40), "44%", 44);
-	this->insertItem(findPlace(170), "170%", 170);
-	
 	
 	this->insertSeparator(this->count());
 	this->lineEdit()->setToolTip("Cr add - Del delete"); 
@@ -84,9 +78,6 @@ ToolBar::MapSizeComboBox::MapSizeComboBox(ToolBar *parent) : QComboBox((QWidget 
 	this->setInsertPolicy(QComboBox::NoInsert);
 	
 		
-	int index = this->findData(100);
-	if (index != -1)
-		this->setCurrentIndex(index);
 	
 		
 	
@@ -227,6 +218,23 @@ void ToolBar::MapSizeComboBox::textActivated(QString text)
 }
 
 
+void ToolBar::MapSizeComboBox::insert(int zoom)
+{	
+	ToolBar::sizeBox->insertItem(ToolBar::sizeBox->findPlace(zoom), QString::number(zoom) + "%", zoom);
+}
+
+
+void ToolBar::MapSizeComboBox::setDefault(int zoom)
+{
+	int index = ToolBar::sizeBox->findData(zoom);	
+	if (index != -1)
+		ToolBar::sizeBox->setCurrentIndex(index);
+}
+
+
+
+
+
 
 ToolBar::MapSizeAction::MapSizeAction(QObject *parent) : QWidgetAction(parent) {}
 
@@ -307,6 +315,7 @@ void ToolBar::zoom(float fraction)
 	
 	
 	Counter::setGUI();
+	
 	
 	mapFrame->repaint();
 	// force redraw of mask layer
@@ -463,7 +472,11 @@ void ToolBar::zoomFraction(QPoint point, float amount)
 		return;
 	
 	float newFraction = Scale::scaleFraction + amount;			
-	zoomCoordinates(point, newFraction);			
+	zoomCoordinates(point, newFraction);
+	
+	// set zoom value in combobox
+	int zoom = (int)std::floor(newFraction * 100);
+	ToolBar::sizeBox->setCurrentText(QString::number(zoom) + "%");			
 }
 
 

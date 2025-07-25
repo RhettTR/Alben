@@ -1,6 +1,7 @@
 #ifndef SETTINGS_H
 #define SETTINGS_H
 
+#include <QtWidgets>
 
 
 class Settings : public QDialog

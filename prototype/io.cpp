@@ -2,6 +2,7 @@
 #include <filesystem>
 #include <sstream>
 #include <fstream>
+#include <QtSvg>
 
 
 #include "io.h"
@@ -9,6 +10,7 @@
 #include "luau.h"
 #include "settings.h"
 #include "toolbar.h"
+#include "overlay.h"
 
 
 extern CentralFrame *mapFrame;
@@ -56,7 +58,7 @@ IO::LoadGame::LoadGame(std::string fileName)
 		{
 			
 			
-					
+				
 			// read file build table
 			while (fs)
 			{	
@@ -94,13 +96,12 @@ IO::LoadGame::LoadGame(std::string fileName)
 					
 					
 						int id = Luau::loadCounter(table);
-						
-						
-						Counter::counters[id]->setOwnershipField(f);
+					
+						Counter::counters[id]->setOwnershipField(f);				
 						Counter::counters[id]->setRights(r);
 						
 					}
-					
+						
 				}
 				
 				else
@@ -131,8 +132,6 @@ IO::LoadGame::LoadGame(std::string fileName)
 				
 			}
 				
-
-			//Luau::doEvent("end", "", "", "", 0);
 			
 			
 	
@@ -275,15 +274,38 @@ void IO::loadGame()
 	if (!fileName.isNull())
 	{
 		close();		
-		
+	
 		LoadGame *load = new LoadGame(fileName.toStdString());	
 		delete load;
 		
 		Counter::resetId();
 		Counter::resetZorder();
 		
+		Counter::setGUI();
+		
 	}
 	
+	
+}
+
+
+void IO::loadSetUp(string filename)
+{
+	QFileInfo fileInfo(QString::fromStdString(filename));
+	
+	QString base = fileInfo.baseName();
+	
+	
+	
+	string completeFileName = "./setups/" + base.toStdString() + ".vsav";
+
+	LoadGame *load = new LoadGame(completeFileName);	
+	delete load;
+	
+	Counter::resetId();
+	Counter::resetZorder();
+	
+	Counter::setGUI();
 	
 }
 
@@ -324,6 +346,14 @@ QSize IO::getSize(string str)
 	return _resources[str].size;
 }
 
+bool IO::isResource(string str)
+{
+	if (_resources.find(str) == _resources.end()) 
+		return false;
+		
+	return true;	
+}
+
 
 unsigned long long IO::getKey()
 {
@@ -359,7 +389,8 @@ std::string IO::findSide()
 	
 }
 
-
+//QSvgRenderer
+//QSvgWidget
 
 void IO::load_resources(string directory)
 {  
@@ -374,7 +405,7 @@ void IO::load_resources(string directory)
 				string str = i->path().parent_path().string();
 				
 				// convert back-slashes to fore-slashes
-				std::replace(str.begin(), str.end(), '\\', '/');
+				std::replace(str.begin(), str.end(), '\\', '/');	
 				
 				str = str + "/" + i->path().stem().string();
 				
@@ -382,7 +413,6 @@ void IO::load_resources(string directory)
 				string substr = str.substr(base.length());
 				printf("loaded %s\n", substr.c_str());
 				
-				//string filename{i->path().relative_path()};
 				string filename = string(i->path().relative_path().generic_string());
 	
 				
@@ -392,8 +422,19 @@ void IO::load_resources(string directory)
 				_resources[substr].size = reader.size();
 			
 				
+				/*
+				QImage image(reader.size(), QImage::Format_ARGB32);
 				
-	
+				if (i->path().extension() == ".svg")
+				{
+					QSvgRenderer renderer(QString(i->path().c_str()));
+					image.fill(Qt::transparent);
+					QPainter *painter = new QPainter(&image);
+						renderer.render(painter);
+					delete painter;
+				}
+				else
+				*/ 
 				QImage image = reader.read();
 
 				_resources[substr].image = image;

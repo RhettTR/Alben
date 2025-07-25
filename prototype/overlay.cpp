@@ -241,6 +241,20 @@ Overlay::StackFrame::StackFrame(QWidget *parent) : QLabel(parent)
 	layout = new Overlay::FlowLayout(grid);	
 	grid->setLayout(layout);
 	grid->layout()->setContentsMargins(0, 0, 0, 0);
+	
+	//
+	
+	image = new QLabel(this);
+	image->setStyleSheet("border: 1px solid black; margin: 0px; background: rgba(0,0,0,0);");
+	image->setVisible(false);
+	image->resize(0,0);		 
+	image->move(border, border);
+	
+	coordinate = new QLabel(this);
+	coordinate->setStyleSheet("border: 0px; margin: 0px; font: 14pt 'Times', serif; ; qproperty-alignment: AlignCenter;");
+	coordinate->setVisible(false);
+	coordinate->resize(0,0);	
+	
 			
 }
  
@@ -267,9 +281,33 @@ void Overlay::StackFrame::moveThis(QPoint hotspot, int w, int h)
 }
 
 
-void Overlay::StackFrame::setImage(QImage image)
+QSize Overlay::StackFrame::setImage(QImage image)
 {
-	this->image = image;
+	// +2 is for 1px border
+	this->image->resize(image.width() + 2, image.height() + 2);	
+	this->image->setPixmap(QPixmap::fromImage(image));
+	this->image->setVisible(true);
+		
+	return QSize(this->image->size());
+}
+
+
+QSize Overlay::StackFrame::setPlace(QString place)
+{	
+	this->coordinate->setText(place);
+	
+	int width = this->coordinate->fontMetrics().boundingRect(place).width();
+	int height = this->coordinate->fontMetrics().boundingRect(place).height();
+	
+	width = width > this->image->size().width() ? width : this->image->size().width();
+	
+	this->coordinate->resize(width, height);	
+	this->coordinate->setVisible(true);
+	
+	this->coordinate->move(border, this->image->size().height() + border);
+	
+	return QSize(this->coordinate->size());
+	
 }
 
 
@@ -286,6 +324,11 @@ void Overlay::StackFrame::setImages(CentralFrame::Stack stack)
 		delete item->widget(); 
 		delete item;   
 	}
+	
+	
+	bool cards = stack.begin()->second->table.find("Card") != stack.begin()->second->table.end();
+	
+	
 
 	
 	// loop stack and create row(s) of counter images		
@@ -295,32 +338,40 @@ void Overlay::StackFrame::setImages(CentralFrame::Stack stack)
 		
 		QLabel *icon = new QLabel();
 		icon->setStyleSheet("border-style: none");
-		icon->resize(obj->second->baseBuffer.width(), obj->second->baseBuffer.height());			
-		icon->setPixmap(QPixmap::fromImage(obj->second->baseBuffer));
 		
-		layout->addWidget(icon);
+		
+		if (obj->second->baseBuffer.height() > 300)
+		{
+			
+			QImage base = obj->second->baseBuffer.scaledToHeight( 300, Qt::SmoothTransformation);
+			
+			icon->resize(base.width(), base.height());			
+			icon->setPixmap(QPixmap::fromImage(base));
+			
+		}	
+		else
+		{
+			icon->resize(obj->second->baseBuffer.width(), obj->second->baseBuffer.height());			
+			icon->setPixmap(QPixmap::fromImage(obj->second->baseBuffer));
+		}
+		
+		if (!cards)
+			layout->addWidget(icon);
+		else
+		{
+			// only show face up cards
+			Counter::Table table = Luau::getTraits("Map", obj->second->id);
+			
+			int index = (int)std::get<double>(std::get<Counter::Table>((table)["Image"])["imageIndex"]);
+				
+			if (index == 1)
+				layout->addWidget(icon);
+		}	
 		
 	}
 	
 	
 }
-
-
-void Overlay::StackFrame::paintEvent(QPaintEvent *e)
-{
-	
-	QPainter painter(this);
-	
-	
-	painter.drawRect(border-1, border-1, this->image.width() + 1, this->image.height() + 1);
-		
-	QPoint point = QPoint(border, border);	
-	painter.drawImage(point, this->image);
-	
-}
-
-
-
 
 
 

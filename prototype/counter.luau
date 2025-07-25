@@ -67,6 +67,7 @@ function Counter:new (id, images, imageIndex, zorder, x, y)
 	o.x = x
 	o.y = y
 	o.zorder = zorder
+	o.deleted = false
 	return o
 end
 
@@ -100,7 +101,7 @@ end
 
 function Counter:toggleMoved (id)
 	if Counter[id].MarkMoved ~= nil then
-		Counter[id].MarkMoved.moved = not Counter[id].MarkMoved.moved	
+		Counter[id].MarkMoved.moved = not Counter[id].MarkMoved.moved
 		State:addMove(id, "MarkMoved", "moved", Counter[id].MarkMoved.moved)
 	end	
 end
@@ -127,7 +128,7 @@ end
 
 function Counter:markMoved (id, moved)
 	if Counter[id].MarkMoved ~= nil then	
-		Counter[id].MarkMoved.moved = moved;	
+		Counter[id].MarkMoved.moved = moved;
 		State:addMove(id, "MarkMoved", "moved", moved)
 		set_moved_status(id, moved)
 	end
@@ -137,6 +138,43 @@ function Counter:select (id)
 	if Counter[id].Select ~= nil then	
 		toggle_select_status(id)
 	end
+end
+
+function Counter:move (id, x, y)
+	local dx, dy = get_size(id)
+	updatePos(id, x - dx, y - dy)
+	State:addMove(id, "Counter", "x", x - dx)
+	State:addMove(id, "Counter", "y", y - dy)
+	Counter:generateGUI()	
+end
+
+function Counter:findId(stringId)
+	for k, v in pairs(Counter) do	
+		if type(k) == "string" and k ~= '__index' and type(v) ~= 'function' and v.deleted == false then
+			local name = Counter[k].Image.images[1]
+			if name == stringId then
+				return k
+			end
+		end
+	end
+	return nil
+end
+
+function Counter:findTrait(table, trait)
+	for k, v in pairs(table) do	
+		if type(k) == "string" and k ~= '__index' and type(v) ~= 'function' then			
+			if k == trait then
+				return v
+			end
+			if type(v) == 'table' and (v.deleted == nil or v.deleted == false) then
+				local table = Counter:findTrait(v, trait)
+				if table ~= nil then
+					return table
+				end
+			end
+		end	
+	end
+	return nil
 end
 
 
@@ -170,7 +208,7 @@ function Counter:generateGUI()
 	
 	for k, v in pairs(Counter) do
 		
-		if type(k) == "string" and k ~= '__index' and type(v) ~= 'function' then
+		if type(k) == "string" and k ~= '__index' and type(v) ~= 'function' and v.deleted == false then
 			
 			local name = Counter[k].Image.images[ Counter[k].Image.imageIndex ]
 			local degrees = 0
@@ -196,6 +234,7 @@ function Counter:generateGUI()
 						Counter[k],
 						'Overlays')
 						
+					
 			moved("Map", k, Counter[k].x, Counter[k].y)
 			
 		end
@@ -205,7 +244,141 @@ function Counter:generateGUI()
 	setGUI()
 
 end
+
+
+
+
+
+-- create Luau tokens
+
+
+Token = {}
+
+function Token:new (fromId, toId)
+	local o = Counter:duplicate(Repository[fromId])
+	o.name = fromId
+	o.id = toId
+	o.x = 0
+	o.y = 0
+	return o
+end
+
+function Token:copy (table, id, x, y)
+	local o = Counter:duplicate(table[id])
+	o.name = table[id].Image.images[1]
+	o.id = id
+	o.x = x
+	o.y = y
+	return o
+end
+
+
+function Token:flip (id)
+	Token[id].Image.imageIndex = Token[id].Image.imageIndex + 1
+	local length = #(Token[id].Image.images)
+	if Token[id].Image.imageIndex > length then
+		Token[id].Image.imageIndex = 1
+	end
+	return Token[id].Image.images[Token[id].Image.imageIndex]
+end
+
+
+function Token:setPos (id, x ,y)
+	Token[id].gridx = x
+	Token[id].gridy = y
+end
+
+
+function Token:updateGUI(id) 
+end
 	
+	
+------	
+	
+
+	
+	
+
+Decks = {}
+
+function Decks:add(id, o)
+	Decks[id] = o
+end
+
+function Decks:get(id)
+	return Decks[id]
+end
+
+function Decks:find(x, y)
+	for k, v in pairs(Decks) do
+		if type(v) ~= 'function' then	
+			if v.x == x and v.y == y then
+				return v
+			end
+		end
+	end
+	return nil
+end
+
+
+
+Deck = {}
+
+function Deck:new (id, move, gridpoint)	
+	local o = {}
+	setmetatable(o, Deck)
+	Deck.__index = Deck
+	o.id = id
+	o.cards = {}
+	o.x = gridpoint.x
+	o.y = gridpoint.y	
+	o.moveto = move
+	Decks:add(id, o)
+	return o
+end	
+
+
+function Deck:add(card)
+	table.insert(self.cards, card)
+end
+
+function Deck:remove(id)
+	local n
+	for k,v in pairs(self.cards) do
+		if v == tonumber(id) then 	
+			n = k
+		end
+	end
+	table.remove(self.cards, n)	
+end
+
+function Deck:draw()
+	if #self.cards == 0 then
+		return nil
+	end	
+	local n = math.random(1, #self.cards)
+	local toId = self.cards[n]
+	table.remove(self.cards, n)
+	delete_class(toId)
+	return toId
+end
+
+
+
+
+Card = {}
+
+function Card:new(deck)
+	local o = {}
+	-- 1 face up, 2 face down (default)
+	o.deck = deck
+	o.face = 2
+	return o 
+end
+
+
+
+
 
 
 return Counter

@@ -3,10 +3,12 @@
 
 #include <QtWidgets>
 
+
 #include "counter.h"
 #include "overlay.h"
 #include "luau.h"
 #include "repository.h"
+
 	
 #include "io.h"
 #include "scale.h"
@@ -18,6 +20,7 @@ using namespace std;
 
 int Counter::_id = 0;
 int Counter::_lastZorder = 0;
+int Counter::_bottomZorder = 0;
 
 
 map<int, Counter *> Counter::counters;
@@ -31,7 +34,10 @@ float Counter::alpha = 1.0;
 
 bool Counter::haveOffset = true;	// true = unopened stack has offset
 int Counter::stackOffset = 5;
-QString Counter::selectionColor = QString("#bc145e");
+//QString Counter::selectionColor = QString("#bc145e");
+QString Counter::selectionColor = QString("yellow");
+bool Counter::hooverShowMap = false;
+bool Counter::hooverShowPlace = false;
 
 
 
@@ -42,6 +48,7 @@ extern CentralFrame *repositoryFrame;
 extern Repository *repositoryWindow;
 extern IO *io;
 extern Scale *scaled;
+
 
 
 
@@ -93,9 +100,14 @@ void Counter::QtCounter::showRightClickMenu(QtCounter *counter)
 	}
 	
 	
-	QMenu MyMenu(counter);
+	QMenu myMenu(counter);
+	QWidget widget;
+	
+	
+	myMenu.clear();
+	//counter->actions().clear();
 		
-	if (counter->actions().isEmpty())
+	//if (counter->actions().isEmpty())
 	{
 		popupentries.clear();
 	
@@ -114,7 +126,7 @@ void Counter::QtCounter::showRightClickMenu(QtCounter *counter)
 			
 			QAction* action = new QAction(name, counter);
 			
-			QVariant v = QVariant(QString(e.entryaction));
+			QVariant v = QVariant(QString(e.entryaction.c_str()));
 			action->setData(v);
 			
 			if (strcmp(window, "Repository") == 0 && 
@@ -123,16 +135,18 @@ void Counter::QtCounter::showRightClickMenu(QtCounter *counter)
 			
 			//action->setShortcut(QKeySequence("Ctrl+D"));
 		   
-			counter->addAction(action);
+			//counter->addAction(action);
+			widget.addAction(action);
 			
 			QObject::connect( action, &QAction::triggered, counter, [=]()->void{ do_activate(action); } );
 			
 		}
 	}
 	
-	MyMenu.addActions(counter->actions());
+	//myMenu.addActions(counter->actions());
+	myMenu.addActions(widget.actions());
 	
-	MyMenu.exec(QCursor::pos());
+	myMenu.exec(QCursor::pos());
 	
 }
 
@@ -176,11 +190,8 @@ void Counter::QtCounter::mousePressEvent (QMouseEvent * e)
 
 void Counter::QtCounter::mouseDoubleClickEvent(QMouseEvent *e)
 {
-	if (CentralFrame::openStackoffset)
-	{	
-		//((CentralFrame *)this->parent())->selectCounter(this->owner);						
+	if (CentralFrame::openStackoffset)						
 		((CentralFrame *)this->parent())->toggleOpenStack(this->owner, 1);
-	}
 	else
 	{
 		((CentralFrame *)this->parent())->selectCounter(this->owner);
@@ -222,45 +233,67 @@ void Counter::QtCounter::hooverAction()
 			stack[obj->second->state.zorder] = obj->second;	
 	}
 	
-	
+
 	Counter *counter = stack.begin()->second;
 	
-	QImage baseImage = scaled->getScaledImage(CentralFrame::backgroundID);
+	QSize s = QSize(0,0);
 	
 	
-	
-	QRect source(0, 
-				 0, 
-				 counter->scaledBuffer.width(), 
-				 counter->scaledBuffer.height());
-					
-	QRect dest(counter->state.x,
-			   counter->state.y,
-			   counter->scaledWidth + 2*counter->scaledMargin,					   
-			   counter->scaledHeight + 2*counter->scaledMargin);						   			
-				  
-	source.moveCenter( dest.center() );
-	
+	if (Counter::hooverShowMap)
+	{
+		
+		
+		QImage baseImage = scaled->getScaledImage(CentralFrame::backgroundID);
+		
+		
+		
+		QRect source(0, 
+					 0, 
+					 counter->scaledBuffer.width(), 
+					 counter->scaledBuffer.height());
+						
+		QRect dest(counter->state.x,
+				   counter->state.y,
+				   counter->scaledWidth + 2*counter->scaledMargin,					   
+				   counter->scaledHeight + 2*counter->scaledMargin);						   			
+					  
+		source.moveCenter( dest.center() );
+		
 
-	CentralFrame::Point trans = 
-		scaled->getScaleRotateCoordinate(counter, source.topLeft().x(), source.topLeft().y());
-	
-	
-	QImage background = baseImage.copy(trans.x, trans.y, source.width(), source.height());
+		CentralFrame::Point trans = 
+			scaled->getScaleRotateCoordinate(counter, source.topLeft().x(), source.topLeft().y());
+		
+		
+		QImage background = baseImage.copy(trans.x, trans.y, source.width(), source.height());
 
-
-	Overlay::hooverView->setImage(background);
+	
+		s = Overlay::hooverView->setImage(background);
+		
+	}
+	
+	
+	QSize t = QSize(0,0);
+	
+	if (Counter::hooverShowPlace)
+		t = Overlay::hooverView->setPlace(Luau::mapPlace(std::round(counter->width/2) + counter->margin, 
+														 std::round(counter->height/2) + counter->margin,
+														 counter->state.x, 
+														 counter->state.y));
+	
+		
+	
+	
+	int width = s.width() > t.width() ?  s.width() : t.width();
+	int height = s.height() + t.height();
+	
+	width = width + 2*Overlay::border;
+	height = height + 2*Overlay::border; 
 	
 	
 	
-	// Overlay::border is the additional space to show around the counter
-	int box = source.height() + 2*Overlay::border;
 	
-	// 2 is the border height of the hoover view
-	Overlay::hooverView->grid->move(box, 2);
-	
-	
-	
+	// hooverview 2px border
+	Overlay::hooverView->grid->move(width, 2);
 									
 	
 	Overlay::hooverView->setImages(stack);	
@@ -276,9 +309,9 @@ void Counter::QtCounter::hooverAction()
 
 	
 	// 4 is double the hoover view border height
-	int heightBox = box > size.height() + 4 ? box : size.height() + 4;
+	int heightBox = height > size.height() + 4 ? height : size.height() + 4;
 	
-	Overlay::hooverView->resize(box + size.width(), heightBox);
+	Overlay::hooverView->resize(width + size.width(), heightBox);
 	
 	
 	
@@ -388,16 +421,19 @@ void Counter::QtCounter::do_activate (QAction *action)
 	}
 					
 }
+
+
+
+
+
 	
-	
-	
-	
-	
-Counter::SystemMask::SystemMask(const char *name, const char *mask, int x, int y) : x(x), y(y)
+Counter::SystemMask::SystemMask(const char *name, const char *mask, const char *valign, const char *halign)
 {
 	
 	this->name = string(name);
 	this->mask = string(mask);
+	this->vAlign = string(valign);
+	this->hAlign = string(halign); 
 	
 	Counter::masks[this->name] = this;
 	
@@ -415,7 +451,6 @@ Counter::Counter(Table *state)
 	
 	this->id = Counter::nextId();
 	
-	//Counter::repository[this->id] = this;
 	
 
 	this->name = std::get<std::string>(std::get<Table>(std::get<Table>((*state)["Image"])["images"])[1]);
@@ -433,8 +468,7 @@ Counter::Counter(Table *state)
 	
 	this->width = io->getSize(this->state.image).width();
     this->height = io->getSize(this->state.image).height();
-	this->margin = 9;
-
+    this->margin = 9;
 	
 	
 	this->parentFrame = repositoryFrame;
@@ -447,7 +481,10 @@ Counter::Counter(Table *state)
 	
 	this->counter = new QtCounter(this, pane);
 		
-    this->setImage();
+	// make sure images in repository have height less than 200	
+    this->setImage(200);
+    
+    
       
     pane->layout()->addWidget(this->counter);
     //
@@ -530,7 +567,7 @@ Counter::Counter(int id, Table *state)
 	this->width = io->getSize(this->state.image).width();
     this->height = io->getSize(this->state.image).height();
 	this->margin = 9;
-    
+	
    
 	this->selected = false;
 	this->doesNotStack = ((*state).find("DoesNotStack") != (*state).end());
@@ -563,6 +600,7 @@ Counter::Counter(int id, Table *state)
 	
 	this->counter = new QtCounter(this, mapFrame);
     this->setImage();
+    
 
     
     this->counter->show();
@@ -633,6 +671,14 @@ int Counter::topZorder()
 }
 
 
+int Counter::bottomZorder()
+{
+	
+	return --Counter::_bottomZorder;
+	
+}
+
+
 void Counter::resetId()
 {
 	int max = 0;
@@ -683,38 +729,11 @@ Counter* Counter::findObj(const char *name)
 }
 
 
-bool Counter::snaptoDefaultGrid (Counter *counter, int &x, int &y)
+QSize Counter::getSize(Counter *counter)
 {
-	
-	// find the first (if any) counter close enough to snap to
-	// returns true if snap found and trait doesnotstack present 
-
-	int maxDistance = 8;
-		
-	for ( auto obj = counters.begin(); obj != counters.end(); ++obj  )
-	{
-		if (counter->name != obj->second->name)
-		{
-			if (abs(x - obj->second->state.x) < maxDistance && 
-				abs(y - obj->second->state.y) < maxDistance)
-			{	
-				if (counter->doesNotStack)
-					return false;
-				
-				if (obj->second->doesNotStack)
-					return false;
-				
-				x = obj->second->state.x;
-				y = obj->second->state.y;
-				
-				return true;
-			}
-		}
-	}
-	
-	return true;
+	return QSize(std::round(counter->width/2) + counter->margin, 
+				 std::round(counter->height/2) + counter->margin); 
 }
-
 
 
 void Counter::toggleSelect(const char *name)
@@ -759,7 +778,21 @@ void Counter::setDisabled(bool disable)
 
 
 
-void Counter::setImage()
+int Counter::findOffset(int size, std::string type)
+{	
+	if (type == "left")
+		return this->width;
+	if (type == "hcenter")
+		return std::floor((this->height - size) / 2);
+		
+	return 0;
+}
+
+
+
+
+
+void Counter::setImage(int maxHeight)
 {
 	
 	
@@ -837,11 +870,13 @@ void Counter::setImage()
 		
 		QPainter *paint = new QPainter(&image);
 		QPen pen = QPen(QColor::fromString(Counter::selectionColor));
-		pen.setWidth(3);
+		//pen.setWidth(3);
+		pen.setWidth(5);
 		pen.setCapStyle(Qt::SquareCap);
 		paint->setPen(pen);
 		// 1.5 is middle of line width 3; width +3 pen size 
-		QRectF rect = QRectF(margin-1.5, margin-1.5, this->width+3.0, this->height+3.0);
+		//QRectF rect = QRectF(margin-1.5, margin-1.5, this->width+3.0, this->height+3.0);
+		QRectF rect = QRectF(margin-2.5, margin-2.5, this->width+5.0, this->height+5.0);
 		paint->drawRect(rect);			
 		delete paint;
 		
@@ -855,8 +890,11 @@ void Counter::setImage()
 		
 		QImage const mask = io->getImage(Counter::masks["MovedMarker"]->mask);
 		
-		int dx = margin + Counter::masks["MovedMarker"]->x;
-		int dy = margin + Counter::masks["MovedMarker"]->y;
+		int x = findOffset(mask.width(), Counter::masks["MovedMarker"]->vAlign);
+		int y = findOffset(mask.height(), Counter::masks["MovedMarker"]->hAlign);		
+		
+		int dx = margin + x;
+		int dy = margin + y;
 		
 		QPainter *paint = new QPainter(&image);
 		paint->drawImage(dx, dy, mask);			
@@ -968,11 +1006,25 @@ void Counter::setImage()
 	
 	
 	
+	/*
+	if (maxHeight != 0 && image.height() > maxHeight)
+	{
+		
+		QImage base = image.scaledToHeight( maxHeight, Qt::SmoothTransformation);
+			
+		image = base.copy(0, 0, base.width(), base.height());
+		
+	}	
+	*/
+	
+	
 	
 	baseBuffer = image.copy(0, 0, image.width(), image.height());
 	
-		
-
+	
+	
+	
+	
 	
 	
 	this->scaledWidth = this->width * Scale::scaleFraction;
@@ -980,7 +1032,8 @@ void Counter::setImage()
 	this->scaledMargin = this->margin * Scale::scaleFraction;
 	
 	
-	QSize scaledSize(image.width() * Scale::scaleFraction, image.height() * Scale::scaleFraction);
+	QSize scaledSize(std::round(image.width() * Scale::scaleFraction), 
+					 std::round(image.height() * Scale::scaleFraction));
 	
 	this->scaledBuffer = image.scaled( scaledSize, Qt::KeepAspectRatio, Qt::SmoothTransformation);
 		
@@ -1103,9 +1156,21 @@ void Counter::setGUI()
 		}	
 	}
 	
+
+
+	
+	// order stacks globally from low to high zorder
+	
+	std::map<int, CentralFrame::Stack> zordered;
+	
+	for (auto const& [point, stack] : stacks)
+		zordered[std::prev(stack.end())->first] = stack;
 	
 	
-	for (auto const& [point, stack] : stacks)	
+	
+	
+	
+	for (auto const& [zorder, stack] : zordered)	
 		for ( auto obj = stack.begin(); obj != stack.end(); ++obj  )
 		{
 			obj->second->setImage();
@@ -1113,5 +1178,7 @@ void Counter::setGUI()
 		}
 	
 }
+
+
 
 

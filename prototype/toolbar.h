@@ -19,6 +19,7 @@ class ToolBar : public QToolBar
 			public:
 				std::string id;
 				ButtonAction(std::string resourceName, const QString toolTip, std::function<void(void)>, const std::string);
+				
 		};
 		
 		class Label : public QLabel
@@ -35,7 +36,9 @@ class ToolBar : public QToolBar
 				ToolBar *parent;
 				int findPlace(int forNewIndex);
 				void editingFinished();
-				void textActivated(QString text);				
+				void textActivated(QString text);
+				static void insert(int zoom);
+				static void setDefault(int zoom);				
 			protected:
 				virtual void focusInEvent(QFocusEvent *e) override;
 				virtual void focusOutEvent(QFocusEvent *e) override;
@@ -65,13 +68,12 @@ class ToolBar : public QToolBar
 		
 		static MapSizeComboBox *sizeBox;
 
-	
+		void zoom(float fraction);
 		
 	private:
 	
 		QScrollArea *scrollArea;
 		
-		void zoom(float fraction);
 		void zoomCoordinates(QPoint point, float newFraction);
 		void zoomMiddle(float newFraction);
 		void zoomFraction(QPoint point, float amount);

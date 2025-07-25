@@ -44,20 +44,19 @@ class Overlay : public QFrame
 			public:
 			
 				StackFrame(QWidget *parent);
-				void setImage(QImage image);
+				QSize setImage(QImage image);
+				QSize setPlace(QString place);
 				void setImages(CentralFrame::Stack stack);
 				QLabel *grid;
+				
 				FlowLayout *layout;
-				QImage image;
 				void moveThis(QPoint hotspot, int w, int h);
-						
-			protected:
-				virtual void paintEvent (QPaintEvent *e);
 				
 			private:	
 				QLabel *icon;
+				QLabel *image;
+				QLabel *coordinate;
 				
-
 		};
 		
 		

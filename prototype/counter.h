@@ -7,8 +7,11 @@
 #include <string>
 #include <map>
 
-#include "frame.h"
+
 #include "settings.h"
+
+
+
 
 #include <QtWidgets>
 
@@ -17,6 +20,8 @@
 class CentralFrame;
 class StackFrame;
 class StackOpen;
+class Token;
+
 
 
 template <class... Fs> struct Overload : Fs... { using Fs::operator()...; };
@@ -50,18 +55,18 @@ class Counter
 				QPoint popupPoint;
 				void hooverAction();	
 		};
-			
+		
 		
 		class SystemMask
 		{
 			public:
 					
-				SystemMask(const char *name, const char *mask, int x, int y);
+				SystemMask(const char *name, const char *mask, const char *valign, const char *halign);
 				
-				int x;
-				int y;
 				std::string name;
-				std::string mask;		
+				std::string mask;
+				std::string vAlign;
+				std::string hAlign;		
 		};
 		
 		
@@ -107,6 +112,7 @@ class Counter
 		
 		Counter::QtCounter *counter;
 		
+		
 		QImage baseBuffer;		// 100% buffer
 		QImage scaledBuffer;		
 	
@@ -125,16 +131,19 @@ class Counter
 		
 		static int nextId();
 		static int topZorder();
+		static int bottomZorder();
 		static void resetId();
 		static void resetZorder();
 		static Counter* findObj(const char *name);
-		static bool snaptoDefaultGrid (Counter *counter, int &x, int &y);
 		static void toggleSelect(const char *name);
 		static void clearMoved();
 		static void setDisabled(bool disable);
+		static QSize getSize(Counter *counter);
 		
-		void setImage();
+		
+		void setImage(int maxHeight = 0);
 		void setPos(int x, int y);
+		int findOffset(int size, std::string type);
 				
 		unsigned long long getOwnershipField();
 		void setOwnershipField(unsigned long long field);
@@ -156,6 +165,8 @@ class Counter
 		static bool  haveOffset;
 		static int   stackOffset;
 		static QString selectionColor;
+		static bool  hooverShowMap;
+		static bool  hooverShowPlace;
 		
 				
 		
@@ -171,6 +182,7 @@ class Counter
 		
 		static std::map<std::string, Counter::SystemMask *> masks;
 		
+		
 			
 	private:
 	
@@ -178,6 +190,8 @@ class Counter
 		
 		static int _lastZorder;	// the number itself is not important, 
 								// only its relative value to other counters in a stack
+								
+		static int _bottomZorder; // ensures counter always on bottom of stack
 								
 		unsigned long long _ownershipField;			// holds a 64-bit number
 		Settings::OwnershipRights _ownershipRights;	// bitfield of rights					

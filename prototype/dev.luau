@@ -1,248 +1,243 @@
+-- loads a setup
 
--- create fire table window and add button to toolbar with callback
-
-create_window("German artillery table", "artillery-window", "GermanArtilleryB")
-
-
-local callback = "toggle_window()"
-
-add_toolbar_button("Icons/GermanArtillery", "German artillery table", callback)
+load_setup('setup.vsav')
 
 
+-- make repository window invisible
+
+repository_visibility(false)
 
 
--- define and set custom grid coordinates
+-- facilitate a right-click area around counters
 
-local grid = {[1] = {}}
-
-function grid:add(x, y)
-	table.insert(grid[1], {x = x, y = y})
-end
-
--- storage locations
-grid:add(104, 136)
-grid:add(192, 136)
-grid:add(280, 136)
-grid:add(368, 136)
-grid:add(456, 136)
-grid:add(544, 136)
-grid:add(632, 136)
+createArea()
 
 
-grid:add(104, 234)
-grid:add(192, 234)
-grid:add(280, 234)
-grid:add(368, 234)
-grid:add(456, 234)
-grid:add(544, 234)
-grid:add(632, 234)
+-- set map zoom range and default zoom (last value)
 
--- fire calculation locations
-grid:add(128, 376)
-grid:add(128, 471)
-
-
-set_grid(grid, 1)
+set_zoom_range(100, 67, 44, 30, 20, 30)
 
 
 
---- define fire location, key = target
 
-local FireLocations = { {x = 128, y = 376, gridx = 1, gridy = 1}, 
-		                {x = 128, y = 471, gridx = 1, gridy = 1}}
-		               
-
-function setTarget(k, x, y)
-	FireLocations[k].gridx = x
-	FireLocations[k].gridy = y
-end
+-- create a hand window with a background color and adds a button to toolbar with a callback
 
 
 
--- create boxes for target coordinate and calculated firepower
+create_window('cphand', 'Central Powers Card Hand', '#999999')
 
-create_label('coor1', 180, 355, 78, 38, 'border:1px solid black; background:white; font:bold 30px; qproperty-alignment: AlignCenter;')		
-create_label('valu1', 268, 355, 58, 38, 'border:1px solid black; background:white; font:bold 30px; qproperty-alignment: AlignCenter; color:red;')	
+local x = 200
+local y = 400
+local w = 900
+local h = 600
+
+set_window('cphand', x, y, w, h)
+
+
+
+local css = "border:0; qproperty-alignment: AlignCenter;"
+
+add_window_label('cphand', 'pos1', 10, 10, 0, 0, 'Icons/cardslot', css)
+add_window_label('cphand', 'pos2', 400, 10, 0, 0, 'Icons/cardslot', css)
+
+
+function draw(x, y)
+
+	local drawpile = Decks:get('draw')
 	
-set_label_text('coor1', '---')		
-set_label_text('valu1', '0')
-
-create_label('coor2', 180, 450, 78, 38, 'border:1px solid black; background:white; font:bold 30px; qproperty-alignment: AlignCenter;')		
-create_label('valu2', 268, 450, 58, 38, 'border:1px solid black; background:white; font:bold 30px; qproperty-alignment: AlignCenter; color:red;')	
 	
-set_label_text('coor2', '---')		
-set_label_text('valu2', '0');
-
-
--- create check box for setting counter battery fire
-
-callback = "recalculate()"
-
-create_checkbox('cb', 100, 20, 200, 28, 'Counter Battery Fire', callback,
-				'QCheckBox:checked {color: black;} QCheckBox {font:bold 16px Arial,sans-serif; color:white;}');
-
-
-
-
-
-
--- create Luau tokens
-
-
-local Token = {}
-
-function Token:new (fromid, toid)
-	local o = Counter:duplicate(Repository[fromid])
-	o = Counter:merge(o, Artillery[fromid])
-	o.FullStrength = (o.Image.imageIndex == 1)
-	o.counter = toid
-	o.gridx = 0
-	o.gridy = 0	
-	o.Overlays = Overlays:new ()
-	o.Overlays:add(Label:new('', "arial", 18, "black", 0, 0, function(o) return o.text ~= '' end))
-	return o
-end
-
-
-function Token:flip (id)
-	Token[id].Image.imageIndex = Token[id].Image.imageIndex + 1
-	local length = #(Token[id].Image.images)
-	if Token[id].Image.imageIndex > length then
-		Token[id].Image.imageIndex = 1
-	end
-	return Token[id].Image.images[Token[id].Image.imageIndex]
-end
-
-
-function Token:pos (id, x ,y)
-	Token[id].gridx = x
-	Token[id].gridy = y
-end
-
-
-Artillery = {}
-
-function Artillery:new (x, y, bfull, cfull, breduced, creduced, range)
-	local o = {}
-	-- placement in artillery window
-	o.x = x
-	o.y = y
-	o.Bombardment = bfull
-	o.CounterBattery = cfull
-	o.Bomb2nd = breduced
-	o.Counter2nd = creduced
-	o.Range = range	
-	return o
-end
-
-
-Artillery["German/Artillery/5-77-2"] = Artillery:new(104, 136, 2, 2, 2, 2, 6)
-Artillery["German/Artillery/5-150H"] = Artillery:new(192, 136, 3, 4, 2, 2, 8)
-Artillery["German/Artillery/5-420H-6"] = Artillery:new(280, 136, 6, 2, 3, 1, 14)
-
-
-
-
-
-function updateGUI(k)
-		
-	local image = Token[k].Image.images[ Token[k].Image.imageIndex ]	
-
-	update_token(k,
-				 Token[k].x, 
-				 Token[k].y,
-				 image,
-				 Token[k],
-				 'Overlays')
- 
-end
-
-
-
-
-local function char(num)
-	return string.char(string.byte("A") + num - 1)
-end
-
-
-function printCoordinates(x, y)
-
-	x = math.floor((x + 20) / 113)
-	y = math.floor((y + 20) / 113)
-	
-	return tostring(char(y + 1)) .. tostring(x + 1)
-	
-end
-
-
-function xyCoordinates(x, y)
-
-	x = math.floor((x + 20) / 113)
-	y = math.floor((y + 20) / 113)
-	
-	return (x + 1), (y + 1) 
-	
-end
-
-
-function recalculate()
-
-	local counterBattery = get_checkbox_checked('artillery-window', 'cb')
-	
-
-	for k, v in ipairs(FireLocations) do
-	
-		local text = get_label_text('coor' .. k)
-		
-		-- if target counter on map
-		
-		if text ~= '---' then
-			
-			-- find tokens in target slot and add firepower
-			
-			local power = 0
-			
-			for key, token in pairs(Token) do
-			
-				if type(key) == "string" and key ~= '__index' and type(token) ~= 'function' then				
-					if  v.x == token.x  and  v.y == token.y  then
-						if  math.abs(v.gridx - token.gridx) <= token.Range and
-							math.abs(v.gridy - token.gridy) <= token.Range then
-							if token.FullStrength then
-								if counterBattery then
-									power = power + token.CounterBattery
-								else
-									power = power + token.Bombardment
-								end
-							else
-								if counterBattery then
-									power = power + token.Counter2nd
-								else
-									power = power + token.Bomb2nd
-								end	
-							end
-						end
-					end					
-				end
-			end
-			
-			set_label_text('valu' .. k, tostring(power))
-			
-		end
-				
+	if drawpile == nil then
+		return
 	end
 	
-end
-
-
-function resetValues()
 	
-	for k, v in ipairs(FireLocations) do
-		set_label_text('valu' .. k, '0')	
+	local card = drawpile:draw()
+
+	if card == nil then
+		return
 	end
 	
-end
+	-- drawn card face up
+	Counter[card].Card.face = 1
+	
+	createToken(card, 'cphand', x, y)
+	
+end		
+
+
+local action1 = "draw(197, 272)"
+local action2 = "draw(587, 272)"
+
+
+add_window_button('cphand', 'btn1', 78, 199, 'Icons/DrawCentral', action1)
+add_window_button('cphand', 'btn2', 460, 199, 'Icons/DrawCentral', action2)
 
 
 
-return Token 
+local callback = "toggle_window('cphand')"
+
+add_toolbar_button('Icons/toolbar_cphand', 'Central Powers Hand', callback)
+
+
+
+
+
+-- define zone for main map
+
+local zone = Zone:new('main')
+
+
+-- upper & lower corner of zone rectangle
+zone:setBorder({x0 = 618, y0 = 952, x1 = 1242, y1 = 1514})
+
+
+-- europe locations
+zone:addGrid(1175, 1034, 'Essen')
+zone:addGrid(1034, 1065, 'Aachen')
+zone:addGrid(1117, 1213, 'Koblenz')
+zone:addGrid(963, 1192, 'Liege')
+zone:addGrid(865, 1306, 'Sedan')
+zone:addGrid(973, 1407, 'Verdun')
+zone:addGrid(797, 1176, 'Brussels')
+zone:addGrid(709, 1313, 'Cambrai')
+zone:addGrid(790, 1452, 'Chateau Thierry')
+
+zone:addMember('German/ge_army01')
+zone:addMember('German/ge_army02')
+zone:addMember('German/ge_army03')
+
+zone:addMember('French/fr_army03')
+zone:addMember('French/fr_army04')
+zone:addMember('French/fr_army05')
+
+zone:addMember('British/bef_army')
+
+zone:addMember('Allied/ap_trench1')
+
+
+
+
+
+
+-- cp action round chart zone
+
+local zonecpa = Zone:new('cpa')
+
+zonecpa:setBorder({x0 = 1500, y0 = 20, x1 = 2071, y1 = 600})
+
+
+zonecpa:addGrid(1593, 116, 'Neutral Entry (CP)')
+zonecpa:addGrid(1680, 211, 'AH Reinforcements')
+zonecpa:addGrid(1593, 211, 'GE Reinforcements')
+zonecpa:addGrid(1767, 211, 'TU Reinforcements')
+zonecpa:addGrid(1593, 308, 'SR (CP)')
+zonecpa:addGrid(1680, 308, 'RP (CP)')
+zonecpa:addGrid(1593, 405, 'OPS (CP)')
+zonecpa:addGrid(1680, 405, 'Event (CP)')
+zonecpa:addGrid(1767, 405, '1 OPS (CP)')
+zonecpa:addGrid(1854, 405, 'Peace Terms (CP)')
+zonecpa:addGrid(1593, 570, 'Action_CP_1')
+zonecpa:addGrid(1680, 570, 'Action_CP_2')
+zonecpa:addGrid(1767, 570, 'Action_CP_3')
+zonecpa:addGrid(1854, 570, 'Action_CP_4')
+zonecpa:addGrid(1933, 570, 'Action_CP_5')
+zonecpa:addGrid(2017, 570, 'Action_CP_6')
+
+Repository:addTrait("Markers/action_cp1", "Move", Move:new('Reset', zonecpa:getGrid('Action_CP_1')))
+Repository:addTrait("Markers/action_cp2", "Move", Move:new('Reset', zonecpa:getGrid('Action_CP_2')))
+Repository:addTrait("Markers/action_cp3", "Move", Move:new('Reset', zonecpa:getGrid('Action_CP_3')))
+Repository:addTrait("Markers/action_cp4", "Move", Move:new('Reset', zonecpa:getGrid('Action_CP_4')))
+Repository:addTrait("Markers/action_cp5", "Move", Move:new('Reset', zonecpa:getGrid('Action_CP_5')))
+Repository:addTrait("Markers/action_cp6", "Move", Move:new('Reset', zonecpa:getGrid('Action_CP_6')))
+
+Repository:addTrait("Markers/action_cp1", "MoveAll", MoveAll:new('cpa', 'Reset all'))
+Repository:addTrait("Markers/action_cp2", "MoveAll", MoveAll:new('cpa', 'Reset all'))
+Repository:addTrait("Markers/action_cp3", "MoveAll", MoveAll:new('cpa', 'Reset all'))
+Repository:addTrait("Markers/action_cp4", "MoveAll", MoveAll:new('cpa', 'Reset all'))
+Repository:addTrait("Markers/action_cp5", "MoveAll", MoveAll:new('cpa', 'Reset all'))
+Repository:addTrait("Markers/action_cp6", "MoveAll", MoveAll:new('cpa', 'Reset all'))
+
+
+zonecpa:addMember('Markers/action_cp1')
+zonecpa:addMember('Markers/action_cp2')
+zonecpa:addMember('Markers/action_cp3')
+zonecpa:addMember('Markers/action_cp4')
+zonecpa:addMember('Markers/action_cp5')
+zonecpa:addMember('Markers/action_cp6')
+
+
+
+
+
+-- general records track zone
+
+local grt = Zone:new('grt')
+
+grt:setBorder({x0 = 48, y0 = 2683, x1 = 1337, y1 = 3274})
+
+grt:setAllowed(false)
+
+grt:squareGrid(63, 2716, 115.0, 132.0)
+
+
+grt:addMember('Markers/warstatus_ap')
+grt:addMember('Markers/warstatus_cp')
+grt:addMember('Markers/warstatus_combined')
+
+
+
+
+-- decks zone
+
+local decks = Zone:new('decks')
+
+decks:setBorder({x0 = 3000, y0 = 3600, x1 = 3800, y1 = 4300})
+
+decks:setAllowed(false)
+
+decks:addGrid(3196, 3722, 'CP Draw')
+decks:addGrid(3700, 3722, 'CP Discard')
+
+
+decks:addMember('Central/card_cp02')
+decks:addMember('Central/card_cp03')
+decks:addMember('Central/card_cp06')
+decks:addMember('Central/card_cp12')
+
+
+
+
+-- create deck markers, captions and a draw deck and cards
+
+
+add_window_label('main', 'd1', 3010, 3462, 0, 0, 'Icons/cardslot', css)
+add_window_label('main', 'd2', 3514, 3462, 0, 0, 'Icons/cardslot', css)
+add_window_label('main', 'nd1', 3010, 4000, 375, 36, '', css)
+add_window_label('main', 'nd2', 3514, 4000, 375, 36, '', css)
+set_label_text('main', 'nd1', 'Draw')
+set_label_text('main', 'nd2', 'Discard Pile')
+
+
+
+local zone = Zones.tags['decks']
+
+local p1 = zone:getGrid('CP Draw')
+local p2 = zone:getGrid('CP Discard')
+
+local draw = Deck:new('draw',{Move = Move:new('Discard', p2)}, p1)
+local discard = Deck:new('discard', {MoveAll = MoveAll:new('CP Draw', 'Reshuffle')}, p2)	
+	
+	
+Repository:addTrait("Central/card_cp02", "Card", Card:new(draw))
+Repository:addTrait("Central/card_cp03", "Card", Card:new(draw))
+Repository:addTrait("Central/card_cp06", "Card", Card:new(draw))
+Repository:addTrait("Central/card_cp12", "Card", Card:new(draw))
+
+
+
+-- 2 is face down
+createCard('Central/card_cp02', draw, 2)
+createCard('Central/card_cp03', draw, 2)
+createCard('Central/card_cp06', draw, 2)
+createCard('Central/card_cp12', draw, 2)
+

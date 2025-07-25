@@ -1,0 +1,10 @@
+== HOW TO BUILD AND RUN ==
+
+
+cd <source directory>
+mkdir ./build
+cmake -B ./build -D CMAKE_CXX_COMPILER=g++ -D CMAKE_RUNTIME_OUTPUT_DIRECTORY=..
+cmake --build ./build 
+LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:/home/me/Qt/6.8.1/gcc_64/lib;export LD_LIBRARY_PATH
+./main
+
