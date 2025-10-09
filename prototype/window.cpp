@@ -1,9 +1,8 @@
-#include <stack>
-
 #include "window.h"
 #include "io.h"
 #include "luau.h"
 #include "scale.h"
+#include "overlay.h"
 
 
 extern IO *io;
@@ -16,15 +15,68 @@ std::map<std::string, Window *> Window::instances;
 
 
 
-Window::Window(QWidget *parent, QString title, std::string tag) : QMainWindow(parent)
+
+Window::Window(QWidget *parent, QString title, std::string tag, std::string type) : QMainWindow(parent)
 {
 	
 	this->setWindowTitle(title);
-    
+	
     
     instances[tag] = this;
+    
     this->tag = tag;
-    this->factor = 1.0;
+    this->zooming = false;
+    
+    
+    // top level window
+    if (parent == nullptr)
+    {
+		this->scrollArea = new QScrollArea;
+		setCentralWidget(scrollArea);
+		
+		this->container = new QWidget(this);
+		container->setAcceptDrops(true);
+			
+		this->scrollArea->setWidget(container);
+	
+		this->frame = new CentralFrame(container, this, type, this->scrollArea);
+		
+		this->frame->setObjectName("centralFrame");
+	}
+	else
+	if (tag == "Repository")
+	{
+		this->reset();
+	
+		
+		this->scrollArea = nullptr;
+		
+		
+		this->frame = new CentralFrame(parent, this, type);
+		setCentralWidget(this->frame);
+		
+		
+		QPalette palette = this->palette();
+		palette.setColor(QPalette::Window, Qt::white);
+		this->setPalette(palette);	
+		setAutoFillBackground(true);
+		
+		this->move(70, 100);   
+		this->resize(480, 300);   
+		this->frame->resize(480, 300);  
+		
+		
+		this->show();
+	}
+	else
+	{
+		this->scrollArea = nullptr;
+		this->container = nullptr;
+		
+		this->frame = new CentralFrame(parent, this, type);
+		setCentralWidget(this->frame);
+		
+	}
     
     
 	setAcceptDrops(true); 		
@@ -36,6 +88,9 @@ Window::~Window()
 {
 	delete this->scrollArea;
 }
+
+
+
 
 
 Window *Window::instance = nullptr;
@@ -60,20 +115,15 @@ Window *Window::getInstance(const char *instance)
 
 
 
-void Window::createToken(int id, Counter::Table *state)
-{
-	(void)new Token(this, id, state);
-}
-
-
-
 void Window::showWindow()
 {	
 	if (this->isHidden())
 		this->show();
 	else
-		this->hide();
+		this->hide();	
 }
+
+
 
 
 void Window::setSingleRowed(int x, int y, int w, int h)
@@ -83,14 +133,10 @@ void Window::setSingleRowed(int x, int y, int w, int h)
 	this->frame->resize(w, h);
 	
 
-	((Frame *)this->frame)->height = h;
-	
-
 	
 	// resize if 100% too big, 400 is height of window minus scrollbar 	
-	if (h > 400)
+	if (this->frame->height() > 400)
 	{
-		((Frame *)this->frame)->height = 400;
 		this->resize(w, 400);
 	}
 	else
@@ -109,36 +155,6 @@ void Window::addAWidget(std::string key,  QWidget *value)
 }
 
 
-void Window::addAToken(int key,  Token *value)
-{
-	tokens[key] = value;
-	setWidgets();
-}
-
-
-
-inline std::stack<Window::Token *> setAsDeleted;
-
-
-void Window::removeAToken(int key)
-{
-	
-		
-	// a very ugly hack; need to return to this
-	
-	Token *token = tokens[key];
-	
-	setAsDeleted.push(token);
-	
-	token->setVisible(false);
-			
-
-	
-	tokens.erase(key);
-	
-}
-
-
 
 
 
@@ -148,15 +164,12 @@ void Window::setWidgets(int height)
 	
 	float fraction;
 	
-	if (widgets.size() == 0 && tokens.size() == 0)
+	if (widgets.size() == 0)
 		return;
 		
 	
-	if (this->tag == "main")
-		fraction = Scale::scaleFraction;
-	else
 	if (height == 0)
-		fraction = this->factor;	
+		fraction = Window::getInstance(this->tag.c_str())->frame->scaleFraction;	
 	else
 	{	
 		
@@ -164,14 +177,14 @@ void Window::setWidgets(int height)
 			return;	
 					
 	
-		this->factor = (float)height / (float)this->frame->size().height();
+		float factor = (float)height / (float)this->frame->size().height();
 		
 		
-		if (this->factor > 1.0)
-			this->factor = 1.0;
+		if (factor > 1.0)
+			factor = 1.0;
 			
 		
-		fraction = this->factor;	
+		fraction = factor;	
 	}
 	
 
@@ -206,126 +219,38 @@ void Window::setWidgets(int height)
 		if (label != nullptr)
 		{
 			
-			QImage base =
-				QImage(label->backgroundImage.width(), label->backgroundImage.height(), QImage::Format_ARGB32_Premultiplied);
+			if (!label->backgroundImage.isNull())
+			{
+				QImage base =
+					QImage(label->backgroundImage.width(), label->backgroundImage.height(), QImage::Format_ARGB32_Premultiplied);
+				
+				base.fill(Qt::transparent);
+				
+				QPainter *paint = new QPainter(&base);	
+				paint->setRenderHint(QPainter::Antialiasing);
+				paint->setRenderHint(QPainter::TextAntialiasing);
+				paint->setRenderHint(QPainter::SmoothPixmapTransform);
+				paint->scale((qreal)fraction, (qreal)fraction);	
+				paint->drawImage(0, 0, label->backgroundImage);		
+				delete paint;
+				
+				
+				label->setPixmap(QPixmap::fromImage(base));
+		
+			}
+			else
+			{
+				label->resize((int)(label->w * fraction), (int)(label->h * fraction));
+			}
 			
-			base.fill(Qt::transparent);
-			
-			QPainter *paint = new QPainter(&base);	
-			paint->setRenderHint(QPainter::Antialiasing);
-			paint->setRenderHint(QPainter::TextAntialiasing);
-			paint->setRenderHint(QPainter::SmoothPixmapTransform);
-			paint->scale((qreal)fraction, (qreal)fraction);	
-			paint->drawImage(0, 0, label->backgroundImage);		
-			delete paint;
-			
-			label->setPixmap(QPixmap::fromImage(base));
 			
 			label->move((int)(label->x * fraction), (int)(label->y * fraction));		
 			
 		}	
 	
 	}
-	
-	
-	// "delayed" deleting - ugly hack 
-
-	while (!setAsDeleted.empty()) 
-	{
-        delete setAsDeleted.top();
-        setAsDeleted.pop();
-    }
-		
-		
-		
-	for (Tokens::iterator it = tokens.begin(); it != tokens.end(); it++)
-	{
-		
-		QImage baseImage = io->getImage(it->second->state.image);
-		
-		
-		
-		
-		
-		int w = (int)(it->second->baseWidth * fraction);
-		int h = (int)(it->second->baseHeight * fraction);
-	
-		
-		it->second->resize(w,h);
-		
-			
-		
-		QImage image = QImage(w, h, QImage::Format_ARGB32_Premultiplied);
-		
-		
-		image.fill(Qt::transparent);
-		
-		
-		QPainter *paint = new QPainter(&image);
-		paint->setRenderHint(QPainter::Antialiasing);
-		paint->setRenderHint(QPainter::TextAntialiasing);
-		paint->setRenderHint(QPainter::SmoothPixmapTransform);
-		paint->scale((qreal)fraction, (qreal)fraction);			
-		paint->drawImage(it->second->margin, it->second->margin, baseImage);
-								
-		delete paint;
-		
-		
-		
-
-		
-		if (it->second->overlays != nullptr)		
-		{	
-			
-			for (auto const &label : (*it->second->overlays))
-			{
-				
-				Counter::Table trait = std::get<Counter::Table>(label.second);
-			
-				
-				try
-				{
-					if (std::get<bool>(trait["apply"]))
-					{
-						int x = (int)std::get<double>(trait["x"]);
-						int y = (int)std::get<double>(trait["y"]);
-						
-						QFont font;
-						font.setFamily(QString::fromStdString(std::get<std::string>(trait["font"])));
-						font.setPixelSize((int)std::get<double>(trait["size"]));
-						font.setWeight(QFont::Bold);
-						
-						std::string color = std::get<std::string>(trait["color"]);
-
-
-						const QString text = QString::fromStdString(std::get<std::string>(trait["text"]));
-						
-						QPainter *paint = new QPainter(&image);
-						paint->setFont(font);
-						paint->setPen(QString::fromStdString(color));
-						paint->drawText(x, y, width(), it->second->margin, Qt::AlignVCenter | Qt::AlignHCenter, text);
-						delete paint;
-					}
-					
-				}
-				catch (std::bad_variant_access const& e)
-				{
-					std::cout << e.what() << std::endl;
-				}	
-				
-			}
-					
-		}
 		
 	
-		
-
-		it->second->setPixmap(QPixmap::fromImage(image));
-		
-		it->second->move((int)(it->second->state.x * fraction), (int)(it->second->state.y  * fraction));
-			
-		
-	}	
 	
 }
 
@@ -335,370 +260,28 @@ void Window::resizeEvent(QResizeEvent* event)
 	
 	QMainWindow::resizeEvent(event);
 	
-
-	setWidgets(event->size().height());
-	
-	event->accept();
-	
-}
-
-
-
-
-
-
-Window::Token::Token(Window *window, int id, Counter::Table *table) : QLabel(window->frame)
-{	
-
-	this->setAutoFillBackground(true);
-	this->setScaledContents(true);
-	this->setSizePolicy( QSizePolicy::Ignored, QSizePolicy::Ignored );
-	this->setStyleSheet("background: transparent");
-	
-	this->setStyleSheet("border-style: none");    
-	this->counterId	= id;
-	this->name = std::to_string(id);
-	
-
-	this->margin = 9;  
-	this->window = window;
+	if (zooming)
+		setWidgets(event->size().height());
 		
 	
-	try
-    {
-		Counter::Table images = std::get<Counter::Table>(std::get<Counter::Table>((*table)["Image"])["images"]);	
-		this->state.image = std::get<std::string>(images[1]);
-		this->state.id = id;
+	if (this->tag == "Repository")
+	{	
+		QLayoutItem *item = this->frame->layout()->itemAt(0);
 		
-		this->baseWidth = io->getSize(this->state.image).width() + 2 * this->margin;
-		this->baseHeight = io->getSize(this->state.image).height() + 2 * this->margin;	
-		this->resize(baseWidth, baseHeight);
-		this->setVisible(true);
-		
-		
-		
-		
-		this->state.x = (int)std::get<double>((*table)["x"]);	 	
-		this->state.y = (int)std::get<double>((*table)["y"]);	   
-	    
-		if ((*table).find("Overlays") != (*table).end())		
+		if (item != nullptr)
 		{	
-			Counter::Table *overlays = new Counter::Table();
-				
-			(*overlays) = std::get<Counter::Table>((*table)["Overlays"]);
-			this->overlays = overlays;
+			QWidget *widget = item->widget();	
+			widget->resize(event->size());
 		}
-		else
-			this->overlays = nullptr;
-			
-			
-		window->addAToken(this->state.id, this);
-		
-		
-		//window->removeAToken(this->state.id);
-		
-			
-			
-	}
-	catch (std::bad_variant_access const& e)
-    {
-        std::cout << e.what() << std::endl;
-    }
-    
- 
-	
-}
-
-
-Window::Token::~Token() 
-{	
-	
-	std::map<int, Token *>::iterator iter = this->window->tokens.find(this->state.id);
-	
-	if (iter != this->window->tokens.end())
-		window->tokens.erase(iter);
-	
-}
-
-
-
-static Luau::PopupEntries popupentries;
-
-
-void Window::Token::showRightClickMenu()
-{
-	
-	QMenu myMenu(this);
-		
-	if (this->actions().isEmpty())
-	{
-		popupentries.clear();
-		
-		const char *tag = this->window->tag.c_str();
-		const char *token = std::to_string(this->state.id).c_str();
-	
-		popupentries = Luau::getTraits(tag, token);
+	}		
 		
 	
-
-		for (auto e : popupentries)
-		{
-			 
-			const QString name = QString::fromStdString(e.entryname);
-			
-			QAction* action = new QAction(name, this);
-			
-			QVariant v = QVariant(QString(e.entryaction.c_str()));
-			action->setData(v);
-
-		   
-			this->addAction(action);
-			
-			QObject::connect( action, &QAction::triggered, this, [=]()->void{ do_activate(action); } );
-			
-		}
-	}
 	
-	myMenu.addActions(this->actions());
-	
-	myMenu.exec(QCursor::pos());
-}
-
-
-void Window::Token::do_activate (QAction *action)
-{
-	QVariant v = action->data();
-	QString str = (QString) v.value<QString>();
-	QByteArray ba = str.toLocal8Bit();
-	const char *entryaction = ba.data();
-	const char *window = this->window->tag.c_str();
-	std::string id = std::to_string(this->state.id);
-
-			
-	Luau::doAction(window, id.c_str(), entryaction);
-					
-}
-
-
-void Window::Token::mousePressEvent (QMouseEvent * event) 
-{
-			
-	if (event->button() == Qt::RightButton)
-	{
-		showRightClickMenu();
-		event->accept();
-	}
-	else 	
-		event->ignore();
-		
-}
-
-
-void Window::Token::set(std::string text)
-{
-	this->setText(QString::fromStdString(text));
-}
-
-
-void Window::Token::setImage(std::string image)
-{
-		
-	this->state.image = image;
-	
-	this->window->setWidgets();	
-	
-}
-
-
-
-
-
-
-Window::Frame::Frame(Window *parent, std::string background) : QFrame(parent)
-{
-	
-	this->window = parent;
-	
-	if (background[0] == '#')
-	{
-		// background is a color
-		this->setStyleSheet("QFrame { background-color:" + QString::fromStdString(background) + "; }");
-	}
-	else
-	{
-		//background is an image
-		if (io->isResource(background))
-		{
-			backgroundImage = io->getImage(background);
-			parent->scrollArea->resize(backgroundImage.size()); 
-		}
-	}
-	
-	setAcceptDrops(true);
-	
-}
-
- 
-Window::Frame::~Frame()
-{
-}
-
-
-
- 
-inline Window::Token *dragged = nullptr;
-
- 
- 
-void Window::Frame::mousePressEvent(QMouseEvent *event)
-{
+	//this->frame->setBackground();
 	
 	event->accept();
 	
-	if (event->button() == Qt::LeftButton)
-	{
-		
-		Token *child = 
-			static_cast<Token*>(childAt(event->position().toPoint()));
-	
-			
-		if (child == nullptr)
-			return;			
-				
-
-		dragged = child;
-		
-	
-		QImage image;
-	
-		if (event->modifiers() == Qt::ControlModifier)
-			image = io->getImage(child->state.image);
-		else
-			image = child->pixmap().toImage();
-		
-			
-			
-		QPixmap img(image.size());
-		
-		
-		
-		img.fill(Qt::transparent);		
-		QPainter painter;
-		painter.begin(&img);
-		painter.setRenderHint(QPainter::Antialiasing);
-		painter.setRenderHint(QPainter::TextAntialiasing);
-		painter.setRenderHint(QPainter::SmoothPixmapTransform);
-		if (event->modifiers() == Qt::ControlModifier)
-			painter.scale((qreal)Scale::scaleFraction, (qreal)Scale::scaleFraction);	
-		painter.drawImage(child->margin, child->margin, image);			
-		painter.end();
-		
-		
-		QByteArray itemData;
-		QDataStream dataStream(&itemData, QIODevice::WriteOnly);
-		
-		
-			
-		
-		QPoint counterOffset = event->position().toPoint() - child->pos(); 
-		
-		if (event->modifiers() == Qt::ControlModifier)
-			// scales up to normal size
-			counterOffset /= window->factor;
-		
-			
-	
-		dataStream << counterOffset;																
-		dataStream << QString::fromStdString(child->state.image);
-		dataStream << child->state.id;
-				
-	
-		QMimeData *mimeData = new QMimeData;
-		mimeData->setData("application/x-alben-window", itemData);
-						
-		
-			
-		
-		QDrag *drag = new QDrag(this);
-		drag->deleteLater();
-		drag->setMimeData(mimeData);
-		drag->setPixmap(img);
-		if (event->modifiers() == Qt::ControlModifier)
-			drag->setHotSpot(counterOffset * Scale::scaleFraction);
-		else
-			drag->setHotSpot(counterOffset + QPoint(child->margin,child->margin));
-			
-	
-		
-		auto result = drag->exec(Qt::CopyAction | Qt::MoveAction);
-		
-		if (result == Qt::MoveAction) 
-		{
-			delete child;
-		}
-		
-		
-	}
-	
 }
-	
-
-void Window::Frame::dragEnterEvent(QDragEnterEvent *event)
-{	
-	if (event->mimeData()->hasFormat("application/x-alben-window")) 	
-		event->acceptProposedAction();
-}
-
-
-void Window::Frame::dropEvent(QDropEvent *event)
-{
-	
-	if (event->mimeData()->hasFormat("application/x-alben-window"))
-	{
-		
-		QPoint counterOffset;
-		
-		QByteArray itemData = event->mimeData()->data("application/x-alben-window");
-		QDataStream dataStream(&itemData, QIODevice::ReadOnly);
-			
-		dataStream >> counterOffset;
-		
-	
-		 
-		int x = event->position().toPoint().x() - counterOffset.x();
-		int y = event->position().toPoint().y() - counterOffset.y();
-	
-
-		
-		dragged->state.x = (int)((float)x / window->factor);
-		dragged->state.y = (int)((float)y / window->factor);
-		
-		
-		
-		window->setWidgets(); 
-		
-		
-		
-		event->setDropAction(Qt::CopyAction);
-		event->accept();			
-	}
-	
-}
-
-
-
-
-
-void Window::Frame::paintEvent(QPaintEvent *event)
-{
-	
-	QPainter painter(this);
-	
-	if (!backgroundImage.isNull())
-		painter.drawImage(0,0,backgroundImage);
-	
-}
-
 
 
 
@@ -710,17 +293,16 @@ Window::Label::Label(std::string tag, Window *parent, int x, int y,  int w, int 
 	
 	if (resourecName.empty())
 	{
-		this->backgroundImage = QImage(w, h, QImage::Format_ARGB32_Premultiplied);	
-		this->backgroundImage.fill(Qt::transparent);
-	}	
+		this->resize(w, h);			
+	}
 	else
-		this->backgroundImage = io->getImage(resourecName);	
+	{
+		this->backgroundImage = io->getImage(resourecName);
+		this->setPixmap(QPixmap::fromImage(backgroundImage));
+		this->resize(this->pixmap().size());	
+	}	
 		
-		
-	this->setPixmap(QPixmap::fromImage(backgroundImage));
-	
-	
-	this->resize(this->pixmap().size());
+
 	this->setVisible(true);
 	
 		
@@ -809,6 +391,514 @@ Window::PushButton::PushButton(std::string widget, QImage image, QString text, i
 
 }
 
+
+
+
+Window::Pane::Pane(QWidget *parent) : QLabel(parent)
+{
+	
+	QPalette palette = this->palette();
+	palette.setColor(QPalette::Window, Qt::white);
+	this->setPalette(palette);	
+	setAutoFillBackground(true);
+	
+	setContentsMargins(0, 0, 0, 0);
+	
+}
+	
+	
+void Window::Pane::resizeEvent(QResizeEvent* event)
+{
+   QLabel::resizeEvent(event);
+}
+
+
+
+Window::ListBox::ListBox(QWidget *parent) : QListWidget(parent)
+{
+	QObject::connect(this, &QListWidget::itemClicked, 
+					 this, [=]()->void{ itemClicked((ListItem *)this->selectedItems().at(0)); });
+					 
+	QObject::connect(this, &QListWidget::itemSelectionChanged, 
+					 this, [=]()->void{ itemSelectionChanged(); });
+}
+
+
+void Window::ListBox::itemClicked(ListItem *item)
+{	
+	for (int i = 0; i < item->listWidget()->count(); ++i)
+	{
+		ListItem* lt = (ListItem *)item->listWidget()->item(i);
+		lt->pane->setVisible(false);
+	}
+	
+	item->pane->setVisible(true);	
+}
+
+
+void Window::ListBox::itemSelectionChanged()
+{	
+	
+	ListItem *item = (ListItem *)this->selectedItems().at(0);
+	
+	for (int i = 0; i < item->listWidget()->count(); ++i)
+	{
+		ListItem* lt = (ListItem *)item->listWidget()->item(i);
+		lt->pane->setVisible(false);
+	}
+	
+	item->pane->setVisible(true);	
+}
+
+
+
+Window::ListItem::ListItem(const QString &text, ListBox *parent, Pane *paneParent, int type) : 
+										QListWidgetItem(text, (QListWidget *)parent, type)
+{
+	Pane *pane = new Pane(paneParent);
+	
+	pane->setVisible(false);
+	paneParent->layout()->addWidget(pane);
+	
+	
+	this->pane = pane;
+    
+    parent->addItem(this);
+    
+    parent->setCurrentItem(parent->item(0));
+    ((ListItem *)parent->currentItem())->pane->setVisible(true);
+ 
+
+}
+
+
+
+Window::ComboBox::ComboBox(QWidget *parent) : QComboBox(parent)
+{
+	QObject::connect(this, &QComboBox::activated, 
+					 this, [=]()->void{ activated(this->currentIndex()); });
+}
+
+void Window::ComboBox::activated(int index)
+{	
+	
+	for (int i = 0; i < this->count(); ++i)
+	{
+		QVariant variant = this->itemData(i);
+		Pane *pane = variant.value<Pane*>();
+		
+		pane->setVisible(false);
+	}
+	
+	
+	
+	QVariant variant = this->itemData(index);
+	
+	
+	if ( strcmp(variant.typeName(), "Window::Pane*") == 0 )
+	{
+		Pane *pane = variant.value<Pane*>();		
+		pane->setVisible(true); 
+	}
+		
+}
+
+
+
+		
+Window::Pane* Window::getParent()
+{
+
+	// return current top pane
+	
+
+    Pane **pane = std::any_cast<Pane*>(&panes.top());  
+  
+	assert( pane != nullptr );
+	
+	
+	
+	if ((*pane)->layout() == nullptr)
+	{
+		(*pane)->setLayout(new Overlay::FlowLayout(*pane));
+		(*pane)->layout()->setContentsMargins(0, 0, 0, 0);
+	}
+
+
+	return *pane;
+	
+}
+
+
+
+void Window::visibility(bool value)
+{
+	this->setVisible(value);	
+}
+
+
+
+
+
+int lastLevel = 0;
+
+
+
+void Window::root(int level)
+{	
+	
+	Pane *pane = new Pane(this->frame);
+	
+	paneList.append(pane);
+	
+	
+	this->frame->layout()->addWidget(pane);
+	
+	pane->resize(this->frame->size());
+	
+	lastLevel = level;
+	
+	
+	panes.push(pane);
+	
+}
+
+
+
+
+void Window::tabs(int level)
+{
+	
+	QTabWidget *w;
+	
+	
+	
+	Pane **parent = (Pane **)std::any_cast<Pane*>(&panes.top());
+	
+	assert( parent != nullptr );
+	
+	
+	
+	(*parent)->setLayout(new QVBoxLayout((*parent)));	
+	(*parent)->layout()->setContentsMargins(QMargins());
+	(*parent)->layout()->setSpacing(0);	
+	
+	
+	
+	
+	w = new QTabWidget(*parent);
+	
+	
+	(*parent)->layout()->addWidget(w);	
+	w->resize((*parent)->size());
+	
+	
+	lastLevel = level;
+	
+    panes.push(w);
+ 
+}
+
+
+void Window::tab(int level, std::string text)
+{
+	
+	if (level == lastLevel)
+		panes.pop();
+	
+		
+	if (level < lastLevel) 			
+		for (int i = 0; i <= lastLevel - level; i++)
+			panes.pop();
+	
+	
+	Pane **parent1 = std::any_cast<Pane*>(&panes.top());		
+	QTabWidget **parent2 = std::any_cast<QTabWidget*>(&panes.top());
+	
+	assert( parent1 != nullptr || parent2 != nullptr );
+	
+	
+	
+	
+	if (parent1 != nullptr)
+	{
+		
+	}
+	
+	else
+	
+	{
+		
+		Pane *pane = new Pane(*parent2); 
+		
+		paneList.append(pane); 
+    
+		// IMPORTANT: you can not presume anything about what follows a tab;
+		// therefore you can not set its layout here
+		
+
+		(void)(*parent2)->addTab(pane, QString::fromStdString(text));
+		
+	   
+		pane->resize( ((QWidget*)(*parent2)->parent())->size() );
+		
+		panes.push(pane);
+		
+	}
+	
+	
+		
+	lastLevel = level;
+    
+
+}
+
+
+
+void Window::listBox(int level)
+{
+	
+    
+	Pane **parent = (Pane **)std::any_cast<Pane*>(&panes.top());
+		
+	assert( parent != nullptr );
+	
+	
+	
+	(*parent)->setLayout(new QVBoxLayout((*parent)));	
+	(*parent)->layout()->setContentsMargins(QMargins());
+	(*parent)->layout()->setSpacing(0);		
+	
+   
+
+	
+	
+	QSplitter *splitter = new QSplitter(Qt::Horizontal, *parent);
+	
+	splitter->setStyleSheet("QSplitter::handle{ background:gainsboro }");
+	splitter->setHandleWidth(3);
+	
+		
+	(*parent)->layout()->addWidget(splitter);
+	
+	
+	
+	
+     
+	ListBox *listWidget = new ListBox(splitter);
+	
+	
+	
+	listWidget->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+	listWidget->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+	
+	
+	Pane *pane = new Pane(splitter);
+	
+	paneList.append(pane);
+	
+	pane->setLayout(new QVBoxLayout());
+	pane->layout()->setContentsMargins(QMargins());
+	
+    
+	splitter->addWidget(pane);
+	splitter->addWidget(listWidget);
+
+	QList<int> sizes;
+    sizes.append(0.8 * splitter->sizeHint().width());
+    sizes.append(0.2 * splitter->sizeHint().width());
+    splitter->setSizes(sizes);
+    
+    
+    lastLevel = level;
+    
+	panes.push(splitter);
+
+	
+}
+
+
+void Window::listItem(int level, std::string text)
+{
+
+	if (level == lastLevel)
+		panes.pop();
+	
+		
+	if (level < lastLevel) 			
+		for (int i = 0; i <= lastLevel - level; i++)
+			panes.pop();
+	
+	
+	Pane **parent1 = std::any_cast<Pane*>(&panes.top());		
+	QSplitter **parent2 = std::any_cast<QSplitter*>(&panes.top());
+	
+	assert( parent1 != nullptr || parent2 != nullptr );
+	
+	
+	
+	if (parent1 != nullptr)
+	{
+		
+	}
+	
+	else
+	
+	{
+			
+		ListItem *item = new ListItem(QString::fromStdString(text), 
+									 (ListBox *)(*parent2)->widget(1), 
+									 (Pane *)(*parent2)->widget(0));
+    
+		panes.push(item->pane);
+	}
+
+
+    lastLevel = level;
+    
+    
+}
+
+
+	
+void Window::comboBox(int level)
+{
+	
+	
+	Pane **parent = (Pane **)std::any_cast<Pane*>(&panes.top());
+	
+	
+	assert( parent != nullptr );
+	
+	
+	(*parent)->setLayout(new QVBoxLayout((*parent)));	
+	(*parent)->layout()->setContentsMargins(QMargins());
+	(*parent)->layout()->setSpacing(0);	
+			
+   
+	
+	
+	
+	Pane *pane = new Pane(*parent);
+	
+	paneList.append(pane);
+	
+	pane->setLayout(new QVBoxLayout(pane));
+	pane->layout()->setContentsMargins(QMargins());
+	pane->layout()->setSpacing(0);
+	
+	pane->resize( (*parent)->size() );
+	
+	
+	(*parent)->layout()->addWidget(pane);
+
+	
+	
+	ComboBox *c = new ComboBox(pane);
+
+	
+	pane->layout()->addWidget(c);	
+	
+	
+	
+	lastLevel = level;
+	
+    
+	panes.push(c);
+	
+}
+
+
+
+void Window::comboItem(int level, std::string text)
+{
+	
+	if (level == lastLevel)
+		panes.pop();
+	
+		
+	if (level < lastLevel) 			
+		for (int i = 0; i <= lastLevel - level; i++)
+			panes.pop();
+	
+	
+	Pane **parent1 = std::any_cast<Pane*>(&panes.top());		
+	ComboBox **parent2 = std::any_cast<ComboBox*>(&panes.top());
+	
+	
+	assert( parent1 != nullptr || parent2 != nullptr );
+	
+	
+	
+	
+	if (parent1 != nullptr)
+	{
+		
+	}
+	
+	else
+	{
+	
+		(*parent2)->addItem(QString::fromStdString(text)); 
+	
+		Pane *pane = new Pane((Pane *)(*parent2)->parent());
+		
+		paneList.append(pane);
+		
+		pane->setVisible(false);
+		
+		(*parent2)->setItemData((*parent2)->count() - 1, QVariant::fromValue(pane), Qt::UserRole);
+	
+		((Pane *)(*parent2)->parent())->layout()->addWidget(pane);
+		
+		(*parent2)->activated(0);
+		
+		
+		
+		panes.push(pane);
+			
+	}
+
+
+	lastLevel = level;
+	
+
+}
+	
+	
+void Window::imageItem(std::string imageID)
+{
+
+	Pane *pane = this->getParent();
+    
+	
+	QImage image = io->getImage(imageID);
+	
+	QLabel *widget = new QLabel();
+	widget->setPixmap( QPixmap::fromImage(image) );
+
+	pane->layout()->addWidget(widget);
+	
+}	
+	
+
+void Window::reset()
+{
+	
+	//  the code here is not finished !!!
+	
+	
+	QMutableListIterator<Pane*> p(paneList);
+	
+	if (p.hasNext())
+		delete p.next();
+	
+	
+	paneList.clear();
+	paneList.squeeze();
+
+    
+}
 
 
 

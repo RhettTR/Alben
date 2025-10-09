@@ -10,8 +10,10 @@
 
 
 
+
 class Counter;
 class Window;
+class Repository;
 
 
 
@@ -30,8 +32,9 @@ class CentralFrame : public QFrame
 		class Area : public QLabel
 		{
 			public:	
-				Area(QFrame *parent);
+				Area(CentralFrame *parent);
 				~Area();
+				CentralFrame *parent;
 				Counter *counter;
 				void showRightClickMenu(Counter *counter);
 				void execute(QAction *action);
@@ -42,29 +45,39 @@ class CentralFrame : public QFrame
 		
 		
 		
-		CentralFrame(QWidget *parent, std::string name, Window *window, QScrollArea *scrollArea = nullptr);
+		CentralFrame(QWidget *parent, Window *window, std::string type, QScrollArea *scrollArea = nullptr);
 		
-		std::string name;
+
 		
 		QScrollArea *scrollArea;
 		Window *window;
+		//
+		float scaleFraction;
+		std::string backgroundID;
+		QColor backgroundColor;
 		
-		bool anySelected(Counter *counter, Counter *&selected);
+		bool anySelected(Counter *counter, Counter *&selected, int &selectedPos);
 		void toggleOpenStack(Counter *counter, int sign);
 		void closeAllOpenStacks();
 		void selectCounter(Counter *counter);
+		void setBackground(std::string background);
 		
 		
 		
-		static std::string backgroundID;
 		static bool openStackoffset;
 		static bool facingMatters;
 		static Area *area;
+		static bool showGrid;
+		static QColor gridColor;
+		static int gridRadius;
+		static bool allowPainting;
 		
 		
 		static QScrollArea *buttonParent;
 		static void createButton(const char *id, const char *text, const char *handler, int x, int y, int w, int h);
 		static void deleteButton(const char *id);
+		static void setGrid(Counter::Table *grid);
+		
 		
 		
 		struct pt 
@@ -104,7 +117,28 @@ class CentralFrame : public QFrame
 		typedef struct std::map<int, Counter *> Stack;
 		typedef struct std::map<Point, Stack> Stacks;
 		
+		typedef struct
+		{
+			int x;
+			int y;
+			const QString text;
+			int hx;
+			int hy;
+		} GridPoint;
 		
+		typedef struct std::vector<GridPoint> GridCoordiantes;
+		
+		
+		
+		typedef struct
+		{
+			int id;
+			QString idStr;
+			int dx;	
+			int dy;
+		} Move;
+		
+		typedef struct std::vector<Move> Moved;
 	
 
 		
@@ -117,7 +151,7 @@ class CentralFrame : public QFrame
 		virtual void dragMoveEvent(QDragMoveEvent *event);
 		virtual void resizeEvent(QResizeEvent* event);
 		virtual void wheelEvent(QWheelEvent *event);	
-		virtual void paintEvent (QPaintEvent *e);
+		virtual void paintEvent (QPaintEvent *event);
 		
 		
 		
@@ -126,8 +160,11 @@ class CentralFrame : public QFrame
 		std::map<Point, int> stackOpen;		// int is sign for offset
 		void selectStack(Counter *counter);			
 		void unselect();
-		QImage stackGhostImage(Counter *counter, QRect &totalRect);
-		QImage selectedGhostImage(QRect &totalRect);
+		QImage selectedGhostImage(Counter *counter, QRect &totalRect);
+		static GridCoordiantes gridCoordinates;
+		static Moved countersDeleted;
+		
+		
 		
 };
 

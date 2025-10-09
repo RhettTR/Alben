@@ -4,9 +4,14 @@
 
 #include <QtWidgets>
 #include <map>
+#include <stack>
+#include <any>
 
 
 #include "counter.h"
+
+
+class CentralFrame;
 
 
 		
@@ -21,70 +26,43 @@ class Window : public QMainWindow
 		class CheckBox;
 		
 		
-		class Token : public QLabel
+		class Pane : public QLabel
 		{
 			public:
-			
-				struct State				
-				{
-					int id;
-					int x;					
-					int y;								
-					std::string image;			// name of current (flipped) image					
-				};
-				
-				Token(Window *window, int id, Counter::Table *table);
-				virtual ~Token();
-				void showRightClickMenu();
-				void do_activate (QAction *action);
-				
-				Window *window; 
-				
-				int margin;	// the area around the counter for rendering masks
-				
-				void setImage(std::string image);
-				
-				State state;
-				
-				int baseWidth;
-				int baseHeight;
-				int counterId;
-				std::string name;
-				
-				Counter::Table *overlays;
-				
-				void set(std::string text);	
-						
-			protected:	
-						
-				virtual void mousePressEvent(QMouseEvent *event);			
-				
+				Pane(QWidget *parent = nullptr);
+			protected:
+				virtual void resizeEvent(QResizeEvent* e);
 		};
 		
 		
-		class Frame : public QFrame
+		class ListItem;
+		
+		class ListBox : public QListWidget
 		{
 			public:
-							
-				Frame(Window *parent, std::string background);
-				~Frame();
-							
-				Window *window;
-				QPixmap pixmap;
-		
-				int height;
-				
-				
-			protected:	
-				virtual void mousePressEvent(QMouseEvent *event);
-				virtual void dragEnterEvent(QDragEnterEvent *event);
-				virtual void dropEvent(QDropEvent *event);
-				virtual void paintEvent (QPaintEvent *event);
-				
+				ListBox(QWidget *parent);				
 			private:
-				QImage backgroundImage;		
-						
+				void itemClicked(ListItem *item);
+				void itemSelectionChanged();
 		};
+		
+		class ListItem : public QListWidgetItem
+		{
+			public:
+				ListItem(const QString &text, ListBox *parent, Pane *paneParent, int type = Type);
+				Pane *pane;
+			
+		};
+		
+		class ComboBox : public QComboBox
+		{
+			public:
+				ComboBox(QWidget *parent = nullptr);
+				void activated(int index);
+				
+		};	
+		
+
 		
 		
 		class Label : public QLabel
@@ -103,7 +81,8 @@ class Window : public QMainWindow
 				Window *parent;
 				
 			protected:	
-				virtual void mousePressEvent(QMouseEvent *event);	
+				virtual void mousePressEvent(QMouseEvent *event);
+				
 		};
 		
 		
@@ -115,7 +94,7 @@ class Window : public QMainWindow
 				int x;
 				int y;	
 				bool get();
-				Frame *frame;	
+				CentralFrame *frame;	
 		};
 		
 		
@@ -135,47 +114,67 @@ class Window : public QMainWindow
 		
 		
 		
-		Window(QWidget *parent, QString title, std::string tag);
+		Window(QWidget *parent, QString title, std::string tag, std::string type);
 		~Window();
 		
+		
 		typedef std::map<std::string, QWidget *> Widgets;
-		typedef std::map<int, Token *> Tokens;
 		
 		Widgets widgets;	
-		Tokens tokens;
 		
 		
 		void addAWidget(std::string key,  QWidget *value);
-		void addAToken(int key,  Token *value);
 		static Window *instance;
-		void removeAToken(int key);
-		void createToken(int id, Counter::Table *state);
+		QWidget *container;
 		void setWidgets(int height = 0);
+		bool zooming;
 		
-		float factor;  // the scale factor applied to the window
 		
 		
 		static Window *getInstance(const char *instance);
 		void showWindow();
 		void setSingleRowed(int x, int y, int w, int h);
 		
-		
+		//
 		std::string tag;
+		
+		
 		QScrollArea *scrollArea;	
 		
 		
-		QFrame *frame;
+		CentralFrame *frame;
 		
+		// repository
+		
+		Pane* getParent();
+		
+		void visibility(bool value);	
+		
+		void root(int level);
+		void tabs(int level);
+		void tab(int level, std::string text);
+		void listBox(int level);
+		void listItem(int level, std::string text);
+		void comboBox(int level);
+		void comboItem(int level, std::string text);
+		void imageItem(std::string imageID);
+		
+		
+		QList<Pane*> paneList;
+		void reset();
 		
 		
 	protected:
 		
-		virtual void resizeEvent(QResizeEvent* event);
+		virtual void resizeEvent(QResizeEvent* event);	
+		
+			
 		
 	
 	private:
 	
 		static std::map<std::string, Window *> instances;
+		std::stack<std::any> panes;
 		
 		
 };

@@ -2,16 +2,16 @@
 #include "overlay.h"
 #include "scale.h"
 #include "io.h"
+#include "window.h"
 
 
 extern IO *io;
-extern QWidget *container;
-extern CentralFrame *mapFrame;
 
 
 
-float Scale::scaleFraction = 1.0;
+//float Scale::scaleFraction = 1.0;
 int Scale::rotation = 0;
+float Scale::minScaleGrid = 0.4;
 
 
 
@@ -42,10 +42,10 @@ void Scale::rotate(Counter *counter, int degree, int &x, int &y)
 	float c = cos(rad);
 
 	
-	QSize baseSize = io->getSize(CentralFrame::backgroundID);
+	QSize baseSize = io->getSize(Window::getInstance("main")->frame->backgroundID);
 
 	
-	baseSize *= Scale::scaleFraction;
+	baseSize *= Window::getInstance(counter->state.tag.c_str())->frame->scaleFraction;
 	
 
 	int cx = std::round((float)baseSize.width() / 2.0);
@@ -69,7 +69,7 @@ void Scale::rotate(Counter *counter, int degree, int &x, int &y)
 	
 	
 	
-	QSize size = getScaledSize(CentralFrame::backgroundID);
+	QSize size = getScaledSize(Window::getInstance("main")->frame->backgroundID);
 	
 	cx = std::round((float)size.width() / 2.0);
 	cy = std::round((float)size.height() / 2.0); 
@@ -99,7 +99,7 @@ void Scale::unrotate(Counter *counter, int degree, int &x, int &y)
 
 	
 	
-	QSize size = getScaledSize(CentralFrame::backgroundID);
+	QSize size = getScaledSize(Window::getInstance("main")->frame->backgroundID);
 	
 			   
 	int cx = std::round((float)size.width() / 2.0);
@@ -120,10 +120,10 @@ void Scale::unrotate(Counter *counter, int degree, int &x, int &y)
 	float ny = x * s + y * c;
 	
 	
-	QSize baseSize = io->getSize(CentralFrame::backgroundID);
+	QSize baseSize = io->getSize(Window::getInstance("main")->frame->backgroundID);
 
 	
-	baseSize *= Scale::scaleFraction;
+	baseSize *= Window::getInstance(counter->state.tag.c_str())->frame->scaleFraction;
 	
 
 	cx = std::round((float)baseSize.width() / 2.0);
@@ -167,7 +167,8 @@ CentralFrame::Point Scale::getScaleRotateCoordinate(Counter *counter, int x, int
 	
 	CentralFrame::Point point = {x, y};
 	
-	point = point * Scale::scaleFraction;
+	//point = point * Scale::scaleFraction;
+	point = point * Window::getInstance(counter->state.tag.c_str())->frame->scaleFraction;
 	
 	if (Scale::rotation != 0)
 		rotate(counter, Scale::rotation, point.x, point.y);
@@ -177,7 +178,7 @@ CentralFrame::Point Scale::getScaleRotateCoordinate(Counter *counter, int x, int
 }
 
 
-void Scale::resourceScaleRotate(std::string name)
+void Scale::resourceScaleRotate(std::string tag, std::string name)
 {
 	
 	QImage image = io->getImage(name);
@@ -189,8 +190,8 @@ void Scale::resourceScaleRotate(std::string name)
 		image = image.transformed(QTransform().rotate(Scale::rotation));
 	
 	
-	QSize size(std::round(image.width() * Scale::scaleFraction), 
-			   std::round(image.height() * Scale::scaleFraction));
+	QSize size(std::round(image.width() * Window::getInstance(tag.c_str())->frame->scaleFraction), 
+			   std::round(image.height() * Window::getInstance(tag.c_str())->frame->scaleFraction));
 	
 	imageScaled = image.scaled( size, Qt::KeepAspectRatio, Qt::SmoothTransformation);
 	
@@ -201,9 +202,9 @@ void Scale::resourceScaleRotate(std::string name)
 	
 	
 	
-	container->setFixedSize(getScaledSize(CentralFrame::backgroundID));
-	mapFrame->setFixedSize(getScaledSize(CentralFrame::backgroundID));
-	Overlay::overlay->setFixedSize(getScaledSize(CentralFrame::backgroundID));
+	Window::getInstance("main")->container->setFixedSize(getScaledSize(Window::getInstance(tag.c_str())->frame->backgroundID));
+	Window::getInstance("main")->frame->setFixedSize(getScaledSize(Window::getInstance(tag.c_str())->frame->backgroundID));
+	Overlay::overlay->setFixedSize(getScaledSize(Window::getInstance(tag.c_str())->frame->backgroundID));
 	
 	
 }

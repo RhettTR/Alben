@@ -13,8 +13,7 @@
 #include "overlay.h"
 
 
-extern CentralFrame *mapFrame;
-extern ToolBar *mainToolBar;
+
 
 using namespace std;
 using namespace std::filesystem;
@@ -35,10 +34,10 @@ void IO::close()
 	Luau::deleteAll();
 	Luau::resetState();
 	Luau::logReset();
-	mapFrame->closeAllOpenStacks();
+	Window::getInstance("main")->frame->closeAllOpenStacks();
 	
-	mainToolBar->enabled("__forward", false);
-	mainToolBar->enabled("__end", false);
+	ToolBar::getInstance("main")->enabled("__forward", false);
+	ToolBar::getInstance("main")->enabled("__end", false);
 }
 	
 	
@@ -68,6 +67,38 @@ IO::LoadGame::LoadGame(std::string fileName)
 							
 				if (!std::getline(fs, key, '\0'))
 					break;
+					
+				if (key == "turn")
+				{
+					// read turn
+					Luau::Turn turn;
+					 					
+					fs.read(reinterpret_cast<char*>(&turn.turn), sizeof turn.turn); 					
+					fs.read(reinterpret_cast<char*>(&turn.phase), sizeof turn.phase);
+					
+					Luau::setTurn(turn);
+				}
+					
+					
+				if (key == "deck")
+				{
+					// read number of keys in this table
+					std::size_t size; 
+					
+					fs.read(reinterpret_cast<char*>(&size), sizeof size);
+					
+					if (size > 0)
+					{	
+					
+						// read table
+						Counter::Table table = loadTable(size);
+					
+						Luau::loadDeck(table);
+						
+					}
+					
+				}		
+				
 					
 				if (key == "counter")
 				{	
@@ -104,7 +135,6 @@ IO::LoadGame::LoadGame(std::string fileName)
 						
 				}
 				
-				else
 				
 				// read log (if any)
 				if (key == "log")				
@@ -145,9 +175,9 @@ IO::LoadGame::LoadGame(std::string fileName)
 			
 			if (logfile)
 			{
-				mainToolBar->enabled("__forward", true);
-				mainToolBar->enabled("__end", true);
-				mainToolBar->enabled("__abort", true);
+				ToolBar::getInstance("main")->enabled("__forward", true);
+				ToolBar::getInstance("main")->enabled("__end", true);
+				ToolBar::getInstance("main")->enabled("__abort", true);
 				Counter::setDisabled(true);
 				IO::stepping = true;				
 			}
@@ -292,13 +322,13 @@ void IO::loadGame()
 void IO::loadSetUp(string filename)
 {
 	QFileInfo fileInfo(QString::fromStdString(filename));
-	
+
 	QString base = fileInfo.baseName();
 	
-	
+
 	
 	string completeFileName = "./setups/" + base.toStdString() + ".vsav";
-
+	
 	LoadGame *load = new LoadGame(completeFileName);	
 	delete load;
 	
@@ -448,10 +478,17 @@ void IO::load_resources(string directory)
 		std::cout << e.code() << '\n';
 		std::cout << e.what() << '\n';
 	}
+	
 			
 }
 
 
+
+void IO::transfer_resource_keys()
+{
+	for (auto resource = _resources.begin(); resource != _resources.end(); ++resource)
+		Luau::setResourceKey(resource->first.c_str());
+}
 
 
 
@@ -520,10 +557,51 @@ QString IO::saveGame(QString saveAs, QString saveTo, QString suffix)
 		
 		
 		fs.open(fileNames[0].toStdString(), ios::binary | ios::out);
+		
+		
+		
+		
+		// save turn and phase
+		
+		std::string key = "turn";
+		fs.write(key.c_str(), key.size() + 1);
+		
+		Luau::Turn turn = Luau::getTurn();
+		
+		fs.write(reinterpret_cast<const char*>(&turn.turn), sizeof turn.turn);
+		fs.write(reinterpret_cast<const char*>(&turn.phase), sizeof turn.phase);
         
 		
 		
-	
+		// save decks
+		
+		Counter::Table keys = Luau::getDecks();
+		
+		
+		for (auto const& [k, v] : keys)
+		{
+			std::string key = "deck";
+			fs.write(key.c_str(), key.size() + 1);
+			
+			
+			std::string index = std::get<std::string>(v);
+			
+			
+			Counter::Table table = Luau::getDeck(index.c_str());
+			
+			std::size_t s = table.size();
+			fs.write(reinterpret_cast<const char*>(&s), sizeof s);		
+			
+			
+			saveTable(table);
+			
+		}
+		
+		
+		
+		
+		// save counters
+		
 		
 		for (auto obj = Counter::counters.begin(); obj != Counter::counters.end(); ++obj)
 		{
@@ -535,32 +613,36 @@ QString IO::saveGame(QString saveAs, QString saveTo, QString suffix)
 			fs.write(key.c_str(), key.size() + 1);
 		
 			
-			Counter::Table table = Luau::getTraits("Map", counter->id);
+			Counter::Table table = Luau::getTraits("", counter->id);
 			
-			// save top level table size
-			std::size_t s = table.size();
-			fs.write(reinterpret_cast<const char*>(&s), sizeof s);
+			if (!table.empty())
+			{
 			
-			// save the ownershipField
-			unsigned long long f = counter->getOwnershipField();
-			Settings::OwnershipRights r = Settings::myOwnershipRights;
-			
-			// case where opponent has dragged your conter on board
-			// set your OwnershipField and rights
-			if (f == 0)
-				if (table.find("Side") != table.end())
-					if (std::get<std::string>(table["Side"]) == Settings::playerSide)
-					{
-						counter->setOwnershipField(IO::getKey() * 0xef06eea1);
-						f = counter->getOwnershipField();						
-					}
-			fs.write(reinterpret_cast<const char*>(&f), sizeof f);
-			
-			// save rights			
-			fs.write(reinterpret_cast<const char*>(&r), sizeof r); 
-			
-			
-			saveTable(table);						
+				// save top level table size
+				std::size_t s = table.size();
+				fs.write(reinterpret_cast<const char*>(&s), sizeof s);
+				
+				// save the ownershipField
+				unsigned long long f = counter->getOwnershipField();
+				Settings::OwnershipRights r = Settings::myOwnershipRights;
+				
+				// case where opponent has dragged your conter on board
+				// set your OwnershipField and rights
+				if (f == 0)
+					if (table.find("Side") != table.end())
+						if (std::get<std::string>(table["Side"]) == Settings::playerSide)
+						{
+							counter->setOwnershipField(IO::getKey() * 0xef06eea1);
+							f = counter->getOwnershipField();						
+						}
+				fs.write(reinterpret_cast<const char*>(&f), sizeof f);
+				
+				// save rights			
+				fs.write(reinterpret_cast<const char*>(&r), sizeof r); 
+				
+				
+				saveTable(table);
+			}						
 				
 		}
 		

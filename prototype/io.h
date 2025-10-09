@@ -46,6 +46,7 @@ class IO
 		IO();
 		
 		void load_resources(std::string directory);
+		void transfer_resource_keys();
 
 		
 		struct Resource

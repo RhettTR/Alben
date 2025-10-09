@@ -1,6 +1,7 @@
 #include "overlay.h"
 #include "luau.h"
 #include "scale.h"
+#include "window.h"
 
 
 extern Scale *scaled;
@@ -10,7 +11,7 @@ int Overlay::border = 9;
 Overlay *Overlay::overlay = nullptr;;
 
 
-int Overlay::FlowLayout::maxColumns = 4;
+int Overlay::FlowLayout::maxColumns = 5;
 
 
 Overlay::StackFrame *Overlay::hooverView = nullptr;
@@ -360,7 +361,7 @@ void Overlay::StackFrame::setImages(CentralFrame::Stack stack)
 		else
 		{
 			// only show face up cards
-			Counter::Table table = Luau::getTraits("Map", obj->second->id);
+			Counter::Table table = Luau::getTraits("main", obj->second->id);
 			
 			int index = (int)std::get<double>(std::get<Counter::Table>((table)["Image"])["imageIndex"]);
 				
@@ -754,23 +755,24 @@ void Overlay::paintEvent(QPaintEvent *e)
 			
 		
 		for (auto obj = Counter::counters.begin(); obj != Counter::counters.end(); ++obj)
-		{
-			CentralFrame::Point p = (CentralFrame::Point){.x = obj->second->state.x, .y = obj->second->state.y};
-			
-			if (stacks.find( p ) == stacks.end()) 
+			if (obj->second->state.tag == "main")
 			{
-				// not found
-				CentralFrame::Stack stack = {{obj->second->state.zorder, obj->second}};
-				stacks[p] = stack;
-			} 
-			else 
-			{
-				// found			
-				CentralFrame::Stack stack = stacks.at( p );
-				stack[obj->second->state.zorder] = obj->second;
-				stacks[p] = stack;
-			}	
-		}
+				CentralFrame::Point p = (CentralFrame::Point){.x = obj->second->state.x, .y = obj->second->state.y};
+				
+				if (stacks.find( p ) == stacks.end()) 
+				{
+					// not found
+					CentralFrame::Stack stack = {{obj->second->state.zorder, obj->second}};
+					stacks[p] = stack;
+				} 
+				else 
+				{
+					// found			
+					CentralFrame::Stack stack = stacks.at( p );
+					stack[obj->second->state.zorder] = obj->second;
+					stacks[p] = stack;
+				}	
+			}
 		
 		
 		
@@ -790,8 +792,8 @@ void Overlay::paintEvent(QPaintEvent *e)
 				auto *top = prev(stack.end())->second;
 				
 				
-				int x = std::round(top->state.x * Scale::scaleFraction);
-				int y = std::round(top->state.y * Scale::scaleFraction);
+				int x = std::round(top->state.x * Window::getInstance("main")->frame->scaleFraction);
+				int y = std::round(top->state.y * Window::getInstance("main")->frame->scaleFraction);
 				
 				
 				if (Scale::rotation != 0)

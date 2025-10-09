@@ -27,7 +27,7 @@ function State:addStage ()
 	State.stagePointer = State.stagePointer + 1
 	State.stageStack[State.stagePointer] = {id = "end"}
 	if not_recording() then
-		toolbar_enable('__undo')
+		toolbar_enable('main', '__undo')
 	end
 end
 
@@ -60,7 +60,7 @@ function State:deleteNextStages()
 	end
 	
 	
-	toolbar_disable('__redo')
+	toolbar_disable('main', '__redo')
 	
 end
 
@@ -82,8 +82,8 @@ end
 
 function State:resetState()
 
-	toolbar_disable('__undo')
-	toolbar_disable('__redo')
+	toolbar_disable('main', '__undo')
+	toolbar_disable('main', '__redo')
 	
 	
 	State.stageStack = nil
@@ -109,10 +109,25 @@ function State:reset()
 			delete_class(key)
 			
 			if State.baseState[key] ~= nil then
-				setCounter(key, State.baseState[key])
+				setCounter(key, State.baseState[key])				
 			end	
 			
 		end	
+	end
+	
+	for key, value in pairs(Decks) do
+		
+		if type(key) == "string" and type(value) ~= 'function' and key ~= '__index' then
+			local deck = Decks[key]
+			deck.cards = Counter:duplicate(State.baseState[key])
+		end
+	end
+	
+	for key, value in pairs(Globals) do
+	
+		if type(key) == "string" and type(value) ~= 'function' and key ~= '__index' then
+			Globals[key] = Counter:duplicate(State.baseState[key])
+		end
 	end
 	
 end
@@ -121,7 +136,7 @@ end
 function State:executeUntil(stack, from, to)
 	
 	for i = from, to do
-				
+			
 		local trait = stack[i].trait
 		local id = stack[i].id
 		local key
@@ -151,9 +166,18 @@ function State:executeUntil(stack, from, to)
 			Counter[id][trait][key] = value
 		end
 		
+		if trait == 'Globals' then
+			Globals[id][key] = value
+		end
+		
+		if trait == 'Decks' then
+			local deck = Decks[id]
+			deck.cards = Counter:duplicate(value)
+		end
+		
 		if trait == 'Create' then
 			setCounter(id, stack[i].table)
-			dropped("Map", stack[i].table.Image.images[1], id, stack[i].table.x, stack[i].table.y)
+			dropped("main", stack[i].table.Image.images[1], id, stack[i].table.x, stack[i].table.y)
 		end
 		
 		if trait == 'Delete' then		
@@ -169,28 +193,38 @@ end
 
 function State:undo()
 
+
 	
 	if #State.stageStack > 0 then
 		if not_recording() then		
-			toolbar_enable('__redo')
+			toolbar_enable('main', '__redo')
 		end
 	end
 	
 			
 	local i = State:findLastStage ()
 	
-	-- reset counters to base state
-	State:reset()								
 	
-	-- execute moves up to last stage
-	State:executeUntil(State.stageStack, 1, i)	
 	
+	toggle_painting()
+	
+	--print(os.clock())
 
+	-- reset counters to base state
+	State:reset()
+		
+	-- execute moves up to last stage
+	State:executeUntil(State.stageStack, 1, i)
+	
+	
+	toggle_painting()
+	
+	
 	Counter:generateGUI()
 	
-	
+
 	if i == 0 then
-		toolbar_disable('__undo')
+		toolbar_disable('main', '__undo')
 	end
 	
 end
@@ -202,25 +236,33 @@ function State:redo()
 	
 	if #State.stageStack > 0 then
 		if not_recording() then	
-			toolbar_enable('__undo')
+			toolbar_enable('main', '__undo')
 		end
 	end
 	
 	
 	local i = State:findNextStage ()
 	
+	
+	
+	toggle_painting()
+	
+
 	-- reset counters to base state
 	State:reset()								
-	
+
 	-- execute moves up to next stage
 	State:executeUntil(State.stageStack, 1, i)	
+	
+	
+	toggle_painting()
 		
 		
 	Counter:generateGUI()
 	
 	
 	if i == #State.stageStack then
-		toolbar_disable('__redo')
+		toolbar_disable('main', '__redo')
 	end	
 	
 end
@@ -279,9 +321,9 @@ end
 
 function Log:abort()
 
-	toolbar_disable('__forward')
-	toolbar_disable('__end')
-	toolbar_disable('__abort')
+	toolbar_disable('main', '__forward')
+	toolbar_disable('main', '__end')
+	toolbar_disable('main', '__abort')
 	
 	stop_stepping()
 	

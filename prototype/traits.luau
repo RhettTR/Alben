@@ -12,10 +12,10 @@ function Image:new (images, imageIndex)
 	--- fields
 	o.images = images
 	o.imageIndex = imageIndex
-	if #images > 1 then
-		o.menuname = "Flip"
-		o.menuclick = "actionFlip"
-	end
+	--if #images > 1 then
+	--	o.menuname = "Flip"
+	--	o.menuclick = "actionFlip"
+	--end
 	return o
 end
 
@@ -109,14 +109,20 @@ end
 
 AreaOfEffect = {}
 
-function AreaOfEffect:new (radius, color, opacity)
+function AreaOfEffect:new (type, radius, color, opacity)
 	local o = {}
 	setmetatable(o, self)
 	self.__index = self
+	o.type = type
 	o.radius = radius
 	o.color = color
 	o.opacity = opacity
-	o.apply = true
+	o.menuname = "Show Radius"
+	o.menutrait = "AreaOfEffect"
+	o.menuclick = "actionToggle"
+	o.menushow = function(window, id) return window == 'main' end
+	o.area = {}
+	o.apply = false
 	return o
 end
 
@@ -166,8 +172,10 @@ function MarkMoved:new ()
 	o.mask = "MovedMarker"
 	o.moved = false 	
 	o.menuname = "Moved"
+	o.menutrait = "MarkMoved"
 	o.menuclick = "actionMoved"
-	o.movetrigger = function(id) Counter:markMoved(id, true) end	
+	o.movetrigger = function(id) Counter:markMoved(id, true) end
+	o.menushow = function(window, id) return window == 'main' end	
 	return o
 end
 
@@ -183,29 +191,7 @@ function WhenMoved:new()
 	self.__index = self
 	o.action = 
 		function()
-			local ap = Counter:findId("Markers/warstatus_ap")
-			local cp = Counter:findId("Markers/warstatus_cp")
-			local combined = Counter:findId("Markers/warstatus_combined")
-		
-			if not ap or not cp or not combined then
-				return
-			end
-			-- find turn for warstatus_ap and warstatus_cp
-			local n = tonumber(Zones:getPlace(Counter[ap].x, Counter[ap].y)) 		
-			if n == nil then
-				return
-			end									
-			local m = tonumber(Zones:getPlace(Counter[cp].x, Counter[cp].y)) 
-			if m == nil then
-				return
-			end				
-			-- find position for sum
-			local x, y = Zones:getCoordinates("grt", n + m)
-			if x == -1 then
-				return
-			end
-			-- move warstatus_combined			
-			Counter:move(combined, x, y)
+			
 		end
 	o.movetrigger = function(id) Counter[id].WhenMoved.action() end
 	return o
@@ -214,7 +200,7 @@ end
 
 
 
--- Rotate,Delete,DoesNotStack,OnlyOneInstance have the same function everywhere so only one instance need exist
+-- These traits have the same function everywhere so only one instance need exist
 
 
 RotateCW = {	
@@ -232,7 +218,9 @@ RotateCCW = {
 	
 Delete = {
 	menuname = "Delete",
-	menuclick = "actionDelete"
+	menutrait = "Delete",
+	menuclick = "actionDelete",
+	menushow = function(window, id) return window == 'main' end
 } 
 
 
@@ -247,17 +235,10 @@ OnlyOneInstance = {
 CantBeMoved = {
 }
 
---[[
-AllCards = {
-	hooverstack = false,           
-	openstack = false,              
-	offsetlessNumber = false,       
-	offsetMax = 3,				    
-	offsetAmount = 3,              							 
-	faceupIndex = 1,              
-	faceDownAlwaysShuffled = true   
+
+OnlyOneInStack = {
 }
---]]
+
 
 
 --- define the rotation trait of one particular counter
@@ -284,6 +265,7 @@ function Global:addTrait (key, trait)
 end
 
 
+
 Area = {
 	menuDelete = {menuname = "Delete all markers here", menuclick = "actionDeleteAll"},
 	menuATrench = {menuname = "Place AP Trench", menuid = "Allied/ap_trench1"}
@@ -298,6 +280,7 @@ function Marker:new(name, dx, dy, side)
 	o.renderOffset = {dx = dx, dy = dy}
 	o.Side = side
 	o.Delete = Delete
+	o.OnlyOneInStack = OnlyOneInStack
 	o.CantBeMoved = CantBeMoved
 	return o
 end
@@ -311,6 +294,8 @@ function Move:new(name, point)
 	o.y = point.y
 	o.menuname = name
 	o.menuclick = "actionMove"
+	o.menutrait = "Move"
+	o.menushow = function(window, id) return window == 'main' end
 	return o
 end
 
@@ -326,7 +311,104 @@ function MoveAll:new(zone, name)
 end
 
 
+MoveStack = {}
 
+function MoveStack:new(name, point)
+	local o = {}
+	o.x = point.x
+	o.y = point.y
+	o.menuname = name
+	o.menuclick = "actionMoveStack"
+	return o
+end
+
+
+Offset = {}
+	
+function Offset:new(cx, cy, of, sh)
+	local o = {}
+	o.xoffsetClosed = cx	-- the offset for each counter in a stack
+	o.yoffsetClosed = cy	
+	o.openFactor = of		-- the offset multiplier when stack opened
+	o.shown = sh			-- number of counters with offset in a stack
+	return o
+end
+
+
+Reveal = {}
+
+function Reveal:new()
+	local o = {}
+	setmetatable(self, self)
+	self.__index = self 	
+	o.menuname = "Reveal"
+	o.menutrait = "Reveal"
+	o.menuclick = "actionReveal"
+	o.menushow = function(window, id) return window == 'main' end
+	return o
+end
+
+
+StepLoss = {}
+
+function StepLoss:new()
+	local o = {}
+	setmetatable(self, self)
+	self.__index = self 
+	o.menuname = "Step Loss"
+	o.menutrait = "StepLoss"
+	o.menuclick = "actionStepLoss"
+	o.menushow = function(window, id) return window == 'main' end
+	return o
+end
+
+
+SubMenu = {}
+
+function SubMenu:new(title)
+	local o = {}
+	setmetatable(self, self)
+	self.__index = self
+	o.menuname = title
+	o.menuactions = [[North, ,actionMoveN:
+					  North-West, ,actionMoveNW:
+					  South-West, ,actionMoveSW:
+					  South, ,actionMoveS:
+					  South-East, ,actionMoveSE:
+					  North-East, ,actionMoveNE]]
+	o.menutrait = "SubMenu"
+	o.menushow = function(window, id) return window == 'main' end
+	return o 
+end
+
+
+PlaceMarker = {}
+
+function PlaceMarker:new(name, trait, marker)
+	local o = {}
+	setmetatable(self, self)
+	self.__index = self
+	o.marker = marker
+	o.menuname = name
+	o.menuclick = "actionPlace"
+	o.menutrait = trait
+	o.menushow = function(window, id) return window == 'main' end
+	return o
+end
+
+
+Take = {}
+
+function Take:new(number)
+	local o = {}
+	setmetatable(self, self)
+	self.__index = self
+	o.menuname = 'Take '..number
+	o.menuclick = 'actionTake'..number
+	o.menutrait = 'Take'..number
+	o.menushow = function(window, id) return window == 'Rf' end
+	return o
+end
 
 
 
@@ -339,8 +421,10 @@ Piece = {}
 function Piece:new ()
 	local o = {}
 	setmetatable(self, self)
-	self.__index = self 
+	self.__index = self
+	o.StepLoss = StepLoss:new()
 	o.MarkMoved = MarkMoved:new()
+	o.SubMenu = SubMenu:new('Retreat')
 	return o
 end
 
@@ -348,38 +432,73 @@ end
 German = {}
 
 function German:new()
-	local o = Piece:new ()
-	setmetatable(self, {__index = Piece})
+	local o = Piece:new()
+	setmetatable(o, self)
 	self.__index = self
-	o.Side = "Central"
+	o.Side = "German"
+	o.Disrupted = PlaceMarker:new('Disrupted', 'Disrupted', 'German Disruption')
+	o.Control = PlaceMarker:new('Place German Control Marker', 'Control', 'German Control')
 	return o   	
-end  
+end
 
+GermanArm = {}
 
-French = {}
-
-function French:new()
-	local o = Piece:new ()
-	setmetatable(self, {__index = Piece})
+function GermanArm:new()
+	local o = German:new()
+	setmetatable(o, self)
 	self.__index = self
-	o.Side = "Allied"
+	o.Take3 = Take:new(3)
+	return o   	
+end
+ 
+
+Soviet = {}
+
+function Soviet:new()
+	local o = Piece:new()
+	setmetatable(o, self)
+	self.__index = self
+	o.Side = "Soviet"
+	o.Disrupted = PlaceMarker:new('Disrupted', 'Disrupted', 'Soviet Disruption')
 	return o   	
 end 
 
-British = {}
 
-function British:new()
-	local o = Piece:new ()
-	setmetatable(self, {__index = Piece})
+SovietHQ = {}
+
+function SovietHQ:new()
+	local o = Soviet:new()
+	setmetatable(o, self)
 	self.__index = self
-	o.Side = "Allied"
+	o.Type = "HQ"
+	o.StepLoss.menuname = "Graveyard"
+	
 	return o   	
 end
 
 
+SovietInf = {}
+
+function SovietInf:new()
+	local o = Soviet:new()
+	setmetatable(o, self)
+	self.__index = self
+	o.Type = "Inf"
+	return o   	
+end 
 
 
- 
+SovietArm = {}
+
+function SovietArm:new()
+	local o = Soviet:new()
+	setmetatable(o, self)
+	self.__index = self
+	o.Type = "Arm"
+	return o   	
+end  
+
+
 
 
 

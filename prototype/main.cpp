@@ -10,7 +10,6 @@
 #include "counter.h"
 #include "scale.h"
 #include "overlay.h"
-#include "repository.h"
 #include "io.h"
 #include "toolbar.h"
 #include "settings.h"
@@ -24,25 +23,29 @@
 Luau l;
 
 
-CentralFrame *mapFrame;
-CentralFrame *repositoryFrame;
 IO *io;
 Scale *scaled;
 
 
 class MainWindow;
 MainWindow *window;
-Repository *repositoryWindow;
+Window *repositoryWindow;
 
 
 
-QWidget *container;
+//QWidget *container;
 
 ToolBar *mainToolBar;
 QAction *beginLogAction;
 QAction *endLogAction;
 
 
+
+
+Window *getMain()
+{
+	return (Window *)window;
+}
 
 
 void reload ()
@@ -59,6 +62,12 @@ void reload ()
 	l.startVM();
 			
 	printf("done\n");
+}
+
+
+void refresh()
+{		
+	Luau::refresh();
 }
 
 
@@ -84,11 +93,16 @@ void settings ()
 	dialog->show();
 }
 
+void help ()
+{
+	
+}
+
 void cancel ()
 {
 	Overlay::openView->hideStack();
 	Overlay::hooverView->setVisible(false);
-	mapFrame->closeAllOpenStacks();
+	Window::getInstance("main")->frame->closeAllOpenStacks();
 }
 
 void close ()
@@ -160,10 +174,8 @@ class MainWindow : public Window
 {
 	public:
 		
-		MainWindow() : Window(nullptr, "Window", "main")
+		MainWindow() : Window(nullptr, "Window", "main", "notype")
 		{
-			this->scrollArea = new QScrollArea;
-			setCentralWidget(scrollArea);
 		}
 		
 		
@@ -187,8 +199,12 @@ class MainWindow : public Window
 					default: break;
 				}
 			
-		}		
+		}
+			
 };
+
+
+
 
 
 
@@ -196,9 +212,12 @@ class MainWindow : public Window
 int main(int argc, char *argv[])
 {
     QApplication app(argc, argv);
+    
+    
+    qRegisterMetaType<ActionData>("ActionData");
+    
 
     window = new MainWindow();
-    
 	
 	
 	QMenuBar *menuBar = window->menuBar();
@@ -240,6 +259,11 @@ int main(int argc, char *argv[])
     QObject::connect(reloadAction, &QAction::triggered, &reload);
     fileMenu->addAction(reloadAction);
     
+    QAction *refreshAction = new QAction("Refresh");
+    refreshAction->setShortcut(QKeySequence("Ctrl+E"));
+    QObject::connect(refreshAction, &QAction::triggered, &refresh);
+    fileMenu->addAction(refreshAction);
+    
     reloadAction = new QAction("Undo");
     reloadAction->setShortcut(QKeySequence("Ctrl+Z"));
     QObject::connect(reloadAction, &QAction::triggered, &undo);
@@ -257,8 +281,13 @@ int main(int argc, char *argv[])
     editMenu->addAction(settingsAction);
     
     
-    window->move(500, 150);
-	window->resize(600, 400 + menuBar->height());
+    QMenu *helpMenu = menuBar->addMenu("&Help");
+   
+    
+    
+    
+    window->move(250, 150);
+	window->resize(980, 500 + menuBar->height());
 	
 	
 	
@@ -270,19 +299,8 @@ int main(int argc, char *argv[])
 	
 	
 	
-	container = new QWidget(window);
-	container->setAcceptDrops(true);
-		
-	window->scrollArea->setWidget(container);
 	
-	
-    window->frame = new CentralFrame(container, "Map", (Window *)window, window->scrollArea);
-    window->frame->setObjectName("centralFrame");
-	mapFrame = (CentralFrame *)Window::getInstance("main")->frame;
-	
-	
-	
-	Overlay *overlay = new Overlay(container, window->scrollArea);
+	Overlay *overlay = new Overlay(window->container, window->scrollArea);
 	Overlay::overlay = overlay;
 	
 	overlay->raise();
@@ -294,28 +312,29 @@ int main(int argc, char *argv[])
 	
 	// tool bar
 	
-	mainToolBar = new ToolBar(window, window->scrollArea);
+	mainToolBar = new ToolBar("main", "System toolbar", window->scrollArea);
 	window->addToolBar(Qt::TopToolBarArea, mainToolBar);
 	mainToolBar->setIconSize(QSize(32, 24));
 
 	
-	mainToolBar->addImageButton("__undo", "Undo last move", &undo);
-	mainToolBar->addImageButton("__redo", "Redo next move", &redo);
+	mainToolBar->addImageButton("__undo", "__undo", "", "Undo last move", &undo);
+	mainToolBar->addImageButton("__redo", "__redo", "", "Redo next move", &redo);
 	mainToolBar->addSeparator();
-	mainToolBar->addImageButton("__forward", "Logfile step forward", &step);
-	mainToolBar->addImageButton("__end", "Logfile go to end", &gotoEnd);
-	mainToolBar->addImageButton("__abort", "Abort logfile", &abortLog);
-	mainToolBar->addLabel("__record", "Logfile recording");
+	mainToolBar->addImageButton("__forward", "__forward", "", "Logfile step forward", &step);
+	mainToolBar->addImageButton("__end", "__end", "", "Logfile go to end", &gotoEnd);
+	mainToolBar->addImageButton("__abort", "__abort", "", "Abort logfile", &abortLog);
+	mainToolBar->addLabel("__record", "__record", "Logfile recording", 24, 24, "");
 	mainToolBar->addSeparator();
-	mainToolBar->addImageButton("__pluss", "Zoom in", [=]()->void{ mainToolBar->zoomIn(); });	
+	mainToolBar->addImageButton("__pluss", "__pluss", "", "Zoom in", [=]()->void{ mainToolBar->zoomIn(); });	
 	mainToolBar->addSizeComboBox();	
-	mainToolBar->addImageButton("__minus", "Zoom out", [=]()->void{ mainToolBar->zoomOut(); });	
+	mainToolBar->addImageButton("__minus", "__minus", "", "Zoom out", [=]()->void{ mainToolBar->zoomOut(); });	
 	mainToolBar->enabled("__pluss", true);
 	mainToolBar->enabled("__minus", true);
 	mainToolBar->addSeparator();
-	mainToolBar->addImageButton("__movedicon", "Delete all moved-makers", &clearMoved);
+	mainToolBar->addImageButton("__movedicon", "__movedicon", "", "Delete all moved-makers", &clearMoved);
 	mainToolBar->enabled("__movedicon", true);
 	
+
 	
 	
 	// default rights table
@@ -332,10 +351,7 @@ int main(int argc, char *argv[])
    
 	// create repository window
 	
-    repositoryFrame = new CentralFrame(repositoryWindow, "Repository", (Window *)window);
-    
-    repositoryWindow = new Repository(window);
-    repositoryWindow->setCentralWidget((QWidget *)repositoryFrame);
+    repositoryWindow = new Window(window, "Counters", "Repository", "Layout");   
     
     
     
@@ -346,7 +362,7 @@ int main(int argc, char *argv[])
     
     
     
-    scaled->resourceScaleRotate(CentralFrame::backgroundID);
+    scaled->resourceScaleRotate("main", window->frame->backgroundID);
 	
     
       

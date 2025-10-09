@@ -5,12 +5,12 @@
 #include "frame.h"
 #include "overlay.h"
 #include "scale.h"
+#include "window.h"
 
 #include "settings.h"
 
 
 extern QWidget *container;
-extern CentralFrame *mapFrame;
 extern Scale *scaled;
 
 
@@ -169,7 +169,7 @@ void Settings::offsetOption(bool checked)
 	
 	Counter::haveOffset = !checked;
 	
-	mapFrame->repaint();
+	Window::getInstance("main")->frame->repaint();
 	//Overlay::overlay->setMasks();	
 	Overlay::overlay->update();	
 	
@@ -191,13 +191,13 @@ void Settings::activated(QComboBox *rotation)
 	int degrees = variant.value<int>();
 	Scale::rotation = degrees;
 	
-	scaled->resourceScaleRotate(CentralFrame::backgroundID);
+	scaled->resourceScaleRotate("main", Window::getInstance("main")->frame->backgroundID);
 	
 	
 	Counter::setGUI();
 	
 
-	mapFrame->repaint();
+	Window::getInstance("main")->frame->repaint();
 	// force redraw of mask layer
 	Overlay::overlay->clearMask();
 	
@@ -211,7 +211,7 @@ void Settings::facingOption(bool checked)
 	CentralFrame::facingMatters = checked;
 		
 	Counter::setGUI();
-	mapFrame->repaint();
+	Window::getInstance("main")->frame->repaint();
 		
 }
 

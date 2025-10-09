@@ -9,6 +9,7 @@
 
 
 #include "settings.h"
+#include "window.h"
 
 
 
@@ -20,12 +21,24 @@
 class CentralFrame;
 class StackFrame;
 class StackOpen;
-class Token;
+class Window;
 
 
 
 template <class... Fs> struct Overload : Fs... { using Fs::operator()...; };
 template <class... Fs> Overload(Fs...) -> Overload<Fs...>;
+
+
+
+// type for multiple arguments in QObject::connect actions
+struct ActionData {
+	QString entryaction;
+	QString entrytrait;
+	QString entryactions;
+};
+
+
+
 
 
 
@@ -49,6 +62,7 @@ class Counter
 				virtual void mouseMoveEvent (QMouseEvent *e);
 				virtual void leaveEvent (QEvent *e);
 				virtual void mouseDoubleClickEvent (QMouseEvent *e);
+				virtual void paintEvent (QPaintEvent *e);
 				
 			private:
 				void do_activate (QAction *action);
@@ -75,6 +89,7 @@ class Counter
 		
 		int id;						// id of this counter		
 		std::string name;			// unique string id of this counter
+		std::string image;			// id of counter in repository
 		
 		
 		
@@ -92,6 +107,7 @@ class Counter
 		{
 			int x;					
 			int y;
+			std::string tag;		// window tag of counter
 			bool moved;				// only true if trait		
 			int degrees;			// only not zero if trait
 			std::string image;		// name of current (flipped) image
@@ -108,7 +124,7 @@ class Counter
 		~Counter();
 		
 		
-		CentralFrame *parentFrame;
+		Window *parentWindow;
 		
 		Counter::QtCounter *counter;
 		
@@ -134,8 +150,8 @@ class Counter
 		static int bottomZorder();
 		static void resetId();
 		static void resetZorder();
-		static Counter* findObj(const char *name);
-		static void toggleSelect(const char *name);
+		static Counter* findObj(const char *id);
+		static void toggleSelect(const char *id);
 		static void clearMoved();
 		static void setDisabled(bool disable);
 		static QSize getSize(Counter *counter);
@@ -163,7 +179,6 @@ class Counter
 							      
 		static float alpha;
 		static bool  haveOffset;
-		static int   stackOffset;
 		static QString selectionColor;
 		static bool  hooverShowMap;
 		static bool  hooverShowPlace;

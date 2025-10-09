@@ -16,8 +16,9 @@ class Scale
 		Scale();
 		
 			
-		static float scaleFraction;
-		static int rotation; 
+		//static float scaleFraction;
+		static int rotation;
+		static float minScaleGrid; 
 		
 		QImage& getScaledImage(std::string str);
 		QSize getScaledSize(std::string str);
@@ -27,7 +28,7 @@ class Scale
 		void turn(int degree, int &x, int &y);
 		CentralFrame::Point getScaleRotateCoordinate(Counter *counter, int x, int y);
 
-		void resourceScaleRotate(std::string id);
+		void resourceScaleRotate(std::string tag, std::string name);
 		
 	
 

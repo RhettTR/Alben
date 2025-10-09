@@ -7,7 +7,7 @@
 #include "counter.h"
 #include "overlay.h"
 #include "luau.h"
-#include "repository.h"
+#include "window.h"
 
 	
 #include "io.h"
@@ -33,9 +33,8 @@ map<string, Counter::SystemMask *> Counter::masks;
 float Counter::alpha = 1.0;
 
 bool Counter::haveOffset = true;	// true = unopened stack has offset
-int Counter::stackOffset = 5;
 //QString Counter::selectionColor = QString("#bc145e");
-QString Counter::selectionColor = QString("yellow");
+QString Counter::selectionColor = QString("red");
 bool Counter::hooverShowMap = false;
 bool Counter::hooverShowPlace = false;
 
@@ -43,9 +42,8 @@ bool Counter::hooverShowPlace = false;
 
 
 
-extern CentralFrame *mapFrame;
-extern CentralFrame *repositoryFrame;
-extern Repository *repositoryWindow;
+
+extern Window *repositoryWindow;
 extern IO *io;
 extern Scale *scaled;
 
@@ -67,7 +65,8 @@ Counter::QtCounter::QtCounter(Counter *owner, QFrame *parent) : QLabel(parent)
 {		
 	this->setAttribute(Qt::WA_DeleteOnClose);		
 	this->setContextMenuPolicy(Qt::CustomContextMenu);
-	this->owner = owner;
+	this->owner = owner;	
+	
 	this->timer = new QTimer(this);
 	this->timer->setSingleShot(true);
 	connect(timer, &QTimer::timeout, this, [=]()->void{ hooverAction(); });
@@ -97,53 +96,110 @@ void Counter::QtCounter::showRightClickMenu(QtCounter *counter)
 		
 		if (rights.NoMenu)
 			return;
+		
 	}
-	
+
 	
 	QMenu myMenu(counter);
 	QWidget widget;
 	
 	
 	myMenu.clear();
-	//counter->actions().clear();
-		
-	//if (counter->actions().isEmpty())
-	{
-		popupentries.clear();
 	
-		QByteArray ba = 
-			QString::fromStdString(((CentralFrame *)counter->owner->parentFrame)->name).toLocal8Bit();
-		const char *window = ba.data();
-		
-		popupentries = Luau::getTraits(window, counter->owner->name.c_str());
-		
+	popupentries.clear();
+	
 
 	
-		for (auto e : popupentries)
+	popupentries = Luau::getTraits(counter->owner->state.tag.c_str(), counter->owner->name.c_str());
+		
+
+	for (auto e : popupentries)
+	{
+	 
+		const QString name = QString::fromStdString(e.entryname);
+		
+		
+		ActionData data;
+		data.entryaction = QString(e.entryaction.c_str());
+		data.entrytrait = QString(e.entrytrait.c_str());
+		data.entryactions = QString(e.entryactions.c_str());
+		
+		
+		if (data.entrytrait == "SubMenu")
 		{
-			 
-			const QString name = QString::fromStdString(e.entryname);
+			QMenu *menu = myMenu.addMenu(name);
+			
+			if (e.entrytest)
+				if (!Luau::doTest(counter->owner->state.tag.c_str(), e.entrytrait.c_str(), counter->owner->name.c_str())) 
+					menu->menuAction()->setEnabled(false);	
+					
+			
+			QString str = data.entryactions.simplified();
+			str = str.replace(" ","");
+		
+			QStringList entries = str.split(':');
+			
+			
+					
+			for (const auto& item : entries )
+			{
+				
+				
+				// entries come as menuname, menutrait, menuaction
+				
+				QStringList entry = item.split(',');
+				
+		
+				QAction* action = new QAction(entry[0], counter);
+			
+				ActionData actionData;
+				actionData.entrytrait = entry[1];
+				actionData.entryaction = entry[2];
+			
+				QVariant v;
+				
+				v.setValue(actionData);
+				
+				action->setData(v);
+				menu->addAction(action);
+				
+				QObject::connect( action, &QAction::triggered, counter, [=]()->void{ do_activate(action); } );
+			}
+			
+			
+		}
+		else
+		{
 			
 			QAction* action = new QAction(name, counter);
+	
+	
 			
-			QVariant v = QVariant(QString(e.entryaction.c_str()));
+			
+			QVariant v;
+			
+			v.setValue(data);
 			action->setData(v);
+		
 			
-			if (strcmp(window, "Repository") == 0 && 
-			   (e.entryname == "Delete" || e.entryname == "Moved"))
-				action->setEnabled(false);
+			if (e.entrytest)
+				if (!Luau::doTest(counter->owner->state.tag.c_str(), e.entrytrait.c_str(), counter->owner->name.c_str())) 
+					action->setEnabled(false);
+					//action->hide();
+				
 			
 			//action->setShortcut(QKeySequence("Ctrl+D"));
+			
+			
 		   
-			//counter->addAction(action);
 			widget.addAction(action);
 			
 			QObject::connect( action, &QAction::triggered, counter, [=]()->void{ do_activate(action); } );
-			
 		}
+		
 	}
 	
-	//myMenu.addActions(counter->actions());
+	
 	myMenu.addActions(widget.actions());
 	
 	myMenu.exec(QCursor::pos());
@@ -174,13 +230,17 @@ void Counter::QtCounter::mousePressEvent (QMouseEvent * e)
 		{
 		
 			Counter *selected;
+			int dummy;
 			
-			if (this->owner->parentFrame->anySelected(this->owner, selected))
+			Window *window = Window::getInstance(this->owner->state.tag.c_str());
+			
+			if (window->frame->anySelected(this->owner, selected, dummy))
 				selected->counter->showRightClickMenu(selected->counter);
 			else
 				showRightClickMenu(this);
 				
 		}
+		e->accept();
 	}
 	else 	
 		e->ignore();
@@ -243,7 +303,7 @@ void Counter::QtCounter::hooverAction()
 	{
 		
 		
-		QImage baseImage = scaled->getScaledImage(CentralFrame::backgroundID);
+		QImage baseImage = scaled->getScaledImage(Window::getInstance(counter->state.tag.c_str())->frame->backgroundID);
 		
 		
 		
@@ -275,7 +335,8 @@ void Counter::QtCounter::hooverAction()
 	QSize t = QSize(0,0);
 	
 	if (Counter::hooverShowPlace)
-		t = Overlay::hooverView->setPlace(Luau::mapPlace(std::round(counter->width/2) + counter->margin, 
+		t = Overlay::hooverView->setPlace(Luau::mapPlace(counter->state.tag.c_str(),
+														 std::round(counter->width/2) + counter->margin, 
 														 std::round(counter->height/2) + counter->margin,
 														 counter->state.x, 
 														 counter->state.y));
@@ -334,7 +395,9 @@ void Counter::QtCounter::hooverAction()
 
 void Counter::QtCounter::mouseMoveEvent (QMouseEvent * e)
 {
-	if (((CentralFrame *)this->owner->parentFrame)->name == "Map")
+	Window *window = Window::getInstance(this->owner->state.tag.c_str());
+
+	if (window->tag == "main")
 	{	
 		popupPoint = e->position().toPoint();		
 		timer->start(1000);
@@ -345,7 +408,9 @@ void Counter::QtCounter::mouseMoveEvent (QMouseEvent * e)
 
 void Counter::QtCounter::leaveEvent (QEvent *e)
 {	
-	if (((CentralFrame *)this->owner->parentFrame)->name == "Map")
+	Window *window = Window::getInstance(this->owner->state.tag.c_str());
+	
+	if (window->tag == "main")
 	{	
 		if (Overlay::hooverView->isVisible())
 		{
@@ -363,15 +428,17 @@ void Counter::QtCounter::leaveEvent (QEvent *e)
 void Counter::QtCounter::do_activate (QAction *action)
 {
 	QVariant v = action->data();
-	QString str = (QString) v.value<QString>();
-	QByteArray ba = str.toLocal8Bit();
-	const char *entryaction = ba.data();
-	QByteArray bb = QString::fromStdString(((CentralFrame *)this->owner->parentFrame)->name).toLocal8Bit();
-	const char *window = bb.data();
-
+	
+	ActionData retrieved = qvariant_cast<ActionData>(v);
+	
+	const char *entryaction = retrieved.entryaction.toStdString().c_str();
+	const char *entrytrait = retrieved.entrytrait.toStdString().c_str();
+	
+	const char *window = this->owner->state.tag.c_str();
+	
+	
 	
 	CentralFrame::Stacks stacks;
-
 
 	
 	if (this->owner->selected && (strcmp(entryaction, "actionSelect") != 0))	// select is always individual
@@ -405,21 +472,34 @@ void Counter::QtCounter::do_activate (QAction *action)
 		
 		for (auto const& [point, stack] : stacks)	
 			for ( auto obj = stack.begin(); obj != stack.end(); ++obj )
-				Luau::doAction(window, obj->second->name.c_str(), entryaction);
+				Luau::doAction(window, obj->second->name.c_str(), entrytrait, entryaction);
 				
-		Luau::doAction("", "", "actionEnd");
+		Luau::doAction("", "", "", "actionEnd");
 		
 	}
 	else	
 	{	
 		// else do action on unselected this
 				
-		Luau::doAction(window, this->owner->name.c_str(), entryaction);
+		Luau::doAction(window, this->owner->name.c_str(), entrytrait, entryaction);
 		
-		if (strcmp(window, "Map") == 0)  // oh oh
-			Luau::doAction("", "", "actionEnd");
+		if (strcmp(window, "main") == 0)  // oh oh
+			Luau::doAction("", "", "", "actionEnd");
 	}
 					
+}
+
+
+void Counter::QtCounter::paintEvent (QPaintEvent *e)
+{
+	
+	if (!CentralFrame::allowPainting)
+	{
+		e->accept();
+		return;		// no painting while undoing
+	}
+	
+	QLabel::paintEvent(e);
 }
 
 
@@ -454,6 +534,7 @@ Counter::Counter(Table *state)
 	
 
 	this->name = std::get<std::string>(std::get<Table>(std::get<Table>((*state)["Image"])["images"])[1]);
+	this->image = this->name;	
 	
 	Counter::repository[this->name] = this;
 	
@@ -464,6 +545,7 @@ Counter::Counter(Table *state)
 	this->state.image = this->name;
 	this->state.overlays = nullptr;
 	this->state.opacity = 1.0;
+	this->state.tag = std::get<std::string>((*state)["window"]);
 	
 	
 	this->width = io->getSize(this->state.image).width();
@@ -471,11 +553,11 @@ Counter::Counter(Table *state)
     this->margin = 9;
 	
 	
-	this->parentFrame = repositoryFrame;
+	this->parentWindow = repositoryWindow;
 	
 	
 	
-	Repository::Pane *pane = repositoryWindow->getParent();
+	Window::Pane *pane = repositoryWindow->getParent();
 	
 	
 	
@@ -495,7 +577,9 @@ Counter::Counter(Table *state)
 	
 	this->selected = false;
 	this->doesNotStack = ((*state).find("DoesNotStack") != (*state).end());
-	this->disabled = false;	
+	this->disabled = false;
+	
+	this->_ownershipField = 0;	
 	
 	
 	this->counter->show();
@@ -521,9 +605,17 @@ Counter::Counter(int id, Table *state)
 	
 	this->state.x = (int)std::get<double>((*state)["x"]);	 	
 	this->state.y = (int)std::get<double>((*state)["y"]);
+	this->state.tag = std::get<std::string>((*state)["window"]);
 	
+	Window *window = Window::getInstance(this->state.tag.c_str());
+	
+	this->parentWindow = window;
+	
+	
+
 	Table images = std::get<Table>(std::get<Table>((*state)["Image"])["images"]);
-	int index = (int)std::get<double>(std::get<Table>((*state)["Image"])["imageIndex"]);	
+	int index = (int)std::get<double>(std::get<Table>((*state)["Image"])["imageIndex"]);
+	this->image = std::get<std::string>(images[1]);	
  	this->state.image = std::get<std::string>(images[index]);
  	
  	
@@ -574,6 +666,8 @@ Counter::Counter(int id, Table *state)
 	this->disabled = false;
 	
 	
+	this->_ownershipField = 0;
+	
 	if ((*state).find("Side") != (*state).end())
 	{
 		if (std::get<std::string>((*state)["Side"]) == Settings::playerSide)
@@ -584,28 +678,26 @@ Counter::Counter(int id, Table *state)
 		}
 		else
 		{
-			this->_ownershipField = 0;
 			// default rights same as own
 			this->_ownershipRights = Settings::myOwnershipRights;
 		}
 	}
-	else
-		// no owner
-		this->_ownershipField = 0;
 	
 	
 	
-	this->parentFrame = mapFrame;
-	
-	
-	this->counter = new QtCounter(this, mapFrame);
+
+	//if (CentralFrame::allowPainting)
+	{
+	this->counter = new QtCounter(this, window->frame);
     this->setImage();
     
 
     
     this->counter->show();
-    this->parentFrame->repaint();
+	}
     
+    //window->frame->repaint();
+    window->frame->update();
 	
 }
 
@@ -628,9 +720,9 @@ Counter::~Counter()
 	
 	Counter::counters.erase(this->id);
 	
+
 	
-	
-	mapFrame->repaint();
+	//Window::getInstance(this->state.tag.c_str())->frame->repaint();
 	
 }
 
@@ -706,10 +798,10 @@ void Counter::resetZorder()
 }
 
 
-Counter* Counter::findObj(const char *name)
+Counter* Counter::findObj(const char *id)
 {
 	
-	string findName = string(name);
+	string findName = string(id);
 	
 	
 	for ( auto obj = counters.begin(); obj != counters.end(); ++obj  )
@@ -736,10 +828,10 @@ QSize Counter::getSize(Counter *counter)
 }
 
 
-void Counter::toggleSelect(const char *name)
+void Counter::toggleSelect(const char *id)
 {
 	
-	Counter *counter = findObj(name);
+	Counter *counter = findObj(id);
 	
 	if (counter != nullptr)
 	{
@@ -758,7 +850,7 @@ void Counter::clearMoved()
 	
 	for (auto obj = counters.begin(); obj != counters.end(); ++obj)
 		if (obj->second->state.moved)
-		{		
+		{	
 			Luau::updateMoved(obj->second->name.c_str(), false);
 			atLeastOne = true;
 		}
@@ -865,18 +957,18 @@ void Counter::setImage(int maxHeight)
 		
 	// selected
 	
-	if (this->selected == true && ((CentralFrame *)this->parentFrame)->name == "Map")
+	if (this->selected == true && this->parentWindow->tag != "Repository")
 	{
 		
 		QPainter *paint = new QPainter(&image);
 		QPen pen = QPen(QColor::fromString(Counter::selectionColor));
-		//pen.setWidth(3);
-		pen.setWidth(5);
+		pen.setWidth(2);
+		//pen.setWidth(3);		
 		pen.setCapStyle(Qt::SquareCap);
 		paint->setPen(pen);
 		// 1.5 is middle of line width 3; width +3 pen size 
 		//QRectF rect = QRectF(margin-1.5, margin-1.5, this->width+3.0, this->height+3.0);
-		QRectF rect = QRectF(margin-2.5, margin-2.5, this->width+5.0, this->height+5.0);
+		QRectF rect = QRectF(margin-1.0, margin-1.0, this->width+2.0, this->height+2.0);
 		paint->drawRect(rect);			
 		delete paint;
 		
@@ -1005,18 +1097,7 @@ void Counter::setImage(int maxHeight)
 	}
 	
 	
-	
-	/*
-	if (maxHeight != 0 && image.height() > maxHeight)
-	{
 		
-		QImage base = image.scaledToHeight( maxHeight, Qt::SmoothTransformation);
-			
-		image = base.copy(0, 0, base.width(), base.height());
-		
-	}	
-	*/
-	
 	
 	
 	baseBuffer = image.copy(0, 0, image.width(), image.height());
@@ -1024,22 +1105,27 @@ void Counter::setImage(int maxHeight)
 	
 	
 	
+	float scaleFraction;
+	 
+	//if (this->state.tag == "Repository")
+		scaleFraction = Window::getInstance("main")->frame->scaleFraction;
+	//else
+		//scaleFraction = Window::getInstance(this->state.tag.c_str())->frame->scaleFraction;
 	
 	
 	
-	this->scaledWidth = this->width * Scale::scaleFraction;
-	this->scaledHeight = this->height * Scale::scaleFraction;
-	this->scaledMargin = this->margin * Scale::scaleFraction;
+	this->scaledWidth = this->width * scaleFraction;
+	this->scaledHeight = this->height * scaleFraction;
+	this->scaledMargin = this->margin * scaleFraction;
 	
 	
-	QSize scaledSize(std::round(image.width() * Scale::scaleFraction), 
-					 std::round(image.height() * Scale::scaleFraction));
+	QSize scaledSize(std::round(image.width() * scaleFraction), 
+					 std::round(image.height() * scaleFraction));
 	
 	this->scaledBuffer = image.scaled( scaledSize, Qt::KeepAspectRatio, Qt::SmoothTransformation);
 		
 	
-	
-	if (((CentralFrame *)this->parentFrame)->name == "Map")	
+	if (this->parentWindow->tag == "main")	
 	{	
 		this->counter->resize(scaledSize);
 		this->counter->setMask(QBitmap::fromImage(this->scaledBuffer.createAlphaMask()));
@@ -1089,7 +1175,7 @@ void Counter::setImage(int maxHeight)
 
 
 	
-	if (((CentralFrame *)this->parentFrame)->name == "Map")	
+	if (this->parentWindow->tag == "main")	
 		this->counter->setPixmap(QPixmap::fromImage(this->scaledBuffer));		
 		
 	else

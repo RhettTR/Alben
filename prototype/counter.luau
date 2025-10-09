@@ -12,6 +12,7 @@ function Repository:new (images)
 	o.Image = Image:new(images, 1)
 	o.x = 0
 	o.y = 0
+	o.window = 'Repository'
 	return o
 end
 
@@ -58,7 +59,7 @@ end
 Counter = {}
 
 
-function Counter:new (id, images, imageIndex, zorder, x, y)	
+function Counter:new (id, images, imageIndex, zorder, window, x, y)	
 	local o = Counter:duplicate(Repository[images[1]])	
 	setmetatable(o, Counter)
 	Counter.__index = Counter
@@ -68,6 +69,7 @@ function Counter:new (id, images, imageIndex, zorder, x, y)
 	o.y = y
 	o.zorder = zorder
 	o.deleted = false
+	o.window = window
 	return o
 end
 
@@ -140,12 +142,25 @@ function Counter:select (id)
 	end
 end
 
-function Counter:move (id, x, y)
-	local dx, dy = get_size(id)
-	updatePos(id, x - dx, y - dy)
-	State:addMove(id, "Counter", "x", x - dx)
-	State:addMove(id, "Counter", "y", y - dy)
-	Counter:generateGUI()	
+function Counter:move (window, id, x, y)
+
+	if (Counter[id].window == window) then	
+		updatePos(window, id, x, y)
+		State:addMove(id, "Counter", "x", x)
+		State:addMove(id, "Counter", "y", y)
+		update_class(Counter, id)
+	else
+		local toId = next_id()
+		local zorder = top_zorder()
+		copyCounter(Counter[id].Image.images[1], toId, zorder, window, x, y)
+		State:addCreate(toId, 'Create')	
+		Counter:delete(id)
+		delete_class(id)
+		State:addStage()
+	end	
+	
+	--Counter:generateGUI()
+	setGUI()	
 end
 
 function Counter:findId(stringId)
@@ -178,6 +193,45 @@ function Counter:findTrait(table, trait)
 end
 
 
+function Counter:setTrait(table, name, trait)
+	table[name] = trait
+end
+
+function Counter:removeTrait(table, trait)
+	table[trait] = nil	
+end
+
+function Counter:getStackSize(window, pos)
+	local res = 0
+	for k, v in pairs(Counter) do
+		if type(k) == "string" and k ~= '__index' and type(v) ~= 'function' and v.deleted == false then
+			if Counter[k].window == window then		
+				local dx, dy = get_size(v.Image.images[1])
+				if v.x + dx == pos.x and v.y + dy == pos.y then
+					res = res + 1
+				end
+			end
+		end	
+	end
+	return res
+end
+
+function Counter:inStack(window, id, counter)
+	local ex, ey = get_size(Counter[id].Image.images[1])	
+	for k, v in pairs(Counter) do
+		if type(k) == "string" and k ~= '__index' and type(v) ~= 'function' and v.deleted == false then
+			if Counter[id].window == Counter[k].window then
+				if counter == v.Image.images[1] then		
+					local dx, dy = get_size(v.Image.images[1])
+					if v.x + dx == Counter[id].x + ex and v.y + dy == Counter[id].y + ey then
+						return true
+					end
+				end
+			end
+		end	
+	end
+	return false
+end
 
 function Counter:duplicate(o)
 	local res = {}
@@ -191,15 +245,111 @@ function Counter:duplicate(o)
 	return res
 end
 
-function Counter:merge(o, n)
-    for k, v in pairs(n) do
-        if type(v) == "table" and type(o[k] or false) == "table" then
+function Counter:merge(o, loaded)
+    for k, v in pairs(loaded) do
+		if type(v) == "table" and type(o[k] or false) == "table" then	
 			o[k] = Counter:merge(o[k], v)
 		else
-			o[k] = v;
+			o[k] = v
 		end
     end
     return o
+end
+
+
+function Counter:refresh()
+	
+	local id
+	local x
+	local y
+	local name
+	local imageIndex
+	local window
+	local zorder
+	local markmoved
+	local degrees
+	local opacity 
+	local table
+	local deleted
+	
+	
+	local keys = {}
+	local n = 0
+
+	for k,v in pairs(Counter) do
+		if type(k) == "string" and k ~= '__index' and type(v) ~= 'function' then
+			n = n + 1
+			keys[n] = k
+		end
+	end
+
+	
+	
+
+	
+	for i = 1 , #keys do
+	
+		local k = keys[i]
+		 
+		if type(k) == "string" and k ~= '__index' and type(v) ~= 'function' then
+		
+			-- save state
+		
+			id = Counter[k].id
+			x = Counter[k].x
+			y = Counter[k].y
+			name = Counter[k].Image.images[1]
+			imageIndex = Counter[k].Image.imageIndex
+			window = Counter[k].window
+			zorder = Counter[k].zorder
+			markmoved = Counter[k].MarkMoved ~= nil and Counter[k].MarkMoved.moved
+			if Counter[k].Rotate ~= nil then
+				degrees = Counter[k].Rotate
+			else
+				degrees = 0	 
+			end
+			if Counter[k].Visibility ~= nil then
+				opacity = Counter[k].Visibility.opacity
+			else
+				opacity = 1.0	
+			end
+			deleted = Counter[k].deleted
+		
+	
+	
+			-- reset counter
+			
+			Counter[k] = nil			
+			Counter[k] = Counter:duplicate(Repository[name])
+			
+			
+			-- reinstall state
+
+			Counter[k].id = id
+			Counter[k].x = x 
+			Counter[k].y = y 
+			Counter[k].Image.imageIndex = imageIndex			
+			Counter[k].window = window
+			Counter[k].zorder = zorder
+			
+			if Counter[k].MarkMoved ~= nil then
+				Counter[k].MarkMoved.moved = markmoved
+			end	
+			if Counter[k].Rotate ~= nil then		
+				Counter[k].Rotate.degrees = degrees
+			end
+			if Counter[k].Visibility ~= nil then
+				Counter[k].Visibility.opacity = opacity
+			end	
+			Counter[k].deleted = deleted 
+		
+			
+		end
+		
+		
+	end
+	
+	
 end
 
 
@@ -209,88 +359,27 @@ function Counter:generateGUI()
 	for k, v in pairs(Counter) do
 		
 		if type(k) == "string" and k ~= '__index' and type(v) ~= 'function' and v.deleted == false then
-			
-			local name = Counter[k].Image.images[ Counter[k].Image.imageIndex ]
-			local degrees = 0
-			local opacity = 1.0			
-			
-			if Counter[k].Rotate ~= nil then
-				degrees = Counter[k].Rotate.degrees
-			end
-			
-			if Counter[k].Visibility ~= nil then
-				opacity = Counter[k].Visibility.opacity
-			end
-			
-
-			updateState(k,
-						Counter[k].x, 
-						Counter[k].y,
-						Counter[k].zorder,  
-						Counter[k].MarkMoved ~= nil and Counter[k].MarkMoved.moved,
-						degrees,
-						name,
-						opacity,
-						Counter[k],
-						'Overlays')
-						
+		
+			update_class(Counter, k)			
+			moved(Counter[k].window, k, Counter[k].x, Counter[k].y)
 					
-			moved("Map", k, Counter[k].x, Counter[k].y)
-			
 		end
 	end
 	
-	
 	setGUI()
-
-end
-
-
-
-
-
--- create Luau tokens
-
-
-Token = {}
-
-function Token:new (fromId, toId)
-	local o = Counter:duplicate(Repository[fromId])
-	o.name = fromId
-	o.id = toId
-	o.x = 0
-	o.y = 0
-	return o
-end
-
-function Token:copy (table, id, x, y)
-	local o = Counter:duplicate(table[id])
-	o.name = table[id].Image.images[1]
-	o.id = id
-	o.x = x
-	o.y = y
-	return o
-end
-
-
-function Token:flip (id)
-	Token[id].Image.imageIndex = Token[id].Image.imageIndex + 1
-	local length = #(Token[id].Image.images)
-	if Token[id].Image.imageIndex > length then
-		Token[id].Image.imageIndex = 1
+	
+	
+	for k, v in pairs(Globals) do
+	
+		if k == 'Turn' then
+			printturn()
+		end
+	
 	end
-	return Token[id].Image.images[Token[id].Image.imageIndex]
+
 end
 
 
-function Token:setPos (id, x ,y)
-	Token[id].gridx = x
-	Token[id].gridy = y
-end
-
-
-function Token:updateGUI(id) 
-end
 	
 	
 ------	
@@ -320,14 +409,35 @@ function Decks:find(x, y)
 	return nil
 end
 
+function Decks:merge(merged, from)
+	local mergedeck = Decks:get(merged)
+	local fromdeck = Decks:get(from)
+	for k, v in ipairs(fromdeck.cards) do
+		table.insert(mergedeck.cards, v)
+	end	
+	for k, v in ipairs(fromdeck.cards) do
+		fromdeck.cards[k] = nil
+	end
+end
+
+function Decks:getKeys()
+	local result = {}
+	for k, v in pairs(self) do
+		if type(k) == "string" and k ~= '__index' and type(v) ~= 'function' then
+			table.insert(result, k)
+		end
+	end
+	return result
+end
+
 
 
 Deck = {}
 
 function Deck:new (id, move, gridpoint)	
 	local o = {}
-	setmetatable(o, Deck)
-	Deck.__index = Deck
+	setmetatable(o, self)
+	self.__index = self
 	o.id = id
 	o.cards = {}
 	o.x = gridpoint.x
@@ -352,15 +462,24 @@ function Deck:remove(id)
 	table.remove(self.cards, n)	
 end
 
-function Deck:draw()
+function Deck:draw(andDelete)
 	if #self.cards == 0 then
 		return nil
 	end	
+	
 	local n = math.random(1, #self.cards)
 	local toId = self.cards[n]
 	table.remove(self.cards, n)
-	delete_class(toId)
+	if andDelete then
+		delete_class(toId)
+	end 
 	return toId
+end
+
+function Deck:load(id, table)
+	local o = Deck:new(id, {}, {0,0})
+	o = Counter:merge(o, table)
+	return o
 end
 
 
@@ -375,6 +494,26 @@ function Card:new(deck)
 	o.face = 2
 	return o 
 end
+
+
+
+
+function refresh()
+
+	Counter:refresh()
+	
+end
+
+
+-----------
+
+
+Globals = {}
+
+function Globals:add(id, o)
+	Globals[id] = o
+end
+
 
 
 
