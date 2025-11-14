@@ -23,6 +23,15 @@ class ToolBar : public QToolBar
 				
 		};
 		
+		class ToolButton : public QToolButton
+		{
+			public:
+				std::string id;
+				ToolButton(const char *id, std::string resourceName, const QString toolTip,
+						   std::function<void(void)>, const std::string);
+				
+		};
+		
 		class Label : public QLabel
 		{
 			public:
@@ -56,12 +65,17 @@ class ToolBar : public QToolBar
 		ToolBar(std::string tag, const QString title, QScrollArea *scrollArea = nullptr);
 		~ToolBar();
 		static ToolBar *getInstance(const char *instance);
+		void reset();
+		std::string tag;
+		bool toolbarPinned;
 		void addImageButton(const char *id, std::string resourceName, QString buttonText, const QString toolTip, std::function<void(void)>, std::string = "");
 		void setImageButton(std::string id, std::string resourceName, QString buttonText);
+		void setLabelImage(std::string id, std::string resourceName, QString buttonText);
 		void addLabel(std::string id, std::string str, const QString toolTip, int w, int h, const QString css);
 		void setLabel(std::string id, QString text);
 		void addseparator();
 		void addSizeComboBox();
+		
 			
 		void zoomIn();
 		void zoomOut();

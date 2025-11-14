@@ -350,7 +350,7 @@ void CentralFrame::mousePressEvent(QMouseEvent *event)
 		
 			QPoint ghostOrigo = ghostRect.topLeft();
 			
-			      
+	      
 																			
 			dataStream << counterOffset;
 			dataStream << ghostOrigo;
@@ -367,7 +367,7 @@ void CentralFrame::mousePressEvent(QMouseEvent *event)
 			
 			
 			
-			QPoint compensation;
+			QPoint compensation = QPoint(0,0);
 			
 			// get stack compensation
 			// this is the position of the lowest selected counter in the stack
@@ -410,21 +410,22 @@ void CentralFrame::mousePressEvent(QMouseEvent *event)
 			
 			
 			
-			// this presumes that only one counter is moved from the repository at a time
-			QString idStr = "";
-			
-			if (this->window->tag == "Repository")
-				idStr = QString::fromStdString(child->owner->name);
-			
 			
 			for (auto const& [point, stack] : stacks)
 				for (auto const& [i, counter] : stack)
 				{	
 					int id = counter->id;
+					QString name = QString::fromStdString(counter->name);
+					QString tag = QString::fromStdString(this->window->tag);
+					int x = counter->state.x;
+					int y = counter->state.y;
 					int dx = counter->state.x - child->owner->state.x; 	
 					int dy = counter->state.y - child->owner->state.y;
 					dataStream << id;
-					dataStream << idStr;
+					dataStream << name;
+					dataStream << tag;
+					dataStream << x;
+					dataStream << y;
 					dataStream << dx;
 					dataStream << dy;
 				}
@@ -446,13 +447,13 @@ void CentralFrame::mousePressEvent(QMouseEvent *event)
 		
 		auto result = drag->exec(Qt::CopyAction | Qt::MoveAction);
 		
-		
+	
 		if (result == Qt::CopyAction)
 		{
 			if (this->window->tag != "Repository")	
 				for (auto d: countersDeleted)
 				{	
-					Luau::doDelete(std::to_string(d.id).c_str());	
+					Luau::doDelete(d.name.c_str());	
 					delete Counter::counters[d.id];
 				}
 					
@@ -660,8 +661,8 @@ void CentralFrame::dropEvent(QDropEvent *event)
 
 		QPoint counterOffset, ghostOrigo, compensation;
 		
-		int n, id, dx, dy;
-		QString idStr;		
+		int n, id, sx, sy, dx, dy;
+		QString name, tag;		
 		Moved countersMoved;
 		
 		countersDeleted.clear();
@@ -678,10 +679,13 @@ void CentralFrame::dropEvent(QDropEvent *event)
 		for (int i = 0; i < n; i++)
 		{	
 			dataStream >> id;
-			dataStream >> idStr;
+			dataStream >> name;
+			dataStream >> tag;
+			dataStream >> sx;
+			dataStream >> sy;
 			dataStream >> dx;
 			dataStream >> dy;
-			countersMoved.push_back({id, idStr, dx, dy});
+			countersMoved.push_back({id, name.toStdString(), tag.toStdString(), sx, sy, dx, dy});
 		}
 		
 		
@@ -780,9 +784,13 @@ void CentralFrame::dropEvent(QDropEvent *event)
 			else
 			{
 				// apply stack position compensation
-				source.setX(source.x() + compensation.x());
-				source.setY(source.y() + compensation.y());
-				
+
+				if (Counter::haveOffset)
+				{
+					source.setX(source.x() + compensation.x());
+					source.setY(source.y() + compensation.y());
+				}
+			
 			}
 			
 			
@@ -862,8 +870,15 @@ void CentralFrame::dropEvent(QDropEvent *event)
 						rx > map.width() || ry > map.height())
 						continue;	
 					
-							
 					
+					
+					
+							
+					Luau::reportMove(obj->second->id, obj->second->image.c_str(), 
+									 obj->second->state.tag.c_str(), obj->second->state.tag.c_str(),
+									 obj->second->state.x, obj->second->state.y,
+									 x, y);
+									 			 
 							
 					if (!(obj->second->state.x == x && obj->second->state.y == y))
 					{
@@ -883,6 +898,11 @@ void CentralFrame::dropEvent(QDropEvent *event)
 					
 					Luau::doEvent("move", obj->second->name.c_str(), "Counter", "x", obj->second->state.x);
 					Luau::doEvent("move", obj->second->name.c_str(), "Counter", "y", obj->second->state.y);
+
+											  
+					
+				    
+					
 					
 					// increment number of moved
 					n++;
@@ -939,7 +959,6 @@ void CentralFrame::dropEvent(QDropEvent *event)
 			// drag from another window
 			
 			
-			
 			for (auto m : countersMoved)
 				// only drag a single stack (for the time being)
 				if (m.dx == 0 && m.dy == 0)
@@ -951,10 +970,10 @@ void CentralFrame::dropEvent(QDropEvent *event)
 	
 					Counter *counter;
 					
-					if (m.idStr.isEmpty())	
-						counter = Counter::counters[m.id];	
+					if (m.tag == "Repository")
+						counter = Counter::repository[m.name];		
 					else
-						counter = Counter::repository[m.idStr.toStdString()];
+						counter = Counter::counters[m.id];
 						
 						
 						
@@ -1018,7 +1037,8 @@ void CentralFrame::dropEvent(QDropEvent *event)
 			
 					
 					const char *fromId = counter->image.c_str();
-					const char *toId = std::to_string(Counter::nextId()).c_str();			
+					int id = Counter::nextId();
+					const char *toId = std::to_string(id).c_str();			
 					int zorder = Counter::topZorder();
 					const char *tag = this->window->tag.c_str();
 					
@@ -1029,18 +1049,21 @@ void CentralFrame::dropEvent(QDropEvent *event)
 					// add counter to undo stack
 					Luau::doCreate(toId, "Create");
 					
+				
+					// save what counter to delete in window moved from (huge bug - use m)
+					countersDeleted.push_back(m);
+						
+					// log 					
+					Luau::reportMove(m.id, fromId, m.tag.c_str(), tag, m.x, m.y, dropX, dropY);
 					
-					// save what counter to delete in window moved from
-					countersDeleted.push_back({m.id, m.idStr, m.dx, m.dy});
 					
-					
-					// hook
+					// hook	
 					Luau::dropped(this->window->tag.c_str(), fromId, toId, dropX, dropY);
 					
 				
 				}
 			
-			
+		
 			
 			event->setDropAction(Qt::CopyAction);
 			event->accept();
@@ -1306,7 +1329,7 @@ QImage CentralFrame::selectedGhostImage(Counter *counter, QRect &totalRect)
 		
 	}
 	
-	
+		
 	
 	// paint ghost
 	

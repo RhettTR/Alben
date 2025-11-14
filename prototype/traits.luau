@@ -406,7 +406,7 @@ function Take:new(number)
 	o.menuname = 'Take '..number
 	o.menuclick = 'actionTake'..number
 	o.menutrait = 'Take'..number
-	o.menushow = function(window, id) return window == 'Rf' end
+	o.menushow = function(window, id) return window == 'Reinforcements' end
 	return o
 end
 
@@ -451,6 +451,15 @@ function GermanArm:new()
 	return o   	
 end
  
+GermanMot = {}
+
+function GermanMot:new()
+	local o = German:new()
+	setmetatable(o, self)
+	self.__index = self
+	o.Take2 = Take:new(2)
+	return o   	
+end 
 
 Soviet = {}
 

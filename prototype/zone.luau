@@ -125,7 +125,7 @@ function Zone:makeHexagonalGrid(width, height)
 	
 	while (true) do
 		 
-		x = self.border.x0 + self.a + i*(self.a + c)
+		x = leftPadding + self.border.x0 + self.a + i*(self.a + c)
 				
 		if x >= width then
 			return
@@ -145,7 +145,7 @@ function Zone:makeHexagonalGrid(width, height)
 				fy = 0	
 			end 
 	
-			y = self.border.y0 + self.b + j*self.b + fy
+			y = topPadding + self.border.y0 + self.b + j*self.b + fy
 			
 					
 			if y >= height then
@@ -411,7 +411,7 @@ function Zones:doSnap(zone, dx, dy, x, y)
 	local minimum_distance = 100000
 
 	local minimumX, minimumY
-	
+
 	for k, v in pairs(zone.grid) do	
 	
 		-- simplification of sqr(dx² + dy²)
@@ -516,9 +516,9 @@ function Zones:getPlace(window, x, y)
 	local squareLength = 10
 
 	local zone = Zones:findZone(window, x, y)
-	
+
 	if zone == nil then
-		return ''
+		return 'Offboard'
 	end
 	
 	if zone.gridType == 'square' then
@@ -533,7 +533,7 @@ function Zones:getPlace(window, x, y)
 			end
 		end
 	end
-	
+
 	return ''	
 
 end

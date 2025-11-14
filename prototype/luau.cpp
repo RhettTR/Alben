@@ -35,7 +35,7 @@ typedef struct std::vector<aScript> Scripts;
 
 extern IO *io;
 extern Window *repositoryWindow;
-extern Window *getMain();
+extern Window *logWindow;
 
 
 
@@ -124,8 +124,19 @@ void Luau::compileScript()
 	{
 
 		bytecode = luau_compile(element.chunk.c_str(), element.chunk.length(), NULL, &bytecodeSize);
-		assert(luau_load(L, element.chunkName.c_str(), bytecode, bytecodeSize, 0) == 0);
-		free(bytecode);	
+		int res = luau_load(L, element.chunkName.c_str(), bytecode, bytecodeSize, 0);	
+		free(bytecode);
+		
+		
+		if (res != 0) 
+		{
+			// https://sleitnick.github.io/luau-api/reference.html#luau_load
+			size_t len;
+			const char* msg = lua_tolstring(L, -1, &len);
+			lua_pop(L, 1);
+			printf("failed to compile: %s\n", msg);
+			std::exit(1);
+		}	
 		
 		// set global to make other script files use this script file
 		lua_setglobal(L, element.chunkName.c_str());
@@ -189,6 +200,25 @@ extern "C" {
 		
 		return 0;
 	}
+	
+	
+	static int set_padding(lua_State *L)
+	{		
+		
+		int bottom = lua_tonumber(L, -1);
+		int right  = lua_tonumber(L, -2);
+		int top    = lua_tonumber(L, -3);
+		int left   = lua_tonumber(L, -4);
+		string resourceId = string(lua_tostring(L, -5));
+				
+		lua_pop(L, 5);
+		
+		
+		IO::addPadding(resourceId, left, top, right, bottom);
+		
+		return 0; 
+	}	
+	
 	
 	Counter::Table getTable();
 	void outTable(Counter::Table);
@@ -397,14 +427,25 @@ extern "C" {
 		return 0;
 	}
 	
-	static int root(lua_State *L)
+	static int set_root_window(lua_State *L)
 	{	
 		
-		const char *tag = lua_tostring(L, -1);
-		int level = lua_tonumber(L, -2);	
-		lua_pop(L, 2);
+		const char *tag = lua_tostring(L, -1);	
+		lua_pop(L, 1);
 		
-		Window *window = Window::getInstance(tag);		
+		Window::rootTag = string(tag);		
+		
+		
+		return 0;
+	}
+	
+	static int root(lua_State *L)
+	{	
+	
+		int level = lua_tonumber(L, -1);	
+		lua_pop(L, 1);
+		
+		Window *window = Window::getInstance(Window::rootTag.c_str());		
 		
 		window->root(level);
 		
@@ -413,11 +454,10 @@ extern "C" {
 	
 	static int tabs(lua_State *L)
 	{			
-		const char *tag = lua_tostring(L, -1);
-		int level = lua_tonumber(L, -2);	
-		lua_pop(L, 2);
+		int level = lua_tonumber(L, -1);	
+		lua_pop(L, 1);
 		
-		Window *window = Window::getInstance(tag);
+		Window *window = Window::getInstance(Window::rootTag.c_str());
 		
 		window->tabs(level);
 		
@@ -426,12 +466,11 @@ extern "C" {
 	
 	static int tab(lua_State *L)
 	{		
-		const char *tag = lua_tostring(L, -1);
-		const char *text = lua_tostring(L, -2);
-		int level = lua_tonumber(L, -3);	
-		lua_pop(L, 3);
+		const char *text = lua_tostring(L, -1);
+		int level = lua_tonumber(L, -2);	
+		lua_pop(L, 2);
 		
-		Window *window = Window::getInstance(tag);
+		Window *window = Window::getInstance(Window::rootTag.c_str());
 		
 		window->tab(level, string(text));
 		
@@ -440,11 +479,10 @@ extern "C" {
 	
 	static int listbox(lua_State *L)
 	{			
-		const char *tag = lua_tostring(L, -1);
-		int level = lua_tonumber(L, -2);	
-		lua_pop(L, 2);
+		int level = lua_tonumber(L, -1);	
+		lua_pop(L, 1);
 		
-		Window *window = Window::getInstance(tag);
+		Window *window = Window::getInstance(Window::rootTag.c_str());
 		
 		window->listBox(level);
 		
@@ -453,12 +491,11 @@ extern "C" {
 	
 	static int listitem(lua_State *L)
 	{		
-		const char *tag = lua_tostring(L, -1);
-		const char *text = lua_tostring(L, -2);
-		int level = lua_tonumber(L, -3);	
-		lua_pop(L, 3);
+		const char *text = lua_tostring(L, -1);
+		int level = lua_tonumber(L, -2);	
+		lua_pop(L, 2);
 		
-		Window *window = Window::getInstance(tag);
+		Window *window = Window::getInstance(Window::rootTag.c_str());
 		
 		window->listItem(level, string(text));
 		
@@ -467,11 +504,10 @@ extern "C" {
 	
 	static int combobox(lua_State *L)
 	{				
-		const char *tag = lua_tostring(L, -1);
-		int level = lua_tonumber(L, -2);	
-		lua_pop(L, 2);
+		int level = lua_tonumber(L, -1);	
+		lua_pop(L, 1);
 		
-		Window *window = Window::getInstance(tag);
+		Window *window = Window::getInstance(Window::rootTag.c_str());
 		
 		window->comboBox(level);
 		
@@ -480,12 +516,11 @@ extern "C" {
 	
 	static int comboitem(lua_State *L)
 	{		
-		const char *tag = lua_tostring(L, -1);
-		const char *text = lua_tostring(L, -2);
-		int level = lua_tonumber(L, -3);	
-		lua_pop(L, 3);
+		const char *text = lua_tostring(L, -1);
+		int level = lua_tonumber(L, -1);	
+		lua_pop(L, 2);
 		
-		Window *window = Window::getInstance(tag);
+		Window *window = Window::getInstance(Window::rootTag.c_str());
 		
 		window->comboItem(level, string(text));
 		
@@ -494,11 +529,10 @@ extern "C" {
 	
 	static int image_item(lua_State *L)
 	{		
-		const char *tag = lua_tostring(L, -1);
-		const char *image = lua_tostring(L, -2);	
-		lua_pop(L, 2);
+		const char *image = lua_tostring(L, -1);	
+		lua_pop(L, 1);
 		
-		Window *window = Window::getInstance(tag);
+		Window *window = Window::getInstance(Window::rootTag.c_str());
 	
 		window->imageItem(string(image));
 		
@@ -596,8 +630,10 @@ extern "C" {
 		lua_pop(L, 2);
 		
 		ToolBar *customBar = new ToolBar(tag, name);
-		getMain()->addToolBarBreak(Qt::TopToolBarArea);
-		getMain()->addToolBar(Qt::TopToolBarArea, customBar);
+		customBar->setIconSize(QSize(36, 36));
+		customBar->setFixedHeight(48);
+		Window::getInstance("main")->addToolBarBreak(Qt::TopToolBarArea);
+		Window::getInstance("main")->addToolBar(Qt::TopToolBarArea, customBar);
 		
 		return 0;
 	}
@@ -632,7 +668,7 @@ extern "C" {
 		
 		ToolBar *toolbar = ToolBar::getInstance(tag);
 		
-		toolbar->setImageButton(id, resourceName, buttonText);
+		toolbar->setLabelImage(id, resourceName, buttonText);
 		
 		return 0;
 	}
@@ -691,6 +727,36 @@ extern "C" {
 		ToolBar *toolbar = ToolBar::getInstance(tag);
 		
 		toolbar->enabled(id, true);
+		
+		return 0;
+	}
+	
+	static int toggle_pin(lua_State *L)
+	{		
+		string id = string(lua_tostring(L, -1));
+		const char *tag = lua_tostring(L, -2); 	
+		lua_pop(L, 2);	
+		
+		ToolBar *toolbar = ToolBar::getInstance(tag);
+		
+		toolbar->toolbarPinned = !toolbar->toolbarPinned;
+		
+		Window *window = (Window *)toolbar->parent();
+	
+		if (toolbar->toolbarPinned)
+		{
+			toolbar->setImageButton(id, "__pin", "");
+			Qt::WindowFlags flags = window->windowFlags();
+			window->setWindowFlags(flags | Qt::WindowStaysOnTopHint);
+			window->show();
+		}
+		else
+		{
+			toolbar->setImageButton(id, "__unpin", "");
+			Qt::WindowFlags flags = window->windowFlags();
+			window->setWindowFlags(flags & ~Qt::WindowStaysOnTopHint);
+			window->show();
+		}
 		
 		return 0;
 	}
@@ -1069,9 +1135,30 @@ extern "C" {
 		return 1;
 	}
 	
+	static int roll_die(lua_State *L)
+	{		
+		Window::rollDie();
+		
+		return 0;
+	}
+	
+	static int log_print(lua_State *L)
+	{	
+		
+		QString text(lua_tostring(L, -1));
+		lua_pop(L, 1);
+			
+		logWindow->textbox->appendHtml(text);
+
+		return 0;
+	}
+	
 	
 	
 }	// extern "C"
+
+
+
 
 
 
@@ -1426,6 +1513,19 @@ void Luau::doEvent(const char *eventName, const char *id, const char *trait, con
 }
 
 
+void Luau::doLog(const char *key, const char *text)
+{
+	
+	lua_getglobal(L, "logging");
+	lua_pushstring(L, key);
+	lua_pushstring(L, text);
+	
+	
+	lua_pcall(L, 2, 0, 0);
+	
+}
+
+
 
 bool Luau::doTest(const char *tag, const char *trait, const char *id)
 {
@@ -1465,6 +1565,36 @@ void Luau::doDelete(const char *id)
 	
 	lua_pcall(L, 1, 0, 0);
 }
+
+
+
+void Luau::reportText(const char *type, const char *text)
+{
+	lua_getglobal(L, "reporttext");
+	lua_pushstring(L, type);
+	lua_pushstring(L, text);
+	
+	lua_pcall(L, 2, 0, 0);
+}
+
+
+void Luau::reportMove(int id, const char *name, const char *fromtag, const char *totag, int fromX, int fromY, int toX, int toY)
+{
+	
+	lua_getglobal(L, "reportmove");
+	lua_pushnumber(L, id);
+	lua_pushstring(L, name);
+	lua_pushstring(L, fromtag);
+	lua_pushstring(L, totag);
+	lua_pushnumber(L, fromX);
+	lua_pushnumber(L, fromY);
+	lua_pushnumber(L, toX);
+	lua_pushnumber(L, toY);
+	
+	lua_pcall(L, 8, 0, 0);
+	
+}
+
 
 
 
@@ -1509,10 +1639,10 @@ bool Luau::afterDrag(const char *window, const char *id, int dx, int dy, int &x,
 	
 }
 
-void Luau::dropped(const char *name, const char *fromid, const char *toid, int x, int y)
+void Luau::dropped(const char *tag, const char *fromid, const char *toid, int x, int y)
 {
 	lua_getglobal(L, "dropped");
-	lua_pushstring(L, name);
+	lua_pushstring(L, tag);
 	lua_pushstring(L, fromid);
 	lua_pushstring(L, toid);
 	lua_pushnumber(L, x);
@@ -1880,6 +2010,9 @@ void Luau::startVM()
 	lua_pushcfunction(L, setBackgroundMapID, "setBackgroundMapID");
 	lua_setglobal(L, "setBackgroundMapID");
 	
+	lua_pushcfunction(L, set_padding, "set_padding");
+	lua_setglobal(L, "set_padding");
+	
 	lua_pushcfunction(L, create_class, "create_class");
 	lua_setglobal(L, "create_class");
 	
@@ -1908,6 +2041,9 @@ void Luau::startVM()
 	lua_setglobal(L, "setGUI");
 	
 	// repository
+	
+	lua_pushcfunction(L, set_root_window, "set_root_window");
+	lua_setglobal(L, "set_root_window");
 	
 	lua_pushcfunction(L, root, "root");
 	lua_setglobal(L, "root");
@@ -1987,6 +2123,9 @@ void Luau::startVM()
 	
 	lua_pushcfunction(L, add_toolbar_separator, "add_toolbar_separator");
 	lua_setglobal(L, "add_toolbar_separator");
+
+	lua_pushcfunction(L, toggle_pin, "toggle_pin");
+	lua_setglobal(L, "toggle_pin");	
 	
 	// window
 	
@@ -2073,6 +2212,16 @@ void Luau::startVM()
 	
 	lua_pushcfunction(L, is_painting, "is_painting");
 	lua_setglobal(L, "is_painting");
+	
+	// die rolling
+	
+	lua_pushcfunction(L, roll_die, "roll_die");
+	lua_setglobal(L, "roll_die");
+	
+	// logging
+	
+	lua_pushcfunction(L, log_print, "log_print");
+	lua_setglobal(L, "log_print");
 	
 	
 	

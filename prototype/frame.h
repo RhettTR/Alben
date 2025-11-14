@@ -132,9 +132,12 @@ class CentralFrame : public QFrame
 		
 		typedef struct
 		{
-			int id;
-			QString idStr;
-			int dx;	
+			int id;				// id int of counter moved 
+			std::string name;	// id string of counter moved 
+			std::string tag;	// window tag of counter
+			int x;				// position of counter moved
+			int y; 
+			int dx;				// multi-stack differernce from source stack dragged
 			int dy;
 		} Move;
 		

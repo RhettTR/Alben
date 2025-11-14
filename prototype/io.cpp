@@ -14,6 +14,8 @@
 
 
 
+extern IO *io;
+
 
 using namespace std;
 using namespace std::filesystem;
@@ -482,6 +484,35 @@ void IO::load_resources(string directory)
 			
 }
 
+
+void IO::addPadding(string resourceId, int left, int top, int right, int bottom)
+{
+	QImage resource = io->getImage(resourceId);
+
+	QImage padded = 
+		QImage(io->getSize(resourceId) + QSize(left + right, top + bottom), QImage::Format_ARGB32_Premultiplied);
+		
+	padded.fill(Qt::white);
+	
+	QPainter *paint = new QPainter(&padded);
+	paint->drawImage(QPoint(left, top), resource);
+	delete paint;
+	
+	// memory leak ? (no it's the heap)
+	io->_resources[resourceId].image = padded;
+	
+	io->_resources[resourceId].size = padded.size();
+	
+}
+
+
+void IO::reset()
+{
+	
+	load_resources("./__images");
+	load_resources("./images");
+	
+}
 
 
 void IO::transfer_resource_keys()

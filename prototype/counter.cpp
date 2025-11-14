@@ -856,7 +856,10 @@ void Counter::clearMoved()
 		}
 	
 	if (atLeastOne)
+	{
+		Luau::reportText("move", "All move-markers removed");
 		Luau::doEvent("end", "", "", "", 0);
+	}
 	
 }
 

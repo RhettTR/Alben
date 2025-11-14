@@ -5,6 +5,7 @@
 Repository = {}
 
 
+
 function Repository:new (images)
 	local o = {}	
 	setmetatable(o, self)
@@ -12,6 +13,7 @@ function Repository:new (images)
 	o.Image = Image:new(images, 1)
 	o.x = 0
 	o.y = 0
+	o.name = images[1]
 	o.window = 'Repository'
 	return o
 end

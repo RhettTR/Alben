@@ -16,6 +16,18 @@ hoover_ShowMap(false)
 hoover_ShowPlace(true)
 
 
+-- padding of main map
+
+leftPadding = 20
+topPadding = 20
+rightPadding = 20
+bottomPadding = 20
+
+set_padding("PGG-map-ver1", leftPadding, topPadding, rightPadding ,bottomPadding)
+	
+
+
+
 -- set seed for random numbers
 
 math.randomseed(os.time())
@@ -123,6 +135,9 @@ local function actionMove (window, id)
 	
 						
 			Counter:move(window, id, move.x - dx, move.y - dy)
+			
+			reporttext('move', '<span style="color:gray;">' .. Repository[Counter[id].Image.images[1]].name .. ' moves to ' .. 
+					   Zones:getPlace(window, move.x,  move.y) .. '</span>') 
 			
 		end
 				
@@ -266,6 +281,13 @@ local function actionReveal (window, id)
 	copyCounter(drawn, toId, Counter[id].zorder, Counter[id].window, Counter[id].x, Counter[id].y)
 	State:addCreate(toId, 'Create')
 	
+	local dx, dy = get_size(Counter[id].Image.images[1])
+	
+	reporttext('reveal', Repository[Counter[id].Image.images[1]].name .. ' in ' .. 
+						 Zones:getPlace(window,  Counter[id].x + dx, Counter[id].y + dy) ..
+						 ' is revealed as ' ..
+						 Repository[Counter[toId].Image.images[1]].name)
+	
 	local cards = Counter:duplicate(drawpile.cards)
 	
 	State:addMove(drawpile.id, 'Decks', '', cards)
@@ -281,15 +303,18 @@ end
 local function actionStepLoss (window, id)
 
 	if Counter[id].Side == 'German' then
-		if Counter[id].Image.imageIndex < #Counter[id].Image.images then			
+		if Counter[id].Image.imageIndex < #Counter[id].Image.images then
+			reporttext('steploss', Repository[Counter[id].Image.images[1]].name .. ' suffers step loss')		
 			actionFlip(window, id)
 		else
+			reporttext('steploss', Repository[Counter[id].Image.images[1]].name .. ' goes to graveyard')
 			Counter:move('Gy', id, 480 + math.random(-100, 100), 270 + math.random(-100, 100))
 		end
 		
 	else -- soviet
 	
 		if Counter[id].Type == 'HQ' then
+			reporttext('steploss', Repository[Counter[id].Image.images[1]].name .. ' goes to graveyard')
 			Counter:move('Gy', id, 180 + math.random(-100, 100), 130 + math.random(-100, 100))
 			return
 		end
@@ -300,16 +325,18 @@ local function actionStepLoss (window, id)
 		
 		
 		if Counter[id].Type == 'Inf' then	
+			
+			reporttext('steploss', Repository[Counter[id].Image.images[1]].name .. ' goes to Soviet Infantry Dead Pool')
 				
 			local pos = zone:getGrid('Soviet Infantry Dead Pool')
 			local dx, dy = get_size('ru-inf-??')
-			copyCounter('ru-inf-??', toId, zorder, 'Rf', pos.x - dx, pos.y - dy)
+			copyCounter('ru-inf-??', toId, zorder, 'Reinforcements', pos.x - dx, pos.y - dy)
 			
 			Counter:setTrait(Counter[toId], 'MoveStack', MoveStack:new('Reuse pile', zone:getGrid('Soviet Infantry Pool')))
 			Counter:setTrait(Counter[toId].MoveStack, 'menutrait', 'MoveStack')
 			Counter:setTrait(Counter[toId].MoveStack, 'menushow', 
 				function(window, id)				
-					local number = Counter:getStackSize('Rf', zone:getGrid('Soviet Infantry Pool'))
+					local number = Counter:getStackSize('Reinforcements', zone:getGrid('Soviet Infantry Pool'))
 					return number == 0 				
 				end)
 				
@@ -321,16 +348,18 @@ local function actionStepLoss (window, id)
 			
 			
 		else -- type is 'Arm'
+		
+			reporttext('steploss', Repository[Counter[id].Image.images[1]].name .. ' goes to Soviet Armor Dead Pool')
 			
 			local pos = zone:getGrid('Soviet Armor Dead Pool')
 			local dx, dy = get_size('ru-mech-??')
-			copyCounter('ru-mech-??', toId, zorder, 'Rf', pos.x - dx, pos.y - dy)
+			copyCounter('ru-mech-??', toId, zorder, 'Reinforcements', pos.x - dx, pos.y - dy)
 			
 			Counter:setTrait(Counter[toId], 'MoveStack', MoveStack:new('Reuse pile', zone:getGrid('Soviet Armor Pool')))
 			Counter:setTrait(Counter[toId].MoveStack, 'menutrait', 'MoveStack')
 			Counter:setTrait(Counter[toId].MoveStack, 'menushow', 
 				function(window, id)				
-					local number = Counter:getStackSize('Rf', zone:getGrid('Soviet Armor Pool'))
+					local number = Counter:getStackSize('Reinforcements', zone:getGrid('Soviet Armor Pool'))
 					return number == 0 					
 				end)
 				
@@ -410,6 +439,8 @@ local function retreat(window, id, zone, incx, incy)
 	local ok, x, y = afterDrag(window, id, dx, dy, Counter[id].x + dx + incx - zone.border.x0, 
 												   Counter[id].y + dy + incy - zone.border.y0)									   
 	if ok and zone:isWithinBorder(x, y) then
+		reporttext('move', Repository[Counter[id].Image.images[1]].name .. ' retreats to ' .. 
+				   Zones:getPlace(window, x + dx, y + dy)) 
 		Counter:move(window, id, x, y )
 	end
 end
@@ -698,6 +729,41 @@ function events(event, id, trait, key, value)
 end
 
 
+function reporttext(type, text)
+	logging(type, text)
+end
+
+
+function reportmove(id, name, fromtag, totag, fromx, fromy, tox, toy)
+
+	local dx, dy = get_size(name)
+	local display = Repository[name].name
+	local text = ''
+	
+	if fromtag == 'Repository' then
+		text = display .. ' placed on ' .. Zones:getPlace(totag, tox + dx, toy + dy)
+	else
+		local zonedisplay = ''
+		if fromtag ~= totag then
+			zonedisplay = ' in ' .. fromtag 	
+		end
+		text = display .. zonedisplay .. ' moves from <span style="color:DarkSlateGray;">' .. 
+			   Zones:getPlace(fromtag, fromx + dx, fromy + dy) .. '</span> to <span style="color:DarkSlateGray;">' .. 
+			   Zones:getPlace(totag, tox + dx, toy + dy) .. '</span>'
+	end			 
+	logging("html", text)
+	
+end
+
+
+function logging(type, text)
+
+	State:addText(type, text)
+	log_print(text)
+
+end
+
+
 
 function doTest(window, trait, id, o)
 	
@@ -978,10 +1044,15 @@ end
 
 
 function dropped(tag, fromid, toid, x, y)
+	
+	if Counter[toid]['Take2'] ~= nil then
+		Counter[toid]['Take2'] = nil 	
+	end
+	
+	if Counter[toid]['Take3'] ~= nil then
+		Counter[toid]['Take3'] = nil 	
+	end
 
-	Counter[toid].Take2 = nil
-	Counter[toid].Take3 = nil
-				
 end
 
 

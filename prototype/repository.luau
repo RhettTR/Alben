@@ -23,7 +23,7 @@ local function assign(prefix)
 	
 		local key = string.match(v, prefix)
 		local n = table.find(used, v)
-		
+	
 		-- resource key must match pattern and not already have been used
 		if key ~= nil and n == nil then
 		
@@ -94,6 +94,87 @@ local function assignClass(pattern)
 end
 
 
+local function assignName(pattern)
+
+	for k, v in pairs(Repository) do
+		if type(k) == "string" and k ~= '__index' and type(v) ~= 'function' then
+			local key = string.match(k, pattern)
+			if key ~= nil then
+				local name = ''
+				if string.match(key, '^ge')then
+					name = 'German ' 
+				elseif string.match(key, '^ru')then
+					name = 'Soviet '
+				end
+				local unit = string.match(key, '%-%w+%-(%d+)PzDiv')
+				local subunit = string.match(key, '%-%w+%-%d+PzDiv%-+(%d+)')
+				if unit ~= nil and subunit ~= nil then
+					unit = string.gsub(unit, '^0+', '')
+					subunit = string.gsub(subunit, '^0+', '')
+					name = name .. subunit .. '/' .. unit .. ' '
+				else
+					local unit = string.match(key, '%-%w+%-(%d+)Mot')
+					local subunit = string.match(key, '%-%w+%-%d+Mot%-(%d+)')
+					if unit ~= nil and subunit ~= nil then
+						unit = string.gsub(unit, '^0+', '')
+						subunit = string.gsub(subunit, '^0+', '')
+						name = name .. subunit .. '/' .. unit .. ' '
+					else
+						local unit = string.match(key, '%-%w+%-(%d+Mos)')
+						if unit ~= nil then
+							unit = string.gsub(unit, '^0+', '')		
+							name = name .. unit .. ' '
+						else	 
+							local unit = string.match(key, '%-%w+%-(%d+)')
+							if unit ~= nil then
+								unit = string.gsub(unit, '^0+', '')		
+								name = name .. unit .. ' ' 
+							else
+								local unit = string.match(key, '%-%w+%-(%w+)')
+								if unit ~= nil then
+									unit = string.gsub(unit, '^0+', '')
+									name = name .. unit .. ' '
+								end
+							end
+						end		
+					end	
+				end	
+				
+				local type = string.match(key, '%-(%w+)%-')
+				if type == 'cav' then
+					name = name .. 'Cavalery Division'
+				end
+				if type == 'inf' then
+					name = name .. 'Infantry Division'
+				end
+				if type == 'pz' then
+					name = name .. 'Panzer Division'
+				end
+				if type == 'mot' then
+					name = name .. 'Motorized Division'
+				end
+				if type == 'arm' then
+					name = name .. 'Armoured Division'
+				end
+				if type == 'mech' then
+					name = name .. 'Mechanized Division'
+				end
+				if type == 'HQ' then
+					name = name .. 'Army Headquarters'
+				end
+				if Repository[key] ~= nil then
+					Repository[key].name = name
+					--print(key)
+					--print(Repository[key].name)
+				end 
+			end
+		end
+	end
+
+
+end
+
+
 
 	
 -- create repository
@@ -146,7 +227,7 @@ end
 	assignTraits('ge%-cav%-%w+%-*%d*$', German)
 	assignTraits('ge%-inf%-%d+$', German)
 	assignTraits('ge%-mot%-%w+$', German)
-	assignTraits('ge%-mot%-%w+%-%d*$', German)
+	assignTraits('ge%-mot%-%w+%-%d*$', GermanMot)
 	assignTraits('ge%-pz%-%w+%-%-%d+pz%-*%d*$', GermanArm)
 	assignTraits('ge%-pz%-%w+-%d+pzgr-%d*$', GermanArm)
 	
@@ -202,20 +283,42 @@ end
 	
 
 	
+-- set display name for all counters
+
 	
+	assignName('ge%-cav%-%w+%-*%d*$')
+	assignName('ge%-inf%-%d+$')
+	assignName('ge%-mot%-%w+$')
+	assignName('ge%-mot%-%w+%-%d*$')
+	assignName('ge%-pz%-%w+%-%-%d+pz%-*%d*$')
+	assignName('ge%-pz%-%w+-%d+pzgr-%d*$')
+	
+	assignName('ru%-arm%-%d+$')
+	assignName('ru%-HQ%-%w+.+$')
+	assignName('ru%-inf%-%w+$')
+	assignName('ru%-mech%-%w+$')
+	
+	Repository['ge-mot-DR-02'].name = '2/DR Motorized Division'
+	Repository['ge-mot-DR-03'].name = '3/DR Motorized Division'
+	Repository['ge-mot-DR-04'].name = '4/DR Motorized Division'
+	
+	Repository['ru-inf-??'].name = 'Soviet Unrevealed Infantry Division'
+	Repository['ru-mech-??'].name = 'Soviet Unrevealed Armored Division'
 	
 
 		
 -- set the content of the repository window
 
 
+set_root_window('Repository')
 
-root(0, 'Repository')	
+
+root(0)	
 		
 		
-	listbox(1, 'Repository')
+	listbox(1)
 	
-		listitem(2, "Markers", 'Repository')
+		listitem(2, "Markers")
 			create_class(Repository, "German Control")
 			create_class(Repository, "German Disruption")
 			create_class(Repository, "German Out of Supply")	
@@ -232,32 +335,32 @@ root(0, 'Repository')
 			create_class(Repository, "SW-Front-4-Units")
 			create_class(Repository, "SW-Front-5-Units")
 					
-		listitem(2, "German Panzer", 'Repository')	
+		listitem(2, "German Panzer")	
 			assignClass('ge%-pz%-%w+%-%-%d+pz%-*%d*$')
 			
-		listitem(2, "German PzGr", 'Repository')	
+		listitem(2, "German PzGr")	
 			assignClass('ge%-pz%-%w+-%d+pzgr-%d*$')
 			
-		listitem(2, "German Motorized", 'Repository')
+		listitem(2, "German Motorized")
 			assignClass('ge%-mot%-%w+$')
 			assignClass('ge%-mot%-%w+%-%d*$')
 			
-		listitem(2, "German Cavalry", 'Repository')
+		listitem(2, "German Cavalry")
 			assignClass('ge%-cav%-%w+%-*%d*$')	
 			
-		listitem(2, "German Infantry", 'Repository')
+		listitem(2, "German Infantry")
 			assignClass('ge%-inf%-%d+$')
 			
-		listitem(2, "Soviet Armor", 'Repository')
+		listitem(2, "Soviet Armor")
 			assignClass('ru%-arm%-%d+$')
 			
-		listitem(2, "Soviet Mechanized", 'Repository')
+		listitem(2, "Soviet Mechanized")
 			assignClass('ru%-mech%-%w+$')	
 	
-		listitem(2, "Soviet Infantry", 'Repository')
+		listitem(2, "Soviet Infantry")
 			assignClass('ru%-inf%-%w+$')
 	
-		listitem(2, "Soviet HQ", 'Repository')
+		listitem(2, "Soviet HQ")
 			assignClass('ru%-HQ%-%w+.+$')
 			
 

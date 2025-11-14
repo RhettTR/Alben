@@ -46,6 +46,8 @@ class IO
 		IO();
 		
 		void load_resources(std::string directory);
+		static void addPadding(std::string resourceId, int left, int top, int right, int bottom);
+		void reset();
 		void transfer_resource_keys();
 
 		

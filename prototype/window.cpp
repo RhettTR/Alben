@@ -3,15 +3,52 @@
 #include "luau.h"
 #include "scale.h"
 #include "overlay.h"
+#include "toolbar.h"
 
 
 extern IO *io;
+extern Window *logWindow;
 
+
+std::string Window::rootTag; 
+
+Window::PlainTextEdit *Window::textbox;
+Window::LineEdit *Window::edit;
+		
 
 Window *getInstance(const char *instance);
 std::map<std::string, Window *> Window::instances;
 
 
+
+Window::PlainTextEdit::PlainTextEdit(QString css, QWidget *parent) : QPlainTextEdit(parent)
+{
+	this->setReadOnly(true);
+	this->setStyleSheet(css);
+}
+
+
+Window::LineEdit::LineEdit(QPlainTextEdit *logbox, QString css, QWidget *parent) : QLineEdit(parent)
+{
+	this->setStyleSheet(css);
+	this->logbox = logbox;
+}
+
+
+void Window::LineEdit::keyPressEvent(QKeyEvent *e)
+{
+	std::string str = "<span style=\"color:black;\">" + this->text().toStdString() + "</span>";
+	switch (e->key())
+	{
+		case Qt::Key_Return: 
+		case Qt::Key_Enter : Luau::doLog("text", str.c_str());
+							 Luau::doEvent("end", "", "", "", 0);
+							 this->clear(); 
+							 break;				
+		default: break;
+	}
+	QLineEdit::keyPressEvent(e);
+}
 
 
 
@@ -66,6 +103,45 @@ Window::Window(QWidget *parent, QString title, std::string tag, std::string type
 		this->frame->resize(480, 300);  
 		
 		
+		this->show();
+	}
+	else
+	if (tag == "LogChat")
+	{
+		
+		this->scrollArea = nullptr;
+		this->container = nullptr;
+		
+		this->frame = new CentralFrame(parent, this, type);
+		setCentralWidget(this->frame);
+		
+		
+		
+		
+		ToolBar *bar = new ToolBar("logbar", "Toolbar", nullptr);
+		this->addToolBar(Qt::TopToolBarArea, bar);
+		
+		
+		
+		QString fontStyle = "font: normal normal normal 15px/1.4 Arial; color: grey;";
+		
+		textbox = new PlainTextEdit(fontStyle, this);
+		this->frame->layout()->addWidget(textbox);
+		
+		 
+		fontStyle = "font: normal normal normal 15px/1.4 Arial; color: black;";  
+		edit = new LineEdit(textbox, fontStyle, this);
+		this->frame->layout()->addWidget(edit);
+		
+		edit->setFocus();
+		
+		
+		this->move(300, 750);   
+		this->resize(800, 250);   
+		this->frame->resize(800, 250);
+		this->frame->backgroundColor = "white";
+
+			 
 		this->show();
 	}
 	else
@@ -252,6 +328,15 @@ void Window::setWidgets(int height)
 		
 	
 	
+}
+
+
+void Window::deleteWidgets()
+{
+	for (Widgets::iterator it = widgets.begin(); it != widgets.end(); it++)
+		delete it->second;
+
+	widgets.clear();
 }
 
 
@@ -902,6 +987,26 @@ void Window::reset()
 
 
 
+// from cppreference, seed set in main.cpp 
 
+// NOTE: this uses a simplified generator and should be changed, see more here: 
+// https://en.cppreference.com/w/cpp/numeric/random/rand.html
 
+unsigned bounded_rand(unsigned range)
+{
+    for (unsigned x, r;;)
+        if (x = rand(), r = x % range, x - r <= -range)
+            return r;
+}
 
+void Window::rollDie()
+{
+	 
+	unsigned roll = 1 + bounded_rand(6);
+	
+	// print roll in log window
+	std::string text = "<span style=\"color:gray;\">dr: </span><span style=\"color:red;\">" + std::to_string(roll) + "</span>";
+	Luau::doLog("roll", text.c_str());
+	Luau::doEvent("end", "", "", "", 0);
+	
+}

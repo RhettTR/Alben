@@ -36,12 +36,15 @@ class Luau
 		static void setTurn(Turn turn);
 		static void doAction(const char *window, const char *id, const char *trait, const char *name);
 		static void doEvent(const char *eventName, const char *id, const char *trait, const char *key, int value);
+		static void doLog(const char *key, const char *text);
 		static bool doTest(const char *tag, const char *trait, const char *id);
 		static void doCreate(const char *fromId, const char *trait);
 		static void doDelete(const char *id);
+		static void reportText(const char *type, const char *text);
+		static void reportMove(int id, const char *name, const char *fromtag, const char *totag, int fromX, int fromY, int toX, int toY);
 		static bool beforeDrag(const char *id);
 		static bool afterDrag(const char *window, const char *id, int dx, int dy, int &x, int &y);
-		static void dropped(const char *name, const char *fromid, const char *toid, int x, int y);
+		static void dropped(const char *tag, const char *fromid, const char *toid, int x, int y);
 		static void moved(const char *name, const char *toid, int x, int y);
 		static void deleted(const char *id);
 		static void flipped(const char *id, const char *image);

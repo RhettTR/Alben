@@ -26,6 +26,22 @@ class Window : public QMainWindow
 		class CheckBox;
 		
 		
+		class PlainTextEdit : public QPlainTextEdit
+		{
+			public:
+				PlainTextEdit(QString css, QWidget *parent);
+		};
+		
+		class LineEdit : public QLineEdit
+		{
+			public:
+				LineEdit(QPlainTextEdit *logbox, QString css, QWidget *parent);
+				QPlainTextEdit *logbox;
+			protected:	
+				void keyPressEvent(QKeyEvent *e);
+		};
+		
+		
 		class Pane : public QLabel
 		{
 			public:
@@ -118,6 +134,8 @@ class Window : public QMainWindow
 		~Window();
 		
 		
+		
+		
 		typedef std::map<std::string, QWidget *> Widgets;
 		
 		Widgets widgets;	
@@ -132,6 +150,8 @@ class Window : public QMainWindow
 		
 		
 		static Window *getInstance(const char *instance);
+		static void rollDie();
+		void deleteWidgets();
 		void showWindow();
 		void setSingleRowed(int x, int y, int w, int h);
 		
@@ -148,7 +168,9 @@ class Window : public QMainWindow
 		
 		Pane* getParent();
 		
-		void visibility(bool value);	
+		void visibility(bool value);
+		
+		static std::string rootTag;	
 		
 		void root(int level);
 		void tabs(int level);
@@ -162,6 +184,12 @@ class Window : public QMainWindow
 		
 		QList<Pane*> paneList;
 		void reset();
+		
+		
+		// log / chat window
+		
+		static PlainTextEdit *textbox;
+		static LineEdit *edit;
 		
 		
 	protected:

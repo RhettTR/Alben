@@ -4,6 +4,18 @@
 repository_visibility(false)
 
 
+-- set log window toolbar icons
+
+local callback = "toggle_pin('logbar', 'pin')"
+add_toolbar_button('logbar', 'pin', '__unpin', '', '', callback)
+add_toolbar_separator('logbar')
+local callback = "roll_die()"
+add_toolbar_button('logbar', 'dieroll', '1d6-twister', '', 'dr', callback)
+
+toolbar_enable('logbar', 'dieroll')
+
+
+
 -- set default offset of stacks (6 = dx 2 = dy 2 = multiplier open stack 0 = unlimited shown)
 
 setDefaultOffset(6, 2, 2, 0)
@@ -24,21 +36,21 @@ set_zoom_range(130, 120, 110, 100, 90, 80, 70, 60, 100)
 
 
 
-create_window('Rf', 'Set-up / Reinforcements', 'Reinforcements', false, '')
+create_window('Reinforcements', 'Set-up / Reinforcements', 'Reinforcements', false, '')
 
 
 -- black squares
 
 local css = "border: 1px solid black;"
-add_window_label('Rf', 'IPool', 113, 290, 54, 54, '', css)
-add_window_label('Rf', 'IPile', 263, 290, 54, 54, '', css)
-add_window_label('Rf', 'MPool', 486, 290, 54, 54, '', css)
-add_window_label('Rf', 'MPile', 635, 290, 54, 54, '', css)
+add_window_label('Reinforcements', 'IPool', 113, 290, 54, 54, '', css)
+add_window_label('Reinforcements', 'IPile', 263, 290, 54, 54, '', css)
+add_window_label('Reinforcements', 'MPool', 486, 290, 54, 54, '', css)
+add_window_label('Reinforcements', 'MPile', 635, 290, 54, 54, '', css)
 
 
 -- zone
 
-local zone = Zone:new('Rf', 'rfzone')
+local zone = Zone:new('Reinforcements', 'rfzone')
 
 zone:setBorder({x0 = 28, y0 = 50, x1 = 849, y1 = 908})
 
@@ -107,18 +119,20 @@ create_window('Gy', 'Graveyard', 'Graveyard', false, '')
 create_window('Ch', 'Charts', '#777777', false, 'Layout')
 set_window('Ch', 70, 70, 870, 780)
 
-root(0, 'Ch')
+set_root_window('Ch')
 
-	tabs(1, 'Ch')
+root(0)
 
-		tab(2, 'CRT', 'Ch')	
-			image_item('CRT', 'Ch')
+	tabs(1)
+
+		tab(2, 'CRT')	
+			image_item('CRT')
 		
-		tab(2, 'Terrain Effects', 'Ch')				
-			image_item('Terrain Effects Chart', 'Ch')
+		tab(2, 'Terrain Effects')				
+			image_item('Terrain Effects Chart')
 			
-		tab(2, 'Terrain Key', 'Ch')				
-			image_item('terrain_key', 'Ch')
+		tab(2, 'Terrain Key')				
+			image_item('terrain_key')
 			
 			
 				
@@ -188,6 +202,9 @@ function nextturn()
 	
 	State:addMove('Turn', 'Globals', 'turn', Globals['Turn'].turn)
 	State:addMove('Turn', 'Globals', 'phase', Globals['Turn'].phase)
+
+	reporttext('move', '<span style="color:gray;">*** Turn: ' .. turn .. ' ' .. phases[phase] .. '</span>')
+	
 	State:addStage()
 	
 end
@@ -205,9 +222,9 @@ add_toolbar_separator('ct')
 
 
 
-local callback = "toggle_window('Rf')"
-add_toolbar_button('ct', 'rf', 'control_button', 'Set-up / Reinforcements', 'Show/Hide window', callback)
-toolbar_enable('ct', 'rf')
+local callback = "toggle_window('Reinforcements')"
+add_toolbar_button('ct', 'Rf', 'control_button', 'Set-up / Reinforcements', 'Show/Hide window', callback)
+toolbar_enable('ct', 'Rf')
 
 local callback = "toggle_window('Gy')"
 add_toolbar_button('ct', 'gy', 'button_headstone', 'Graveyard', 'Show/Hide window', callback)
@@ -243,9 +260,9 @@ specify_grid(0.4, 5, 255, 0, 0, 255 )
 show_grid(false)
 
 
-mainzone:addGrid(477, 43, 'German Air Interdiction', 0, 0, Offset:new(2, 2, 3, 0))
-mainzone:addGrid(634, 43, 'Soviet Interdiction')
-mainzone:addGrid(786, 43, 'Soviet Rail Cut', 0, 0, Offset:new(2, 2, 3, 0))
+mainzone:addGrid(leftPadding + 477, topPadding + 43, 'German Air Interdiction', 0, 0, Offset:new(2, 2, 3, 0))
+mainzone:addGrid(leftPadding + 634, topPadding + 43, 'Soviet Interdiction')
+mainzone:addGrid(leftPadding + 786, topPadding + 43, 'Soviet Rail Cut', 0, 0, Offset:new(2, 2, 3, 0))
 
 
 local p1 = mainzone:getGrid('German Air Interdiction')
@@ -290,9 +307,9 @@ mainzone:addMember('ru-mech-??')
 
 local css = ' border: 1px solid black;'
 
-add_window_label('main', 'German Air Interdiction', 450, 16, 54, 54, '', css)
-add_window_label('main', 'Soviet Air Interdiction', 607, 16, 54, 54, '', css)
-add_window_label('main', 'Soviet Rail Cut', 759, 16, 54, 54, '', css)
+add_window_label('main', 'German Air Interdiction', leftPadding + 450, topPadding + 16, 54, 54, '', css)
+add_window_label('main', 'Soviet Air Interdiction', leftPadding + 607, topPadding + 16, 54, 54, '', css)
+add_window_label('main', 'Soviet Rail Cut', leftPadding + 759, topPadding + 16, 54, 54, '', css)
 
 
 
@@ -329,9 +346,9 @@ load_setup('setup.vsav')
   --  after the setup is saved the following code must be removed --
 --------------------------------------------------------------------
 
+
+
 --[[
-
-
 
 
 local deck = Decks:get('ru-inf')
@@ -382,7 +399,7 @@ for i = 1, 78 do
 	local toId = next_id()
 	local zorder = top_zorder()
 	local dx, dy = get_size('ru-inf-??')
-	copyCounter('ru-inf-??', toId, zorder, 'Rf', point.x - dx, point.y - dy)
+	copyCounter('ru-inf-??', toId, zorder, 'Reinforcements', point.x - dx, point.y - dy)
 end
 
 point = zone:getGrid('Soviet Armor Pool')
@@ -391,7 +408,7 @@ for i = 1, 20 do
 	local toId = next_id()
 	local zorder = top_zorder()
 	local dx, dy = get_size('ru-mech-??')
-	copyCounter('ru-mech-??', toId, zorder, 'Rf', point.x - dx, point.y - dy)
+	copyCounter('ru-mech-??', toId, zorder, 'Reinforcements', point.x - dx, point.y - dy)
 end
 
 		

@@ -23,12 +23,15 @@ function State:addCreate (id, trait)
 	State.stageStack[State.stagePointer] = { id = id, trait = trait, table = Counter:load(Counter[id]) }
 end
 
+function State:addText (key, text)
+	State.stagePointer = State.stagePointer + 1
+	State.stageStack[State.stagePointer] = {id = '', trait = 'text', key = key, value = text}
+end
+
 function State:addStage ()
 	State.stagePointer = State.stagePointer + 1
 	State.stageStack[State.stagePointer] = {id = "end"}
-	if not_recording() then
-		toolbar_enable('main', '__undo')
-	end
+	toolbar_enable('main', '__undo')
 end
 
 
@@ -119,14 +122,18 @@ function State:reset()
 		
 		if type(key) == "string" and type(value) ~= 'function' and key ~= '__index' then
 			local deck = Decks[key]
-			deck.cards = Counter:duplicate(State.baseState[key])
+			if State.baseState[key] ~= nil then
+				deck.cards = Counter:duplicate(State.baseState[key])
+			end	
 		end
 	end
 	
 	for key, value in pairs(Globals) do
 	
 		if type(key) == "string" and type(value) ~= 'function' and key ~= '__index' then
-			Globals[key] = Counter:duplicate(State.baseState[key])
+			if State.baseState[key] ~= nil then
+				Globals[key] = Counter:duplicate(State.baseState[key])
+			end
 		end
 	end
 	
@@ -143,12 +150,18 @@ function State:executeUntil(stack, from, to)
 		local value
 		
 		
-		if (trait ~= 'Create') then
+		if trait ~= 'Create' then
 			key = stack[i].key
 			value = stack[i].value	
 		end
 		
 			
+		
+		if trait == 'text' then
+			if is_painting() then
+				log_print(value)
+			end	
+		end
 		
 		if trait == 'Counter' then	
 			Counter[id][key] = value
@@ -183,7 +196,7 @@ function State:executeUntil(stack, from, to)
 		if trait == 'Delete' then		
 			delete_class(id)
 		end
-
+		
 		
 	end	
 
@@ -193,16 +206,29 @@ end
 
 function State:undo()
 
-
 	
-	if #State.stageStack > 0 then
-		if not_recording() then		
-			toolbar_enable('main', '__redo')
+	local currentStage = State.stagePointer
+			
+	local i = State:findLastStage ()
+	
+	-- check whether a die roll is undone
+	for j = i + 1, currentStage do
+		if State.stageStack[j].key == 'roll' then
+			log_print('ERROR: Can not undo a dieroll')
+			State.stagePointer = currentStage
+			return
+		end 
+		if State.stageStack[j].key == 'reveal' then
+			log_print('ERROR: Can not undo a revealed unit')
+			State.stagePointer = currentStage
+			return
 		end
 	end
 	
-			
-	local i = State:findLastStage ()
+	
+	if #State.stageStack > 0 then	
+		toolbar_enable('main', '__redo')
+	end
 	
 	
 	
@@ -220,6 +246,15 @@ function State:undo()
 	toggle_painting()
 	
 	
+	
+	-- print log of redone move
+	for j = i + 1, currentStage do
+		if State.stageStack[j].trait == 'text' then
+			log_print("UNDO: " .. State.stageStack[j].value)
+		end 
+	end
+	
+	
 	Counter:generateGUI()
 	
 
@@ -235,11 +270,10 @@ end
 function State:redo()
 	
 	if #State.stageStack > 0 then
-		if not_recording() then	
-			toolbar_enable('main', '__undo')
-		end
+		toolbar_enable('main', '__undo')
 	end
 	
+	local currentStage = State.stagePointer + 1
 	
 	local i = State:findNextStage ()
 	
@@ -256,6 +290,15 @@ function State:redo()
 	
 	
 	toggle_painting()
+	
+	
+	
+	-- print log of redone move
+	for j = currentStage, i do
+		if State.stageStack[j].trait == 'text' then
+			log_print("REDO: " .. State.stageStack[j].value)
+		end 
+	end
 		
 		
 	Counter:generateGUI()

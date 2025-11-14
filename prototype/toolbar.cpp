@@ -13,7 +13,6 @@ extern Luau l;
 extern QWidget *container;
 extern IO *io;
 extern Scale *scaled;
-extern Window *getMain();
 
 
 
@@ -26,16 +25,19 @@ std::map<std::string, ToolBar *> ToolBar::instances;
 
 
 ToolBar::ButtonAction::ButtonAction(const char *id, std::string resourceName, QString buttonText, const QString toolTip, 
-									std::function<void(void)> f, std::string luaScript)
+									std::function<void(void)> f, std::string luaScript) 
 {
 	QPixmap pixmap;
 	(void)pixmap.convertFromImage(io->getImage(resourceName));
 	const QIcon icon = QIcon(pixmap);
-	
+
+
 	this->setIcon(icon);
-	this->setIconText(buttonText);
+	this->setIconText(buttonText);	
 	this->setToolTip(toolTip);
 	this->setEnabled(false);
+	
+	 
 	this->id = id;
 
 	
@@ -45,6 +47,31 @@ ToolBar::ButtonAction::ButtonAction(const char *id, std::string resourceName, QS
 		QObject::connect(this, &QAction::triggered, this, [=](){ Luau::callbackScript(luaScript); });
 	
 }
+
+
+
+ToolBar::ToolButton::ToolButton(const char *id, std::string resourceName, const QString toolTip, 
+								std::function<void(void)> f, std::string luaScript) 
+{
+	QPixmap pixmap;
+	(void)pixmap.convertFromImage(io->getImage(resourceName));
+	const QIcon icon = QIcon(pixmap);
+
+
+	this->setIcon(icon);
+	this->setToolTip(toolTip);
+	
+	 
+	this->id = id;
+
+	
+	if (luaScript.empty())		
+		QObject::connect(this, &QAbstractButton::clicked, this, [=]()->void{ f(); });	
+	else
+		QObject::connect(this, &QAbstractButton::clicked, this, [=](){ Luau::callbackScript(luaScript); });
+	
+}
+
 
 
 ToolBar::Label::Label(std::string str, const QString toolTip, int w, int h, const QString css)
@@ -254,16 +281,16 @@ ToolBar::MapSizeAction::MapSizeAction(QObject *parent) : QWidgetAction(parent) {
 
 
 
-ToolBar::ToolBar(std::string tag, const QString title, QScrollArea *scrollArea) : QToolBar(title, (QWidget *)getMain())
+ToolBar::ToolBar(std::string tag, const QString title, QScrollArea *scrollArea) : QToolBar(title, getInstance(tag.c_str()))
 {
 	this->scrollArea = scrollArea;
 	
 	if (tag != "main")
-	{
 		this->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
-		this->setIconSize(QSize(24, 24));
-	}	
-		
+	
+	this->setIconSize(QSize(24, 24));
+	this->toolbarPinned = false;	
+	this->tag = tag;	
 	instances[tag] = this;
 
 }
@@ -296,14 +323,50 @@ ToolBar *ToolBar::getInstance(const char *instance)
 
 
 
+void ToolBar::reset()
+{
+	
+	for ( auto obj = ToolBar::instances.begin(); obj != ToolBar::instances.end(); ++obj  )
+	{
+		if (obj->second->windowTitle() != "System toolbar")
+			((Window *)this->parent())->removeToolBar(obj->second);
+	}
+	
+}
+
+
 
 void ToolBar::addImageButton(const char *id, std::string resourceName, QString buttonText, const QString toolTip, std::function<void(void)> func, std::string luaScript)
 {
-	ButtonAction *action = new ButtonAction(id, resourceName, buttonText, toolTip, func, luaScript);
-	this->addAction(action);
+	if (this->tag == "main" || !buttonText.isEmpty())
+	{
+		ButtonAction *action = new ButtonAction(id, resourceName, buttonText, toolTip, func, luaScript);
+		this->addAction(action);
+	}
+	else
+	{
+		ToolButton *button = new ToolButton(id, resourceName, toolTip, func, luaScript);
+		this->addWidget(button);
+	}
 }
 
+
 void ToolBar::setImageButton(std::string id, std::string resourceName, QString buttonText)
+{
+	foreach (QObject *child, this->children())
+		if (child->inherits("QToolButton"))
+			if (((ToolButton *)child)->id == id)
+			{
+				QImage image = io->getImage(resourceName);
+				QSize size = QSize(this->width(), this->height());	
+				QIcon icon(QPixmap::fromImage(image).scaled(size, Qt::KeepAspectRatio));
+				((ToolButton *)child)->setIcon(icon);
+				return;
+			}		
+}
+		
+		
+void ToolBar::setLabelImage(std::string id, std::string resourceName, QString buttonText)
 {
 
 	foreach (QObject *child, this->children()) 
@@ -319,6 +382,7 @@ void ToolBar::setImageButton(std::string id, std::string resourceName, QString b
 				label->setText(buttonText);
 			}
 		}
+		
 		
 }
 

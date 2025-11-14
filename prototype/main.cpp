@@ -30,6 +30,7 @@ Scale *scaled;
 class MainWindow;
 MainWindow *window;
 Window *repositoryWindow;
+Window *logWindow;
 
 
 
@@ -41,28 +42,7 @@ QAction *endLogAction;
 
 
 
-
-Window *getMain()
-{
-	return (Window *)window;
-}
-
-
-void reload ()
-{
-	printf("loading ...\n");
-	
-	l.closeVM();
-	
-	Counter::deleteAll();
-	
-	repositoryWindow->reset();
-	
-	
-	l.startVM();
-			
-	printf("done\n");
-}
+void reload ();
 
 
 void refresh()
@@ -167,6 +147,12 @@ void abortLog()
 	Luau::logAbort();
 }
 
+void windows()
+{
+	logWindow->show();
+	logWindow->activateWindow();
+}
+
 
 
 
@@ -204,6 +190,24 @@ class MainWindow : public Window
 };
 
 
+void reload ()
+{
+	printf("loading ...\n");
+	
+	l.closeVM();
+	
+	Counter::deleteAll();
+	
+	repositoryWindow->reset();
+	mainToolBar->reset();
+	io->reset();
+	window->deleteWidgets();
+	
+	
+	l.startVM();
+			
+	printf("done\n");
+}
 
 
 
@@ -216,6 +220,8 @@ int main(int argc, char *argv[])
     
     qRegisterMetaType<ActionData>("ActionData");
     
+    std::srand(std::time({})); // seed for random generator
+    
 
     window = new MainWindow();
 	
@@ -225,6 +231,8 @@ int main(int argc, char *argv[])
     menuBar->setStyleSheet("QMenuBar {background-color: gainsboro}");
     menuBar->setFixedHeight(22);
  
+    
+    // File
     
     QMenu *fileMenu = menuBar->addMenu("&File");
          
@@ -275,11 +283,34 @@ int main(int argc, char *argv[])
     fileMenu->addAction(reloadAction);
     
     
+    // Edit
+    
     QMenu *editMenu = menuBar->addMenu("&Edit");
     QAction *settingsAction = new QAction("Setti&ngs");
     QObject::connect(settingsAction, &QAction::triggered, &settings);
     editMenu->addAction(settingsAction);
     
+    // Windows
+    
+    QMenu *windowsMenu = menuBar->addMenu("&Windows");
+    QAction *chatAction = new QAction("Show &LogChat window");
+    QObject::connect(chatAction, &QAction::triggered, []()
+					 { 
+						logWindow->show();
+						logWindow->activateWindow();
+					 });
+    windowsMenu->addAction(chatAction);
+    
+    QAction *repositoryAction = new QAction("Show &Repository window");
+    QObject::connect(repositoryAction, &QAction::triggered, []()
+					 { 
+						repositoryWindow->show();
+						repositoryWindow->activateWindow();
+					 });
+    windowsMenu->addAction(repositoryAction);
+    
+    
+    // Help
     
     QMenu *helpMenu = menuBar->addMenu("&Help");
    
@@ -287,7 +318,7 @@ int main(int argc, char *argv[])
     
     
     window->move(250, 150);
-	window->resize(980, 500 + menuBar->height());
+	window->resize(1030, 500 + menuBar->height());
 	
 	
 	
@@ -313,9 +344,9 @@ int main(int argc, char *argv[])
 	// tool bar
 	
 	mainToolBar = new ToolBar("main", "System toolbar", window->scrollArea);
-	window->addToolBar(Qt::TopToolBarArea, mainToolBar);
 	mainToolBar->setIconSize(QSize(32, 24));
-
+	window->addToolBar(Qt::TopToolBarArea, mainToolBar);
+	
 	
 	mainToolBar->addImageButton("__undo", "__undo", "", "Undo last move", &undo);
 	mainToolBar->addImageButton("__redo", "__redo", "", "Redo next move", &redo);
@@ -351,7 +382,12 @@ int main(int argc, char *argv[])
    
 	// create repository window
 	
-    repositoryWindow = new Window(window, "Counters", "Repository", "Layout");   
+    repositoryWindow = new Window(window, "Counters", "Repository", "Layout");
+    
+    
+    // create log / chat window
+	
+    logWindow = new Window(window, "Log / Chat", "LogChat", "Layout");
     
     
     
