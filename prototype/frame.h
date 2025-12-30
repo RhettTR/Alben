@@ -61,7 +61,7 @@ class CentralFrame : public QFrame
 		void closeAllOpenStacks();
 		void selectCounter(Counter *counter);
 		void setBackground(std::string background);
-		
+		void setGrid(Counter::Table *grid);
 		
 		
 		static bool openStackoffset;
@@ -76,7 +76,7 @@ class CentralFrame : public QFrame
 		static QScrollArea *buttonParent;
 		static void createButton(const char *id, const char *text, const char *handler, int x, int y, int w, int h);
 		static void deleteButton(const char *id);
-		static void setGrid(Counter::Table *grid);
+		
 		
 		
 		
@@ -164,7 +164,7 @@ class CentralFrame : public QFrame
 		void selectStack(Counter *counter);			
 		void unselect();
 		QImage selectedGhostImage(Counter *counter, QRect &totalRect);
-		static GridCoordiantes gridCoordinates;
+		GridCoordiantes gridCoordinates;
 		static Moved countersDeleted;
 		
 		

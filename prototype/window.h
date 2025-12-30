@@ -32,6 +32,13 @@ class Window : public QMainWindow
 				PlainTextEdit(QString css, QWidget *parent);
 		};
 		
+		class TextEdit : public QTextEdit
+		{
+			public:
+				TextEdit(QWidget *parent = nullptr);
+				QSize sizeHint() const override;	
+		};
+		
 		class LineEdit : public QLineEdit
 		{
 			public:
@@ -151,6 +158,7 @@ class Window : public QMainWindow
 		
 		static Window *getInstance(const char *instance);
 		static void rollDie();
+		static QString textInput(QString title, QString start);
 		void deleteWidgets();
 		void showWindow();
 		void setSingleRowed(int x, int y, int w, int h);
@@ -180,6 +188,7 @@ class Window : public QMainWindow
 		void comboBox(int level);
 		void comboItem(int level, std::string text);
 		void imageItem(std::string imageID);
+		void htmlItem(std::string filename);
 		
 		
 		QList<Pane*> paneList;

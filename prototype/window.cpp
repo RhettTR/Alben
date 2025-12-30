@@ -21,12 +21,24 @@ std::map<std::string, Window *> Window::instances;
 
 
 
+
 Window::PlainTextEdit::PlainTextEdit(QString css, QWidget *parent) : QPlainTextEdit(parent)
 {
 	this->setReadOnly(true);
 	this->setStyleSheet(css);
 }
 
+Window::TextEdit::TextEdit(QWidget *parent) : QTextEdit(parent)
+{
+	this->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Minimum);
+	this->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    this->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+}
+
+QSize Window::TextEdit::sizeHint() const
+{ 
+	return(((Pane *)this->parent())->size());
+}
 
 Window::LineEdit::LineEdit(QPlainTextEdit *logbox, QString css, QWidget *parent) : QLineEdit(parent)
 {
@@ -99,11 +111,11 @@ Window::Window(QWidget *parent, QString title, std::string tag, std::string type
 		setAutoFillBackground(true);
 		
 		this->move(70, 100);   
-		this->resize(480, 300);   
-		this->frame->resize(480, 300);  
+		this->resize(450, 300);   
+		this->frame->resize(450, 300);  
 		
 		
-		this->show();
+		//this->show();
 	}
 	else
 	if (tag == "LogChat")
@@ -142,7 +154,7 @@ Window::Window(QWidget *parent, QString title, std::string tag, std::string type
 		this->frame->backgroundColor = "white";
 
 			 
-		this->show();
+		//this->show();
 	}
 	else
 	{
@@ -349,7 +361,10 @@ void Window::resizeEvent(QResizeEvent* event)
 		setWidgets(event->size().height());
 		
 	
-	if (this->tag == "Repository")
+		
+	
+	//if (this->tag == "Repository")
+	if (this->frame->layout() != nullptr)
 	{	
 		QLayoutItem *item = this->frame->layout()->itemAt(0);
 		
@@ -790,8 +805,8 @@ void Window::listBox(int level)
 	splitter->addWidget(listWidget);
 
 	QList<int> sizes;
-    sizes.append(0.8 * splitter->sizeHint().width());
-    sizes.append(0.2 * splitter->sizeHint().width());
+    sizes.append(0.75 * splitter->sizeHint().width());
+    sizes.append(0.25 * splitter->sizeHint().width());
     splitter->setSizes(sizes);
     
     
@@ -964,7 +979,38 @@ void Window::imageItem(std::string imageID)
 
 	pane->layout()->addWidget(widget);
 	
+}
+
+
+void Window::htmlItem(std::string filename)
+{
+
+	Pane *pane = this->getParent();
+	
+	
+	TextEdit *text = new TextEdit();
+	
+	text->setReadOnly(true);
+	
+	pane->resize(this->size());
+	text->resize(pane->size());
+	
+		
+	QString source = io->loadHtml(filename);
+	
+	text->show();
+	text->resize(pane->size());
+	
+	
+	
+	text->setHtml(source);
+
+
+	pane->layout()->addWidget(text);
+	
 }	
+
+	
 	
 
 void Window::reset()
@@ -983,6 +1029,23 @@ void Window::reset()
 	paneList.squeeze();
 
     
+}
+
+
+QString Window::textInput(QString title, QString start)
+{
+	
+	bool ok{};
+	Window *parent = Window::getInstance("main");
+	
+    QString text = QInputDialog::getText(parent, title,
+                                         "Text value:", QLineEdit::Normal,
+                                         start, &ok);
+    if (ok)
+        return text;
+	
+	return start;
+	
 }
 
 

@@ -194,7 +194,7 @@ void Settings::activated(QComboBox *rotation)
 	scaled->resourceScaleRotate("main", Window::getInstance("main")->frame->backgroundID);
 	
 	
-	Counter::setGUI();
+	Counter::setGUI("main");
 	
 
 	Window::getInstance("main")->frame->repaint();
@@ -210,7 +210,7 @@ void Settings::facingOption(bool checked)
 	
 	CentralFrame::facingMatters = checked;
 		
-	Counter::setGUI();
+	Counter::setGUI("main");
 	Window::getInstance("main")->frame->repaint();
 		
 }
@@ -230,7 +230,7 @@ void Settings::colorSelection(QLabel *box)
 		QPixmap pixmap(box->size());
 		pixmap.fill(QColor::fromString(Counter::selectionColor));
 		box->setPixmap(pixmap);
-		Counter::setGUI();
+		Counter::setGUI("main");
 	});
 	
 }

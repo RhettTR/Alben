@@ -48,8 +48,8 @@ end
 
 
 
-create_mask('MovedMarker', '__moved', 'left', 'hcenter')
-
+--create_mask('MovedMarker', '__moved', 'left', 'hcenter')
+create_mask('MovedMarker', '__moved', 'vleft', 'htop')
 
 
 
@@ -62,30 +62,62 @@ function Overlays:new ()
 	return o
 end
 
+function Overlays:add (id, value)
+	self[id] = value
+end
 
-function Overlays:add (value)
-	value["apply"] = value.test(value)
-	table.insert(self, value)
+
+function Overlays:show (trait, id, name)
+	local o = {}
+	o.id = id
+	o.menuname = name
+	o.menuclick = 'actionToggleO'
+	o.menutrait = trait
+	o.menushow = function(window, id) return window == 'main' end
+	return o
+end
+
+
+function Overlays:set(trait, id, name)
+	local o = {}
+	o.id = id
+	o.menuname = name
+	o.menuclick = 'actionInput'
+	o.menutrait = trait
+	o.menushow = function(window, id) return window == 'main' end
+	return o
+end
+
+
+function Overlays:inc(trait, id, increment, name)
+	local o = {}
+	o.id = id
+	o.inc = increment
+	o.menuname = name
+	o.menuclick = 'actionInc'
+	o.menutrait = trait
+	o.menushow = function(window, id) return window == 'main' end
+	return o
 end
 
 
 
 Mask = {}
 
-function Mask:new (mask, x, y, func)
+function Mask:new (mask, x, y)
 	local o = {}
 	setmetatable(o, self)
 	self.__index = self
 	o.mask = mask
 	o.x = x
 	o.y = y	
-	o.test = func
+	o.apply = false
 	return o
 end
 
 Label = {}
 
-function Label:new (text, font, size, color, x, y, func)
+function Label:new (text, font, size, color, x, y)
 	local o = {}
 	setmetatable(o, self)
 	self.__index = self
@@ -95,14 +127,10 @@ function Label:new (text, font, size, color, x, y, func)
 	o.color = color
 	o.x = x
 	o.y = y
-	o.test = func
+	o.apply = true
 	return o
 end
 
-function Label:setText (value)
-	self.text = value
-	self.apply = self.test(self)
-end
 
 
 
@@ -134,7 +162,9 @@ function Clone:new ()
 	setmetatable(o, self)
 	self.__index = self	
 	o.menuname = "Clone"
+	o.menutrait = "Clone"
 	o.menuclick = "actionClone"
+	o.menushow = function(window, id) return window == 'main' end
 	return o
 end
 
@@ -279,8 +309,8 @@ function Marker:new(name, dx, dy, side)
 	o.marker = name
 	o.renderOffset = {dx = dx, dy = dy}
 	o.Side = side
-	o.Delete = Delete
-	o.OnlyOneInStack = OnlyOneInStack
+	--o.Delete = Delete
+	--o.OnlyOneInStack = OnlyOneInStack
 	o.CantBeMoved = CantBeMoved
 	return o
 end
@@ -288,13 +318,14 @@ end
 
 Move = {}
 
-function Move:new(name, point)
+function Move:new(window, trait, name, point)
 	local o = {}
 	o.x = point.x
 	o.y = point.y
+	o.window = window
 	o.menuname = name
 	o.menuclick = "actionMove"
-	o.menutrait = "Move"
+	o.menutrait = trait
 	o.menushow = function(window, id) return window == 'main' end
 	return o
 end
@@ -325,12 +356,13 @@ end
 
 Offset = {}
 	
-function Offset:new(cx, cy, of, sh)
+function Offset:new(cx, cy, xm, ym, sh)
 	local o = {}
 	o.xoffsetClosed = cx	-- the offset for each counter in a stack
 	o.yoffsetClosed = cy	
-	o.openFactor = of		-- the offset multiplier when stack opened
-	o.shown = sh			-- number of counters with offset in a stack
+	o.xopenFactor = xm		-- the offset multiplier when stack opened
+	o.yopenFactor = ym
+	o.shown = sh			-- number of counters with offset in a stack, 0=unlimited
 	return o
 end
 
@@ -413,7 +445,68 @@ end
 
 
 
---- define counter and card playing pieces
+--- define menu table
+
+Broom = {}
+
+function Broom:new()
+	local o = {}
+	o.options = {
+		supply = {menuname = "Remove All Out-Of-Supply Markers", menutrait = 'supply', menuclick = "actionToggleA"},
+		freeRail = {menuname = "Remove All Free Rail Markers", menutrait = 'freeRail', menuclick = "actionToggleA"},
+		rail = {menuname = "Remove All Rail Movement Markers", menutrait = 'rail', menuclick = "actionToggleR"},	
+		autoVictory = {menuname = "Remove Automatic Victory Markers", menutrait = 'autoVictory', menuclick = "actionToggleA"},
+		removeAll = {menuname = "Remove All Markers", menutrait = 'removeAll', menuclick = "actionToggleX"}	
+	}
+	return o
+end
+
+Globals:add('Broom', Broom:new())
+
+
+
+
+--- define counter and card traits
+
+
+Stukas = {}
+
+function Stukas:new()
+	local o = {}
+	setmetatable(o, self)
+	self.__index = self
+	o.airfield = Move:new('Airfield', 'airfield', 'To Airfield', {x = 250 + math.random(-200, 200), y = 157 + math.random(-75, 75)})
+	return o
+end
+
+
+Markers = {}
+
+function Markers:new ()
+	local o = {}
+	setmetatable(self, self)
+	self.__index = self
+	o.Delete = Delete
+	o.Clone = Clone:new()	
+	return o
+end
+
+
+
+Odds = {}
+
+function Odds:new()
+	local o = Markers:new()
+	setmetatable(o, self)
+	self.__index = self
+	o.Overlays = Overlays:new()
+	o.Overlays:add('number', Label:new('1', 'sans', 24, 'black', 'vcenter', 'hcenter'))
+	o.Overlays:add('odds', Label:new('1:1', 'arial', 12, 'black', 'vcenter', 47))
+	o.Label = o.Overlays:set('Label', 'odds', 'Set Odds')
+	o.Increase = o.Overlays:inc('Increase', 'number', 1, 'Increase')
+	o.Decrease = o.Overlays:inc('Decrease', 'number', -1, 'Decrease')
+	return o
+end
 
 
 Piece = {}
@@ -422,94 +515,45 @@ function Piece:new ()
 	local o = {}
 	setmetatable(self, self)
 	self.__index = self
-	o.StepLoss = StepLoss:new()
 	o.MarkMoved = MarkMoved:new()
-	o.SubMenu = SubMenu:new('Retreat')
+	o.Overlays = Overlays:new()
+	o.Overlays:add('train_marker_black_50', Mask:new('train_marker_black_50', 4, 4))
+	o.Overlays:add('train_marker_blue_50', Mask:new('train_marker_blue_50', 4, 4))
+	o.Overlays:add('av_force_layer', Mask:new('av_force_layer', 0, 0))	
+	o.Overlays:add('supply', Mask:new('supply', 0, 0))
+	o.Overlays:add('top', Label:new('', 'arial', 12, 'black', 'vcenter', 0))
+	o.freeRail = o.Overlays:show('freeRail', 'train_marker_black_50', 'Free Rail Movement')
+	o.rail = o.Overlays:show('rail', 'train_marker_blue_50', 'Rail Movement (6/3)')
+	o.autoVictory = o.Overlays:show('autoVictory', 'av_force_layer', 'Automatic Victory')
+	o.supply = o.Overlays:show('supply', 'supply', 'Out Of Supply')
+	o.label = o.Overlays:set('label', 'top', 'Change Label')
+	o.prisoners = Move:new('POW', 'prisoners', 'Prisoners Of War', {x = 100 + math.random(-35, 35), y = 100 + math.random(-35, 35)})
+	o.replace = Move:new('Repl', 'replace', 'To Replacement Pool', {x = 150, y = 150})
+
 	return o
 end
 
 
-German = {}
+Axis = {}
 
-function German:new()
+function Axis:new ()
 	local o = Piece:new()
 	setmetatable(o, self)
 	self.__index = self
-	o.Side = "German"
-	o.Disrupted = PlaceMarker:new('Disrupted', 'Disrupted', 'German Disruption')
-	o.Control = PlaceMarker:new('Place German Control Marker', 'Control', 'German Control')
-	return o   	
+	o.rail = o.Overlays:show('rail', 'train_marker_blue_50', 'Rail Movement (6/3)')
+	return o
 end
 
-GermanArm = {}
-
-function GermanArm:new()
-	local o = German:new()
-	setmetatable(o, self)
-	self.__index = self
-	o.Take3 = Take:new(3)
-	return o   	
-end
- 
-GermanMot = {}
-
-function GermanMot:new()
-	local o = German:new()
-	setmetatable(o, self)
-	self.__index = self
-	o.Take2 = Take:new(2)
-	return o   	
-end 
 
 Soviet = {}
 
-function Soviet:new()
+function Soviet:new ()
 	local o = Piece:new()
 	setmetatable(o, self)
 	self.__index = self
-	o.Side = "Soviet"
-	o.Disrupted = PlaceMarker:new('Disrupted', 'Disrupted', 'Soviet Disruption')
-	return o   	
-end 
-
-
-SovietHQ = {}
-
-function SovietHQ:new()
-	local o = Soviet:new()
-	setmetatable(o, self)
-	self.__index = self
-	o.Type = "HQ"
-	o.StepLoss.menuname = "Graveyard"
-	
-	return o   	
+	o.rail = o.Overlays:show('rail', 'train_marker_blue_50', 'Rail Movement (5)')
+	return o
 end
-
-
-SovietInf = {}
-
-function SovietInf:new()
-	local o = Soviet:new()
-	setmetatable(o, self)
-	self.__index = self
-	o.Type = "Inf"
-	return o   	
-end 
-
-
-SovietArm = {}
-
-function SovietArm:new()
-	local o = Soviet:new()
-	setmetatable(o, self)
-	self.__index = self
-	o.Type = "Arm"
-	return o   	
-end  
-
-
-
-
 
 
 

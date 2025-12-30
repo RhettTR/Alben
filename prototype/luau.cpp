@@ -209,12 +209,47 @@ extern "C" {
 		int right  = lua_tonumber(L, -2);
 		int top    = lua_tonumber(L, -3);
 		int left   = lua_tonumber(L, -4);
-		string resourceId = string(lua_tostring(L, -5));
+		QString color(lua_tostring(L, -5));
+		string resourceId = string(lua_tostring(L, -6));
 				
-		lua_pop(L, 5);
+		lua_pop(L, 6);
 		
 		
-		IO::addPadding(resourceId, left, top, right, bottom);
+		IO::addPadding(resourceId, QColor::fromString(color), left, top, right, bottom);
+		
+		return 0; 
+	}
+	
+	
+	static int set_mask(lua_State *L)
+	{		
+		
+		int height = lua_tonumber(L, -1);
+		int width  = lua_tonumber(L, -2);
+		int top    = lua_tonumber(L, -3);
+		int left   = lua_tonumber(L, -4);
+		QString color(lua_tostring(L, -5));
+		string resourceId = string(lua_tostring(L, -6));
+				
+		lua_pop(L, 6);
+		
+		
+		IO::addMask(resourceId, QColor::fromString(color), left, top, width, height);
+		
+		return 0; 
+	}
+	
+	
+	static int set_image(lua_State *L)
+	{		
+		
+		string toImage = string(lua_tostring(L, -1));
+		string fromImage = string(lua_tostring(L, -2));
+				
+		lua_pop(L, 2);
+		
+		
+		IO::changeImage(fromImage, toImage);
 		
 		return 0; 
 	}	
@@ -280,6 +315,8 @@ extern "C" {
 				
 				found->state.x = (int)std::get<double>((state)["x"]);	 	
 				found->state.y = (int)std::get<double>((state)["y"]);
+				found->state.cx = (int)std::get<double>((state)["cx"]);	 	
+				found->state.cy = (int)std::get<double>((state)["cy"]);
 				found->state.tag = std::get<std::string>((state)["window"]);
 				
 				Counter::Table images = std::get<Counter::Table>(std::get<Counter::Table>((state)["Image"])["images"]);
@@ -303,7 +340,7 @@ extern "C" {
 					found->state.degrees = 0;
 					
 				if ((state).find("Overlays") != (state).end())		
-				{	
+				{
 					Counter::Table *overlays = new Counter::Table();	
 					(*overlays) = std::get<Counter::Table>((state)["Overlays"]);	
 					found->state.overlays = overlays;
@@ -322,6 +359,7 @@ extern "C" {
 				
 				//found->parentWindow->frame->repaint();
 				found->parentWindow->frame->update();
+				
 				
 			}			
 		}
@@ -422,12 +460,15 @@ extern "C" {
 	static int setGUI(lua_State *L)
 	{		
 		
-		Counter::setGUI();
+		const char *tag = lua_tostring(L, -1);	
+		lua_pop(L, 1);
+		
+		Counter::setGUI(tag);
 		
 		return 0;
 	}
 	
-	static int set_root_window(lua_State *L)
+	static int set_root(lua_State *L)
 	{	
 		
 		const char *tag = lua_tostring(L, -1);	
@@ -535,6 +576,28 @@ extern "C" {
 		Window *window = Window::getInstance(Window::rootTag.c_str());
 	
 		window->imageItem(string(image));
+		
+		return 0;
+	}
+	
+	static int html_item(lua_State *L)
+	{		
+		const char *file = lua_tostring(L, -1);	
+		lua_pop(L, 1);
+		
+		Window *window = Window::getInstance(Window::rootTag.c_str());
+	
+		window->htmlItem(string(file));
+		
+		return 0;
+	}
+	
+	static int set_row_length(lua_State *L)
+	{		
+		int length = lua_tonumber(L, -1);		
+		lua_pop(L, 1);
+		
+		Overlay::FlowLayout::maxColumns = length;
 		
 		return 0;
 	}
@@ -761,6 +824,19 @@ extern "C" {
 		return 0;
 	}
 	
+	static int show_menu(lua_State *L)
+	{		
+		const char *menuid = lua_tostring(L, -1); 
+		const char *tag = lua_tostring(L, -2); 	
+		lua_pop(L, 2);	
+		
+		ToolBar *toolbar = ToolBar::getInstance(tag);
+		
+		toolbar->showMenu(menuid);
+		
+		return 0;
+	}
+	
 	static int toolbar_disable(lua_State *L)
 	{		
 		const char *id = lua_tostring(L, -1);
@@ -792,8 +868,8 @@ extern "C" {
 		if (anyScroll)
 		{
 			window->scrollArea = new QScrollArea;
-			window->scrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
-			window->scrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+			window->scrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+			window->scrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
 			window->scrollArea->setWidget(window->frame);
 			
 			window->setCentralWidget(window->scrollArea);
@@ -934,6 +1010,18 @@ extern "C" {
 		return 1;
 	}
 	
+	static int get_text_input(lua_State *L)
+	{	
+		QString start(lua_tostring(L, -1));
+		QString title(lua_tostring(L, -2));
+		lua_pop(L, 2);
+		
+		QString text = Window::textInput(title, start);
+		lua_pushstring(L, text.toStdString().c_str());	
+				
+		return 1;
+	}	
+	
 	static int hoover_ShowMap(lua_State *L)
 	{	
 		
@@ -1046,13 +1134,17 @@ extern "C" {
 	
 	static int set_grid(lua_State *L)
 	{	
+		const char *tag = lua_tostring(L, -1); 
+		lua_pop(L, 1);	
+		Window *window = Window::getInstance(tag);
+		
 		(void)lua_gettable(L, -2);
 		
 		if (lua_istable(L, -1))
 		{			
 			Counter::Table grid = getTable();
 			
-			CentralFrame::setGrid(&grid);
+			window->frame->setGrid(&grid);
 		}	
 		
 		lua_pop(L, 2);
@@ -1276,7 +1368,7 @@ Luau::PopupEntries entries;
 	
 void getEntries()
 {
-	
+
 	lua_pushnil(L);
 	
 	Luau::Popupentry e = {"", "", "", "", "", false};
@@ -1284,7 +1376,7 @@ void getEntries()
 	while(lua_next(L, -2) != 0) 
 	{
 		
-		
+			
 		// skip number keys
 		if (lua_isnumber(L, -2))
 		{
@@ -1299,7 +1391,7 @@ void getEntries()
 			if (lua_isstring(L, -2))
 			{
 				std::string s(lua_tostring(L, -2));
-				
+			
 				if (s == "menuname" || s == "menutrait" || s == "menuclick" || s == "menuid")
 				{		
 					
@@ -1360,16 +1452,18 @@ void getEntries()
     
 Luau::PopupEntries Luau::getTraits(const char *tag, const char *id)
 {
-	
+
 	lua_getglobal(L, "getTraits");
 	lua_pushstring(L, tag);
 	lua_pushstring(L, id);
 	lua_pcall(L, 2, 1, 0);
 	
-	
+
 	entries.clear();
 	
 	getEntries();
+
+
 	
 	lua_pop(L, 1);
 	
@@ -1618,7 +1712,7 @@ bool Luau::beforeDrag(const char *id)
 }
 
 
-bool Luau::afterDrag(const char *window, const char *id, int dx, int dy, int &x, int &y)
+bool Luau::afterDrag(const char *window, const char *id, int dx, int dy, int &x, int &y, int &cx, int &cy)
 {	
 	lua_getglobal(L, "afterDrag");
 	lua_pushstring(L, window);
@@ -1627,27 +1721,28 @@ bool Luau::afterDrag(const char *window, const char *id, int dx, int dy, int &x,
 	lua_pushnumber(L, dy);
 	lua_pushnumber(L, x);
 	lua_pushnumber(L, y);
-	lua_pcall(L, 6, 3, 0);	
+	lua_pcall(L, 6, 5, 0);	
 
-	y = (int)lua_tonumber (L, -1);
-	x = (int)lua_tonumber (L, -2);
-	bool flag = lua_toboolean (L, -3);
+	cy = (int)lua_tonumber (L, -1);
+	cx = (int)lua_tonumber (L, -2);
+	y = (int)lua_tonumber (L, -3);
+	x = (int)lua_tonumber (L, -4);
+	bool flag = lua_toboolean (L, -5);
 
-	lua_pop(L, 3);
+	lua_pop(L, 5);
 	
 	return flag;
 	
 }
 
-void Luau::dropped(const char *tag, const char *fromid, const char *toid, int x, int y)
+void Luau::dropped(const char *tag, const char *id, int x, int y)
 {
 	lua_getglobal(L, "dropped");
 	lua_pushstring(L, tag);
-	lua_pushstring(L, fromid);
-	lua_pushstring(L, toid);
+	lua_pushstring(L, id);
 	lua_pushnumber(L, x);
 	lua_pushnumber(L, y);
-	lua_pcall(L, 5, 0, 0);	
+	lua_pcall(L, 4, 0, 0);	
 }
 
 
@@ -1732,7 +1827,7 @@ bool Luau::menucounter(int id)
 }
 
 
-void Luau::pointoffset(const char *tag, int x, int y, int dx, int dy, float &xoff, float &yoff, int &open, int &shown)
+void Luau::pointoffset(const char *tag, int x, int y, int dx, int dy, float &xoff, float &yoff, int &xopen, int &yopen, int &shown)
 {
 	lua_getglobal(L, "pointoffset");
 	lua_pushstring(L, tag);
@@ -1740,14 +1835,15 @@ void Luau::pointoffset(const char *tag, int x, int y, int dx, int dy, float &xof
 	lua_pushnumber(L, dx);
 	lua_pushnumber(L, y);
 	lua_pushnumber(L, dy);
-	lua_pcall(L, 5, 4, 0);
+	lua_pcall(L, 5, 5, 0);
 	
 	shown = (int)lua_tonumber (L, -1);
-	open = (int)lua_tonumber (L, -2);
-	xoff = (int)lua_tonumber (L, -3);
-	yoff = (int)lua_tonumber (L, -4);	
+	yopen = (int)lua_tonumber (L, -2);
+	xopen = (int)lua_tonumber (L, -3);
+	yoff = (int)lua_tonumber (L, -4);
+	xoff = (int)lua_tonumber (L, -5);	
 	
-	lua_pop(L, 4);
+	lua_pop(L, 5);
 }
 
 
@@ -1779,7 +1875,7 @@ void Luau::redo()
 
 
 
-void Luau::copyCounter(const char *fromId, const char *toId, int zorder, const char *window, int x, int y)
+void Luau::copyCounter(const char *fromId, const char *toId, int zorder, const char *window, int x, int y, int cx, int cy)
 {
 	
 	lua_getglobal(L, "copyCounter");
@@ -1789,6 +1885,23 @@ void Luau::copyCounter(const char *fromId, const char *toId, int zorder, const c
 	lua_pushstring(L, window);
 	lua_pushnumber(L, x);
 	lua_pushnumber(L, y);
+	lua_pushnumber(L, cx);
+	lua_pushnumber(L, cy);
+	lua_pcall(L, 8, 0, 0);
+	
+}
+
+
+void Luau::moveCounter(const char *window, const char *id, int x, int y, int cx, int cy)
+{
+	
+	lua_getglobal(L, "moveCounter");
+	lua_pushstring(L, window);
+	lua_pushstring(L, id);
+	lua_pushnumber(L, x);
+	lua_pushnumber(L, y);
+	lua_pushnumber(L, cx);
+	lua_pushnumber(L, cy);
 	lua_pcall(L, 6, 0, 0);
 	
 }
@@ -1891,14 +2004,16 @@ void Luau::setResourceKey(const char *id)
 }
 
 
-void Luau::updatePos(const char *window, const char *id, int x, int y)
+void Luau::updatePos(const char *window, const char *id, int x, int y, int cx, int cy)
 {
 	lua_getglobal(L, "updatePos");
 	lua_pushstring(L, window);
 	lua_pushstring(L, id);
 	lua_pushnumber(L, x);
 	lua_pushnumber(L, y);
-	lua_pcall(L, 4, 0, 0);
+	lua_pushnumber(L, cx);
+	lua_pushnumber(L, cy);
+	lua_pcall(L, 6, 0, 0);
 }
 
 
@@ -2013,6 +2128,12 @@ void Luau::startVM()
 	lua_pushcfunction(L, set_padding, "set_padding");
 	lua_setglobal(L, "set_padding");
 	
+	lua_pushcfunction(L, set_mask, "set_mask");
+	lua_setglobal(L, "set_mask");
+	
+	lua_pushcfunction(L, set_image, "set_image");
+	lua_setglobal(L, "set_image");
+	
 	lua_pushcfunction(L, create_class, "create_class");
 	lua_setglobal(L, "create_class");
 	
@@ -2042,8 +2163,8 @@ void Luau::startVM()
 	
 	// repository
 	
-	lua_pushcfunction(L, set_root_window, "set_root_window");
-	lua_setglobal(L, "set_root_window");
+	lua_pushcfunction(L, set_root, "set_root");
+	lua_setglobal(L, "set_root");
 	
 	lua_pushcfunction(L, root, "root");
 	lua_setglobal(L, "root");
@@ -2068,6 +2189,15 @@ void Luau::startVM()
 	
 	lua_pushcfunction(L, image_item, "image_item");
 	lua_setglobal(L, "image_item");
+	
+	lua_pushcfunction(L, html_item, "html_item");
+	lua_setglobal(L, "html_item");
+	
+	lua_pushcfunction(L, repository_visibility, "repository_visibility");
+	lua_setglobal(L, "repository_visibility");
+	
+	lua_pushcfunction(L, set_row_length, "set_row_length");
+	lua_setglobal(L, "set_row_length");
 	
 	// gui
 	
@@ -2125,7 +2255,10 @@ void Luau::startVM()
 	lua_setglobal(L, "add_toolbar_separator");
 
 	lua_pushcfunction(L, toggle_pin, "toggle_pin");
-	lua_setglobal(L, "toggle_pin");	
+	lua_setglobal(L, "toggle_pin");
+	
+	lua_pushcfunction(L, show_menu, "show_menu");
+	lua_setglobal(L, "show_menu");	
 	
 	// window
 	
@@ -2156,6 +2289,9 @@ void Luau::startVM()
 	lua_pushcfunction(L, get_checkbox_checked, "get_checkbox_checked");
 	lua_setglobal(L, "get_checkbox_checked");
 	
+	lua_pushcfunction(L, get_text_input, "get_text_input");
+	lua_setglobal(L, "get_text_input");
+	
 	// hoover window
 	
 	lua_pushcfunction(L, hoover_ShowMap, "hoover_ShowMap");
@@ -2178,11 +2314,6 @@ void Luau::startVM()
 	
 	lua_pushcfunction(L, load_setup, "load_setup");
 	lua_setglobal(L, "load_setup");
-	
-	// repository
-	
-	lua_pushcfunction(L, repository_visibility, "repository_visibility");
-	lua_setglobal(L, "repository_visibility");
 	
 	// toolbar zoom
 	

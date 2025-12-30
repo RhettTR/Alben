@@ -10,7 +10,7 @@ setCounterDragAlpha(0.5)
 
 -- set map 
 
-setBackgroundMapID("PGG-map-ver1")
+setBackgroundMapID("TRCMapD")
 
 hoover_ShowMap(false)
 hoover_ShowPlace(true)
@@ -18,19 +18,41 @@ hoover_ShowPlace(true)
 
 -- padding of main map
 
-leftPadding = 20
-topPadding = 20
-rightPadding = 20
-bottomPadding = 20
+leftPadding = 50
+topPadding = 50
+rightPadding = 50
+bottomPadding = 50
 
-set_padding("PGG-map-ver1", leftPadding, topPadding, rightPadding ,bottomPadding)
+set_padding("TRCMapD", "white", leftPadding, topPadding, rightPadding ,bottomPadding)
+
+
+-- hack to erase '5' on the odds counter
+set_mask("Battle05", "#feff5f", 22, 17, 16 ,18)
+
+-- redefine the __moved system image
+set_image("__moved", "moved")
 	
 
+-- set log window toolbar icons
+
+local callback = "toggle_pin('logbar', 'pin')"
+add_toolbar_button('logbar', 'pin', '__unpin', '', '', callback)
+add_toolbar_separator('logbar')
+local callback = "roll_die()"
+add_toolbar_button('logbar', 'dieroll', '1d6', '', 'dr', callback)
+
+toolbar_enable('logbar', 'dieroll')
 
 
--- set seed for random numbers
 
-math.randomseed(os.time())
+
+
+
+-- set map zoom range and default zoom (last value)
+
+set_zoom_range(125, 100, 75, 50, 100)
+
+
 
 
 --- definition of actions must happen before defintion of Traits
@@ -40,7 +62,7 @@ local function actionDelete (window, id)
 	if window == 'main' then
 		Counter:delete(id)
 		delete_class(id)
-		setGUI()
+		setGUI('main')
 	end
 end
 
@@ -71,6 +93,55 @@ local function actionToggle (window, id, trait)
 	update_class(Counter, id)	
 end
 
+
+local function actionToggleO (id, trait)
+	local overlay = Counter[id].Overlays[Counter[id][trait].id]
+	if overlay ~= nil then
+		overlay.apply = not overlay.apply
+		State:addMove(id, "Overlays", trait, overlay.apply, "apply")
+		local status = Counter[id][trait].menuname 
+		if overlay.apply == false then
+			status = 'not ' .. status
+		end 
+		reporttext('move', Repository[Counter[id].Image.images[1]].name  .. ' becomes <span style="color:DarkSlateGray;">'
+		 .. status .. '</span>')
+		update_class(Counter, id)
+		setGUI('main')
+	end
+end
+
+
+local function actionToggleA (trait)
+	for k, v in pairs(Counter) do
+		if type(k) == "string" and k ~= '__index' and type(v) ~= 'function' and v.deleted == false then
+			local overlays = Counter[k].Overlays
+			if overlays ~= nil then
+				local overlay = overlays[Counter[k][trait].id]
+				if overlay ~= nil then
+					if overlay.apply then										
+						actionToggleO(k, trait) 
+					end
+				end
+			end
+		end
+	end
+end
+
+
+local function actionToggleR ()
+	actionToggleA('rail')
+	actionToggleA('freeRail')
+end
+
+
+local function actionToggleX ()
+	actionToggleA('rail')
+	actionToggleA('freeRail')
+	actionToggleA('supply')
+	actionToggleA('autoVictory')
+end
+
+
 local function actionRotate (window, id, sign)
 	if window == 'main' then
 		Counter:rotate(id, sign*Rotate.increment)
@@ -93,9 +164,13 @@ end
 local function actionClone (window, id)
 	if window == 'main' then
 		if Counter[id].Clone ~= nil then
-			local toId = next_id()
-			local zorder = top_zorder()
-			cloneCounter(id, toId, zorder)
+			if Counter[id].OnlyOneInStack == nil then
+				local toId = next_id()
+				local zorder = top_zorder()
+				cloneCounter(id, toId, zorder)
+				reporttext('move', Counter[id].name  .. ' in <span style="color:DarkSlateGray;">' ..
+								   Zones:getPlace(window, Counter[id].cx, Counter[id].cy) .. '</span> is cloned') 
+			end	
 		end
 	end
 end
@@ -108,41 +183,21 @@ local function actionSelect (window, id)
 	end
 end
 
-local function actionMove (window, id)
+local function actionMove (window, id, trait)
+	
+	local move = Counter:findTrait(Counter[id], trait)
 
-	if window == 'main' then
-	
-		local move = Counter:findTrait(Counter[id], 'Move')
+	if move ~= nil then		
 		
-		if move ~= nil then
-		
-			if Counter[id].Card ~= nil then	
-					
-				local deck = Decks:find(Counter[id].Card.deck.x, Counter[id].Card.deck.y) 	
-				deck:remove(id)
-							
-				local newdeck = Decks:find(deck.moveto.Move.x, deck.moveto.Move.y)	
-				newdeck:add(id)
-				Counter[id].Card.deck = Counter:duplicate(newdeck)
-				if newdeck.id == 'draw' then				
-					Counter[id].Image.imageIndex = 2
-					Counter[id].Card.face = 2
-				end
+		local dx, dy = get_size(Counter[id].Image.images[1])	
 						
-			end
-			
-			local dx, dy = get_size(Counter[id].Image.images[1])
+		Counter:move(move.window, id, move.x - dx, move.y - dy, move.x,  move.y)
 	
-						
-			Counter:move(window, id, move.x - dx, move.y - dy)
-			
-			reporttext('move', '<span style="color:gray;">' .. Repository[Counter[id].Image.images[1]].name .. ' moves to ' .. 
-					   Zones:getPlace(window, move.x,  move.y) .. '</span>') 
-			
-		end
-				
+		reporttext('move', Repository[Counter[id].Image.images[1]].name  .. ' moves to <span style="color:DarkSlateGray;">'
+		 .. move.window .. '</span>') 	
+		
 	end
-	
+				
 end
 
 local function actionMoveAll (window, id)
@@ -158,85 +213,10 @@ local function actionMoveAll (window, id)
 					actionMove(window, k) 
 				end
 			end
-		end
-		
-		
-	else
-	
-		-- move without a move trait (reshuffel)
-		
-		-- find the moveall trait for this counter
-		local moveall = Counter:findTrait(Counter[id], 'MoveAll')
-		
-		-- get the zone
-		local zone = Zones:get('decks')
-		
-		-- find point to move to
-		local point = zone:getGrid(moveall.zoneTag)
-	
-		
-		
-		for k, v in pairs(Counter) do
-			if type(k) == "string" and k ~= '__index' and type(v) ~= 'function' and v.deleted == false then
-				
-				-- for all counters find its moveall trait if any
-				local mall = Counter:findTrait(Counter[k], 'MoveAll')
-	
-								
-				if mall ~= nil then	
-				
-					-- test if moveall is to same zone
-					if mall.zoneTag == moveall.zoneTag then	
-				
-						
-						if Counter[k].Card ~= nil then
-						
-							-- find its deck
-							local deck = Decks:find(Counter[k].Card.deck.x, Counter[k].Card.deck.y)
-							if deck == nil then 
-								return
-							end
-							-- find deck to be moved to			
-							local newdeck = Decks:find(point.x, point.y)
-							if newdeck == nil then 	
-								return
-							end
-							
-							
-							-- remove card from deck
-							
-							deck:remove(k)
-							
-							
-							
-							
-							--make sure the counter belongs to the new deck
-							
-							newdeck:add(k)
-							
-							
-							
-							Counter[k].Card.deck = Decks:find(point.x, point.y)
-							
-							
-							--  all reshuffled cards are face down
-							if newdeck.id == 'draw' then				
-								Counter[k].Image.imageIndex = 2
-								Counter[k].Card.face = 2								
-							end
-						end
-						
-						Counter:move(Counter[k].window, k, point.x, point.y)
-						
-					end		
-				end
-				
-			end
-		end
-		
-
+		end	
 	
 	end
+	
 end
 
 local function actionDeleteAll (window, id)
@@ -254,131 +234,14 @@ local function actionDeleteAll (window, id)
 	end	
 end
 
+
 local function actionReveal (window, id)
-
-	local drawpile
-	
-	if Counter[id].Image.images[1] == 'ru-inf-??' then
-		drawpile = Decks:get('ru-inf')
-	else
-		drawpile = Decks:get('ru-mech')
-	end	
-
-	if drawpile == nil then
-		return
-	end
-	
-	-- false is to not delete cpp counter in deck
-	local drawn = drawpile:draw(false)
-
-	if drawn == nil then
-		return
-	end
-	
-	
-	local toId = next_id()
-	
-	copyCounter(drawn, toId, Counter[id].zorder, Counter[id].window, Counter[id].x, Counter[id].y)
-	State:addCreate(toId, 'Create')
-	
-	local dx, dy = get_size(Counter[id].Image.images[1])
-	
-	reporttext('reveal', Repository[Counter[id].Image.images[1]].name .. ' in ' .. 
-						 Zones:getPlace(window,  Counter[id].x + dx, Counter[id].y + dy) ..
-						 ' is revealed as ' ..
-						 Repository[Counter[toId].Image.images[1]].name)
-	
-	local cards = Counter:duplicate(drawpile.cards)
-	
-	State:addMove(drawpile.id, 'Decks', '', cards)
-	
-	
-	Counter:delete(id)
-	delete_class(id)
 	
 		
 end
 
 
 local function actionStepLoss (window, id)
-
-	if Counter[id].Side == 'German' then
-		if Counter[id].Image.imageIndex < #Counter[id].Image.images then
-			reporttext('steploss', Repository[Counter[id].Image.images[1]].name .. ' suffers step loss')		
-			actionFlip(window, id)
-		else
-			reporttext('steploss', Repository[Counter[id].Image.images[1]].name .. ' goes to graveyard')
-			Counter:move('Gy', id, 480 + math.random(-100, 100), 270 + math.random(-100, 100))
-		end
-		
-	else -- soviet
-	
-		if Counter[id].Type == 'HQ' then
-			reporttext('steploss', Repository[Counter[id].Image.images[1]].name .. ' goes to graveyard')
-			Counter:move('Gy', id, 180 + math.random(-100, 100), 130 + math.random(-100, 100))
-			return
-		end
-		
-		local zone = Zones:get('rfzone')
-		local toId = next_id()
-		local zorder = top_zorder()
-		
-		
-		if Counter[id].Type == 'Inf' then	
-			
-			reporttext('steploss', Repository[Counter[id].Image.images[1]].name .. ' goes to Soviet Infantry Dead Pool')
-				
-			local pos = zone:getGrid('Soviet Infantry Dead Pool')
-			local dx, dy = get_size('ru-inf-??')
-			copyCounter('ru-inf-??', toId, zorder, 'Reinforcements', pos.x - dx, pos.y - dy)
-			
-			Counter:setTrait(Counter[toId], 'MoveStack', MoveStack:new('Reuse pile', zone:getGrid('Soviet Infantry Pool')))
-			Counter:setTrait(Counter[toId].MoveStack, 'menutrait', 'MoveStack')
-			Counter:setTrait(Counter[toId].MoveStack, 'menushow', 
-				function(window, id)				
-					local number = Counter:getStackSize('Reinforcements', zone:getGrid('Soviet Infantry Pool'))
-					return number == 0 				
-				end)
-				
-			State:addCreate(toId, 'Create')
-			
-			Decks['ru-inf-d']:add(Counter[id].Image.images[1])
-			local cards = Counter:duplicate(Decks['ru-inf-d'].cards)
-			State:addMove('ru-inf-d', 'Decks', '', cards)
-			
-			
-		else -- type is 'Arm'
-		
-			reporttext('steploss', Repository[Counter[id].Image.images[1]].name .. ' goes to Soviet Armor Dead Pool')
-			
-			local pos = zone:getGrid('Soviet Armor Dead Pool')
-			local dx, dy = get_size('ru-mech-??')
-			copyCounter('ru-mech-??', toId, zorder, 'Reinforcements', pos.x - dx, pos.y - dy)
-			
-			Counter:setTrait(Counter[toId], 'MoveStack', MoveStack:new('Reuse pile', zone:getGrid('Soviet Armor Pool')))
-			Counter:setTrait(Counter[toId].MoveStack, 'menutrait', 'MoveStack')
-			Counter:setTrait(Counter[toId].MoveStack, 'menushow', 
-				function(window, id)				
-					local number = Counter:getStackSize('Reinforcements', zone:getGrid('Soviet Armor Pool'))
-					return number == 0 					
-				end)
-				
-			State:addCreate(toId, 'Create')
-			
-			Decks['ru-mech-d']:add(Counter[id].Image.images[1])
-			local cards = Counter:duplicate(Decks['ru-mech-d'].cards)
-			State:addMove('ru-mech-d', 'Decks', '', cards)
-				
-		end
-		
-		Counter:setTrait(Counter[toId], "CantBeMoved", CantBeMoved)	
-		Counter:removeTrait(Counter[toId], "Reveal")
-		
-		Counter:delete(id)
-		delete_class(id)
-			
-		
-	end
 	
 	
 end
@@ -386,100 +249,10 @@ end
 
 local function actionMoveStack (window, id)
 	
-	local toPos
-	local fromPos
-	local zone = Zones:get('rfzone')
-
-	if Counter[id].Image.images[1] == 'ru-inf-??' then
-		toPos = zone:getGrid('Soviet Infantry Pool')
-		fromPos = zone:getGrid('Soviet Infantry Dead Pool')
-		
-		Decks:merge('ru-inf', 'ru-inf-d')
-		
-		local deck = Decks:get('ru-inf')
-		State:addMove('ru-inf', 'Decks', '', deck.cards)
-		local deck = Decks:get('ru-inf-d')
-		State:addMove('ru-inf-d', 'Decks', '', deck.cards)
-	else
-		toPos = zone:getGrid('Soviet Armor Pool')
-		fromPos = zone:getGrid('Soviet Armor Dead Pool')
-		
-		Decks:merge('ru-mech', 'ru-mech-d')
-
-		local deck = Decks:get('ru-mech')
-		State:addMove('ru-mech', 'Decks', '', deck.cards)
-		local deck = Decks:get('ru-mech-d')
-		State:addMove('ru-mech-d', 'Decks', '', deck.cards)
-	end
-	
-	
-	
-	local number = Counter:getStackSize(Counter[id].window, fromPos)
-
-	for i = 1, number do
-		local toId = next_id()
-		local zorder = top_zorder()
-		local dx, dy = get_size(Counter[id].Image.images[1])		
-		copyCounter(Counter[id].Image.images[1], toId, zorder, Counter[id].window, toPos.x - dx, toPos.y - dy)
-		State:addCreate(toId, 'Create')
-	end
-	
-	
-	actionDeleteAll (window, id)
-	
-	State:addStage()
-	
 	
 end
 
 
-
-local function retreat(window, id, zone, incx, incy)
-	local dx, dy = get_size(Counter[id].Image.images[1])		
-	local ok, x, y = afterDrag(window, id, dx, dy, Counter[id].x + dx + incx - zone.border.x0, 
-												   Counter[id].y + dy + incy - zone.border.y0)									   
-	if ok and zone:isWithinBorder(x, y) then
-		reporttext('move', Repository[Counter[id].Image.images[1]].name .. ' retreats to ' .. 
-				   Zones:getPlace(window, x + dx, y + dy)) 
-		Counter:move(window, id, x, y )
-	end
-end
-
-local function actionMoveN (window, id)
-	local dx, dy = get_size(Counter[id].Image.images[1])
-	local zone = Zones:findZone(window, Counter[id].x + dx, Counter[id].y + dy)	
-	retreat(window, id, zone, 0, -math.round(zone.b))
-end
-
-local function actionMoveS (window, id)
-	local dx, dy = get_size(Counter[id].Image.images[1])
-	local zone = Zones:findZone(window, Counter[id].x + dx, Counter[id].y + dy)
-	retreat(window, id, zone, 0, math.round(zone.b))
-end
-
-local function actionMoveNW (window, id)
-	local dx, dy = get_size(Counter[id].Image.images[1])
-	local zone = Zones:findZone(window, Counter[id].x + dx, Counter[id].y + dy)
-	retreat(window, id, zone, -math.round(zone.a / 2), -math.round(zone.b / 2))
-end
-
-local function actionMoveSW (window, id)
-	local dx, dy = get_size(Counter[id].Image.images[1])
-	local zone = Zones:findZone(window, Counter[id].x + dx, Counter[id].y + dy)
-	retreat(window, id, zone, -math.round(zone.a / 2), math.round(zone.b / 2))
-end
-
-local function actionMoveNE (window, id)
-	local dx, dy = get_size(Counter[id].Image.images[1])
-	local zone = Zones:findZone(window, Counter[id].x + dx, Counter[id].y + dy)
-	retreat(window, id, zone, math.round(zone.a / 2), -math.round(zone.b / 2))
-end
-
-local function actionMoveSE (window, id)
-	local dx, dy = get_size(Counter[id].Image.images[1])
-	local zone = Zones:findZone(window, Counter[id].x + dx, Counter[id].y + dy)
-	retreat(window, id, zone, math.round(zone.a / 2), math.round(zone.b / 2))
-end
 
 
 
@@ -505,12 +278,12 @@ local function actionPlace (window, id, trait)
 	local ex, ey = get_size(Counter[id].Image.images[1])
 	
 	copyCounter(Counter[id][trait].marker, toId, zorder, Counter[id].window, 
-				Counter[id].x - dx + ex, Counter[id].y - dy + ex)
+				Counter[id].x - dx + ex, Counter[id].y - dy + ey, Counter[id].x + ex, Counter[id].y + ey)
 	State:addCreate(toId, 'Create')			
 		
 		
 	-- has to be here for zorder			
-	setGUI()			
+	setGUI(window)			
 	
 end
 
@@ -546,6 +319,64 @@ local function actionTake (window, id, number)
 	 
 end
 
+
+
+local function actionInput(window, id, trait)
+
+	local input = Counter:findTrait(Counter[id], trait)
+	
+	if input ~= nil then
+	
+		local before = Counter[id].Overlays[input.id].text
+		
+		local text = get_text_input(input.menuname, Counter[id].Overlays[input.id].text)
+		
+		Counter[id].Overlays[input.id].text = text
+		
+		State:addMove(id, "Overlays", trait, text, "text")
+		update_class(Counter, id)
+		setGUI(window)		
+
+		reporttext('move', 'Label on ' .. Counter[id].name .. ' set from <span style="color:DarkSlateGray;">' ..
+					       before .. '</span> to <span style="color:DarkSlateGray;">' .. text .. '</span>') 
+		
+	end
+
+end
+
+
+
+local function actionInc(window, id, trait)
+
+	local table = Counter:findTrait(Counter[id], trait)
+	
+	if table ~= nil then
+	
+		local text = Counter[id].Overlays[table.id].text
+		
+		local number = tonumber(text)
+		
+		if number == nil then
+			return
+		end
+		
+		number = number + table.inc
+		
+		Counter[id].Overlays[table.id].text = tostring(number)
+		
+		State:addMove(id, "Overlays", trait, tostring(number), "text")
+		update_class(Counter, id)
+		setGUI(window)
+		
+
+		reporttext('move', 'Number on ' .. Counter[id].name .. ' changes from <span style="color:DarkSlateGray;">' ..
+					text .. '</span> to <span style="color:DarkSlateGray;">' .. tostring(number) .. '</span>') 
+		
+	end
+	
+end
+
+
 ------
 
 
@@ -559,9 +390,7 @@ function action(window, id, trait, action)
 		State:deleteNextStages()
 	end
 	
-	--if not action == 'actionEnd' then
-	--	handlers(id, action)
-	--end	
+
 	
 	if action == 'actionDelete' then
 		actionDelete(window, id)
@@ -578,8 +407,20 @@ function action(window, id, trait, action)
 	if action == 'actionMoved' then
 		actionMoved(window, id)
 	end
-	if action == 'actionToggle' then
+	if action == 'actionToggle' then	
 		actionToggle(window, id, trait)
+	end
+	if action == 'actionToggleO' then
+		actionToggleO(id, trait)
+	end
+	if action == 'actionToggleA' then
+		actionToggleA(trait)
+	end
+	if action == 'actionToggleR' then
+		actionToggleR()
+	end
+	if action == 'actionToggleX' then
+		actionToggleX()
 	end
 	if action == 'actionClone' then
 		actionClone(window, id)
@@ -588,7 +429,7 @@ function action(window, id, trait, action)
 		actionSelect(window, id)
 	end
 	if action == 'actionMove' then
-		actionMove(window, id)
+		actionMove(window, id, trait)
 	end
 	if action == 'actionMoveAll' then
 		actionMoveAll(window, id)
@@ -601,27 +442,15 @@ function action(window, id, trait, action)
 	end
 	if action == 'actionStepLoss' then
 		actionStepLoss(window, id)
+	end
+	if action == 'actionInput' then
+		actionInput(window, id, trait)
+	end	
+	if action == 'actionInc' then
+		actionInc(window, id, trait)
 	end	
 	if action == 'actionMoveStack' then
 		actionMoveStack(window, id)
-	end
-	if action == 'actionMoveN' then
-		actionMoveN(window, id)
-	end
-	if action == 'actionMoveNW' then
-		actionMoveNW(window, id)
-	end
-	if action == 'actionMoveS' then
-		actionMoveS(window, id)
-	end
-	if action == 'actionMoveSW' then
-		actionMoveSW(window, id)
-	end
-	if action == 'actionMoveSE' then
-		actionMoveSE(window, id)
-	end
-	if action == 'actionMoveNE' then
-		actionMoveNE(window, id)
 	end
 	if action == 'actionPlace' then
 		actionPlace(window, id, trait)
@@ -660,7 +489,7 @@ function getTraits(window, id)
 	elseif window == 'State' then
 		return State.stageStack[id] == nil and {} or State.stageStack[id]
 	elseif window == 'Global' then
-		return Global[id] == nil and {} or Global[id]
+		return Globals[id] == nil and {} or Globals[id]
 	elseif window == 'Deck'	then
 		return Decks[id] == nil and {} or Decks[id]
 	else
@@ -734,27 +563,6 @@ function reporttext(type, text)
 end
 
 
-function reportmove(id, name, fromtag, totag, fromx, fromy, tox, toy)
-
-	local dx, dy = get_size(name)
-	local display = Repository[name].name
-	local text = ''
-	
-	if fromtag == 'Repository' then
-		text = display .. ' placed on ' .. Zones:getPlace(totag, tox + dx, toy + dy)
-	else
-		local zonedisplay = ''
-		if fromtag ~= totag then
-			zonedisplay = ' in ' .. fromtag 	
-		end
-		text = display .. zonedisplay .. ' moves from <span style="color:DarkSlateGray;">' .. 
-			   Zones:getPlace(fromtag, fromx + dx, fromy + dy) .. '</span> to <span style="color:DarkSlateGray;">' .. 
-			   Zones:getPlace(totag, tox + dx, toy + dy) .. '</span>'
-	end			 
-	logging("html", text)
-	
-end
-
 
 function logging(type, text)
 
@@ -799,10 +607,14 @@ end
 
 
 
+
 function create(fromId, trait)
 	State:addCreate (fromId, trait)
 end
 
+function moveCounter(window, id, x, y, cx, cy)
+	Counter:move (window, id, x, y, cx, cy)
+end
 
 function delete(id)
 	Counter:delete (id)
@@ -827,7 +639,6 @@ local Zone = zone()
 
 
 
-
 -- set rotate degrees for counters
 
 Rotate.increment = 45
@@ -839,15 +650,16 @@ Rotate.increment = 45
 
 -- create Luau and C++ counter
 
-function copyCounter(fromId, toId, zorder, window, x, y)
+function copyCounter(fromId, toId, zorder, window, x, y, cx, cy)
 	local images, imageIndex = Image:getImages(fromId)
-	Counter[toId] = Counter:new(toId, images, imageIndex, zorder, window, x, y)
+	Counter[toId] = Counter:new(toId, images, imageIndex, zorder, window, x, y, cx, cy)
 	create_class_copy(Counter, toId)
 end
 
 function cloneCounter(fromId, toId, zorder)
-	Counter[toId] = Counter:clone(fromId, zorder)
+	Counter[toId] = Counter:clone(fromId, zorder)	
 	create_class_copy(Counter, toId)
+	State:addCreate(toId, 'Create')
 end
 
 function setCounter(id, table)
@@ -871,6 +683,17 @@ function loadDeck(table)
 	return id
 end
 
+function updatePos(window, id, x, y, cx, cy)
+	Counter[id]["window"] = window
+	Counter[id]["x"] = x
+	Counter[id]["y"] = y
+	Counter[id]["cx"] = cx
+	Counter[id]["cy"] = cy
+end
+
+function updateMoved(id, moved)
+	Counter:markMoved (id, moved)
+end
 
 
 
@@ -879,7 +702,7 @@ end
 
 
 function copyCard(fromId, toId, oldtoId, zorder, window, x, y)
-	copyCounter(fromId, toId, zorder, window, x, y)
+	copyCounter(fromId, toId, zorder, window, x, y, x, y)
 end
 
 
@@ -900,49 +723,6 @@ end
 
 
 
-
-
-
-
--- logging
-
-function logReset()
-	Log:reset()
-end
-
-function loadLog(table)
-	Log:add(table)
-end
-
-function logStep(oneStep)
-	Log:step(oneStep)
-end
-
-function logAbort()
-	Log:abort()
-end
-
-
-
-
-function mapPlace(window, dx, dy, x, y)	
-
-	if Zones.coordinatesUsed then
-		return Zones:printCoordinates(x, y)
-	end
-	return Zones:getPlace(window, x + dx, y + dy)
-end	
-
-
-function updatePos(window, id, x, y)
-	Counter[id]["window"] = window
-	Counter[id]["x"] = x
-	Counter[id]["y"] = y
-end
-
-function updateMoved(id, moved)
-	Counter:markMoved (id, moved)
-end
 
 function updateSide(side)
 	PlayerSide = side
@@ -973,15 +753,72 @@ function createArea()
 	create_area()
 end
 
-function setDefaultOffset(dx, dy, multiplier, shown)
-	defaultStack = Offset:new(dx, dy, multiplier, shown)
+function setDefaultOffset(dx, dy, xmultiplier, ymultiplier, shown)
+	defaultStack = Offset:new(dx, dy, xmultiplier, ymultiplier, shown)
 end
 
 function defaultOffset()
-	return defaultStack['xoffsetClosed'], defaultStack['yoffsetClosed'], defaultStack['openFactor'], defaultStack['shown']
+	return defaultStack['xoffsetClosed'], defaultStack['yoffsetClosed'], defaultStack['xopenFactor'], defaultStack['yopenFactor'], defaultStack['shown']
 end
 
 
+
+
+
+-- logging
+
+function logReset()
+	Log:reset()
+end
+
+function loadLog(table)
+	Log:add(table)
+end
+
+function logStep(oneStep)
+	Log:step(oneStep)
+end
+
+function logAbort()
+	Log:abort()
+end
+
+
+
+function mapPlace(window, dx, dy, x, y)
+
+	return Zones:getPlace(window, x + dx, y + dy)
+	
+end	
+
+
+function reportmove(id, name, fromtag, totag, fromx, fromy, tox, toy)
+
+	local dx, dy = get_size(name)
+	local display = Repository[name].name
+	local text = ''
+	
+	if fromtag == 'Repository' then	
+		text = display .. ' placed on ' .. Zones:getPlace(totag, tox + dx, toy + dy)
+	else
+	
+		local zonedisplay = ''	
+		if fromtag ~= totag then
+			zonedisplay = ' in ' .. fromtag 	
+		end		
+		text = display .. zonedisplay .. ' moves from <span style="color:DarkSlateGray;">' .. 
+			   Zones:getPlace(fromtag, fromx + dx, fromy + dy) .. '</span> to <span style="color:DarkSlateGray;">' .. 
+			   Zones:getPlace(totag, tox + dx, toy + dy) .. '</span>'
+	   
+	end			 
+	logging("html", text)
+	
+end
+
+
+
+
+---
 
 
 function runScript(func)
@@ -1043,15 +880,8 @@ end
 
 
 
-function dropped(tag, fromid, toid, x, y)
-	
-	if Counter[toid]['Take2'] ~= nil then
-		Counter[toid]['Take2'] = nil 	
-	end
-	
-	if Counter[toid]['Take3'] ~= nil then
-		Counter[toid]['Take3'] = nil 	
-	end
+function dropped(tag, id, x, y)
+
 
 end
 
@@ -1066,7 +896,7 @@ end
 
 function deleted(id)
 
-	-- very important -- must always be here
+	-- IMPORTANT  must always be here
 	Counter[id].deleted = true
 
 end
@@ -1140,7 +970,7 @@ function pointoffset(window, x, dx, y, dy)
 	end
 	
 
-	return offset['xoffsetClosed'], offset['yoffsetClosed'], offset['openFactor'], offset['shown']
+	return offset['xoffsetClosed'], offset['yoffsetClosed'], offset['xopenFactor'], offset['yopenFactor'], offset['shown']
 	
 end
 
@@ -1150,28 +980,11 @@ end
 
 
 
-
 -- handlers
 
 function handlers(id, func)
 	_G[func](id)	
 end
-
-
-
-
-
-
---local ok = beforeDrag("1002")
---if ok then
---	local x,y
---	ok, x, y = afterDrag("main", "1002", 45, 45, 37, 27)
---	if ok then
---		updatePos("1002", x, y)
---		Counter:generateGUI()
---	end
---end 
-
 
 
 

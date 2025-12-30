@@ -13,9 +13,9 @@ savedPointer = 0
 
 
 
-function State:addMove (id, trait, key, value)
+function State:addMove (id, trait, key, value, subkey)
 	State.stagePointer = State.stagePointer + 1
-	State.stageStack[State.stagePointer] = {id = id, trait = trait, key = key, value = value}
+	State.stageStack[State.stagePointer] = {id = id, trait = trait, key = key, value = value, subkey = subkey}
 end
 
 function State:addCreate (id, trait)
@@ -148,11 +148,13 @@ function State:executeUntil(stack, from, to)
 		local id = stack[i].id
 		local key
 		local value
-		
+		local subkey
+	
 		
 		if trait ~= 'Create' then
 			key = stack[i].key
-			value = stack[i].value	
+			value = stack[i].value
+			subkey = stack[i].subkey	
 		end
 		
 			
@@ -163,7 +165,7 @@ function State:executeUntil(stack, from, to)
 			end	
 		end
 		
-		if trait == 'Counter' then	
+		if trait == 'Counter' then				
 			Counter[id][key] = value
 		end
 		
@@ -173,6 +175,10 @@ function State:executeUntil(stack, from, to)
 		
 		if trait == 'MarkMoved' then
 			Counter[id][trait][key] = value
+		end
+		
+		if trait == 'Overlays' then	
+			Counter[id].Overlays[Counter[id][key].id][subkey] = value
 		end
 		
 		if trait == 'Image' then
@@ -190,7 +196,7 @@ function State:executeUntil(stack, from, to)
 		
 		if trait == 'Create' then
 			setCounter(id, stack[i].table)
-			dropped("main", stack[i].table.Image.images[1], id, stack[i].table.x, stack[i].table.y)
+			dropped(stack[i].table.window, stack[i].table.Image.images[1], id, stack[i].table.x, stack[i].table.y)
 		end
 		
 		if trait == 'Delete' then		
@@ -230,7 +236,7 @@ function State:undo()
 		toolbar_enable('main', '__redo')
 	end
 	
-	
+
 	
 	toggle_painting()
 	
@@ -276,7 +282,6 @@ function State:redo()
 	local currentStage = State.stagePointer + 1
 	
 	local i = State:findNextStage ()
-	
 	
 	
 	toggle_painting()

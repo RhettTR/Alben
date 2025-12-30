@@ -65,6 +65,7 @@ class ToolBar : public QToolBar
 		ToolBar(std::string tag, const QString title, QScrollArea *scrollArea = nullptr);
 		~ToolBar();
 		static ToolBar *getInstance(const char *instance);
+		ToolButton *getToolButton(const char *id);
 		void reset();
 		std::string tag;
 		bool toolbarPinned;
@@ -89,6 +90,10 @@ class ToolBar : public QToolBar
 
 		void zoom(float fraction);
 		
+		void showMenu(const char *menuid);
+		void do_activate (QAction *action);
+		
+		
 	private:
 	
 		QScrollArea *scrollArea;
@@ -99,6 +104,7 @@ class ToolBar : public QToolBar
 		void zoomIndex(int inc);
 	
 		static std::map<std::string, ToolBar *> instances;
+		std::map<std::string, ToolButton *> buttons;
 		
 		
 };

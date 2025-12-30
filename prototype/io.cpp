@@ -313,7 +313,7 @@ void IO::loadGame()
 		Counter::resetId();
 		Counter::resetZorder();
 		
-		Counter::setGUI();
+		Counter::setGUI("all");
 		
 	}
 	
@@ -337,10 +337,67 @@ void IO::loadSetUp(string filename)
 	Counter::resetId();
 	Counter::resetZorder();
 	
-	Counter::setGUI();
+	Counter::setGUI("all");
 	
 }
 
+
+QString IO::loadHtml(string filename)
+{
+	QFileInfo fileInfo(QString::fromStdString(filename));
+
+	QString base = fileInfo.baseName();
+	
+
+	
+	string completeFileName = "./docs/" + base.toStdString() + ".html";
+	
+	
+	QString text;
+	
+	
+	
+	try
+	{
+		fs.exceptions(std::ios_base::badbit);
+				
+		fs.open(completeFileName, ios::in);
+	
+		if (fs.is_open()) 
+		{
+				
+
+			while (fs)
+			{	
+				
+				// read a line of html
+				std::string line;
+							
+				if (!std::getline(fs, line, '\0'))
+					break;
+					
+			
+				text.append(QString::fromStdString(line));
+			
+			}
+			
+			fs.close();
+			
+		}
+			
+	}
+	catch (const ifstream::failure& e)
+	{
+		std::cout << e.what() << std::endl;
+	}
+
+
+	
+	return text;	
+	
+
+	
+}
 
 
 
@@ -485,14 +542,14 @@ void IO::load_resources(string directory)
 }
 
 
-void IO::addPadding(string resourceId, int left, int top, int right, int bottom)
+void IO::addPadding(string resourceId, QColor color, int left, int top, int right, int bottom)
 {
 	QImage resource = io->getImage(resourceId);
 
 	QImage padded = 
 		QImage(io->getSize(resourceId) + QSize(left + right, top + bottom), QImage::Format_ARGB32_Premultiplied);
 		
-	padded.fill(Qt::white);
+	padded.fill(color);
 	
 	QPainter *paint = new QPainter(&padded);
 	paint->drawImage(QPoint(left, top), resource);
@@ -502,6 +559,39 @@ void IO::addPadding(string resourceId, int left, int top, int right, int bottom)
 	io->_resources[resourceId].image = padded;
 	
 	io->_resources[resourceId].size = padded.size();
+	
+}
+
+
+void IO::addMask(string resourceId, QColor color, int left, int top, int width, int height)
+{
+	QImage resource = io->getImage(resourceId);
+
+	QImage mask = 
+		QImage(QSize(width, height), QImage::Format_ARGB32_Premultiplied);
+		
+	mask.fill(color);
+	
+	QPainter *paint = new QPainter(&resource);
+	paint->drawImage(QPoint(left, top), mask);
+	delete paint;
+	
+	io->_resources[resourceId].image = resource;
+	
+	io->_resources[resourceId].size = resource.size();
+	
+}
+
+
+void IO::changeImage(std::string fromImage, std::string toImage)
+{
+	
+	QImage resource = io->getImage(toImage);
+	
+
+	io->_resources[fromImage].image = resource;
+	
+	io->_resources[fromImage].size = resource.size();
 	
 }
 

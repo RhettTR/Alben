@@ -636,12 +636,12 @@ void Overlay::StackOpen::updateImages(Counter *counter)
 	
 	CentralFrame::Stack stack = {{counter->state.zorder, counter}};
 	
-	QPoint point = QPoint(counter->state.x, counter->state.y);
+	QPoint point = QPoint(counter->state.cx, counter->state.cy);
 	       
 		
 	for ( auto obj = Counter::counters.begin(); obj != Counter::counters.end(); ++obj  )	
 	{
-		QPoint p = QPoint(obj->second->state.x, obj->second->state.y);
+		QPoint p = QPoint(obj->second->state.cx, obj->second->state.cy);
 		
 		if (p == point)
 		{

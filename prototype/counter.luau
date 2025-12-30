@@ -20,6 +20,9 @@ end
 
 
 function Repository:addTrait (id, key, trait)
+	if Repository[id][key] == nil then
+		Repository[id][key] = {}
+	end
 	Repository[id][key] = trait
 end
 
@@ -61,7 +64,7 @@ end
 Counter = {}
 
 
-function Counter:new (id, images, imageIndex, zorder, window, x, y)	
+function Counter:new (id, images, imageIndex, zorder, window, x, y, cx, cy)	
 	local o = Counter:duplicate(Repository[images[1]])	
 	setmetatable(o, Counter)
 	Counter.__index = Counter
@@ -69,6 +72,8 @@ function Counter:new (id, images, imageIndex, zorder, window, x, y)
 	o.id = id
 	o.x = x
 	o.y = y
+	o.cx = cx
+	o.cy = cy
 	o.zorder = zorder
 	o.deleted = false
 	o.window = window
@@ -144,25 +149,58 @@ function Counter:select (id)
 	end
 end
 
-function Counter:move (window, id, x, y)
+function Counter:move (window, id, x, y, cx, cy)
+	
 
-	if (Counter[id].window == window) then	
-		updatePos(window, id, x, y)
+	local counter
+	
+	if Counter[id] ~= nil then
+		counter = Counter[id]
+	else
+		counter = Repository[id]
+	end
+	
+	
+	
+	if (counter[id].window == window) then
+		
+		updatePos(window, id, x, y, cx, cy)
 		State:addMove(id, "Counter", "x", x)
 		State:addMove(id, "Counter", "y", y)
+		State:addMove(id, "Counter", "cx", cx)
+		State:addMove(id, "Counter", "cy", cy)
+		State:addMove(id, "Counter", "window", window)		
 		update_class(Counter, id)
-	else
+	
+	elseif counter[id].window == 'Repository' then
+	
 		local toId = next_id()
 		local zorder = top_zorder()
-		copyCounter(Counter[id].Image.images[1], toId, zorder, window, x, y)
-		State:addCreate(toId, 'Create')	
+		copyCounter(id, toId, zorder, window, x, y, cx, cy)
+		State:addCreate(toId, 'Create')
+	
+	else
+	
+		-- moved to another window
+		
+		-- delete counter in old window and create updated counter in new window
+		
 		Counter:delete(id)
 		delete_class(id)
-		State:addStage()
+		
+		
+		updatePos(window, id, x, y, cx, cy)
+		
+		local zorder = top_zorder()	
+		Counter[id].zorder = zorder
+		Counter[id].deleted = false
+		
+		
+		create_class_copy(Counter, id)			
+		State:addCreate(id, 'Create')
+		
 	end	
-	
-	--Counter:generateGUI()
-	setGUI()	
+		
 end
 
 function Counter:findId(stringId)
@@ -258,7 +296,7 @@ function Counter:merge(o, loaded)
     return o
 end
 
-
+--[[
 function Counter:refresh()
 	
 	local id
@@ -353,7 +391,7 @@ function Counter:refresh()
 	
 	
 end
-
+--]]
 
 
 function Counter:generateGUI()
@@ -368,7 +406,7 @@ function Counter:generateGUI()
 		end
 	end
 	
-	setGUI()
+	setGUI('all')
 	
 	
 	for k, v in pairs(Globals) do

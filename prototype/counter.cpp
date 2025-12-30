@@ -185,7 +185,6 @@ void Counter::QtCounter::showRightClickMenu(QtCounter *counter)
 			if (e.entrytest)
 				if (!Luau::doTest(counter->owner->state.tag.c_str(), e.entrytrait.c_str(), counter->owner->name.c_str())) 
 					action->setEnabled(false);
-					//action->hide();
 				
 			
 			//action->setShortcut(QKeySequence("Ctrl+D"));
@@ -207,6 +206,10 @@ void Counter::QtCounter::showRightClickMenu(QtCounter *counter)
 }
 
 
+
+
+
+
 void Counter::QtCounter::mousePressEvent (QMouseEvent * e) 
 {
 	
@@ -224,7 +227,11 @@ void Counter::QtCounter::mousePressEvent (QMouseEvent * e)
 		if (QApplication::keyboardModifiers() == Qt::ControlModifier)
 		{
 			if (CentralFrame::openStackoffset)
+			{
 				((CentralFrame *)this->parent())->toggleOpenStack(this->owner, -1);
+				this->owner->state.zorder = Counter::topZorder();
+				Counter::setGUI(this->owner->state.tag.c_str());
+			}
 		}
 		else
 		{
@@ -250,13 +257,20 @@ void Counter::QtCounter::mousePressEvent (QMouseEvent * e)
 
 void Counter::QtCounter::mouseDoubleClickEvent(QMouseEvent *e)
 {
-	if (CentralFrame::openStackoffset)						
-		((CentralFrame *)this->parent())->toggleOpenStack(this->owner, 1);
-	else
+	if (this->owner->state.tag == "main")
 	{
-		((CentralFrame *)this->parent())->selectCounter(this->owner);
-		QPoint pos = e->position().toPoint() + this->pos();		
-		Overlay::openView->open(this->owner, pos);
+		if (CentralFrame::openStackoffset)
+		{						
+			((CentralFrame *)this->parent())->toggleOpenStack(this->owner, 1);
+			this->owner->state.zorder = Counter::topZorder();
+			Counter::setGUI("main");
+		}
+		else
+		{
+			((CentralFrame *)this->parent())->selectCounter(this->owner);
+			QPoint pos = e->position().toPoint() + this->pos();		
+			Overlay::openView->open(this->owner, pos);
+		}
 	}
 }
 
@@ -282,12 +296,12 @@ void Counter::QtCounter::hooverAction()
 	
 	CentralFrame::Stack stack = {{this->owner->state.zorder, this->owner}};
 	
-	QPoint point = QPoint(this->owner->state.x, this->owner->state.y);
+	QPoint point = QPoint(this->owner->state.cx, this->owner->state.cy);
 	
 	
 	for ( auto obj = counters.begin(); obj != counters.end(); ++obj  )	
 	{
-		QPoint p = QPoint(obj->second->state.x, obj->second->state.y);
+		QPoint p = QPoint(obj->second->state.cx, obj->second->state.cy);
 		
 		if (p == point)		
 			stack[obj->second->state.zorder] = obj->second;	
@@ -400,7 +414,7 @@ void Counter::QtCounter::mouseMoveEvent (QMouseEvent * e)
 	if (window->tag == "main")
 	{	
 		popupPoint = e->position().toPoint();		
-		timer->start(1000);
+		timer->start(1500);
 	}
 }
 
@@ -449,7 +463,7 @@ void Counter::QtCounter::do_activate (QAction *action)
 		{
 			if (obj->second->selected == true)
 			{
-				CentralFrame::Point p = (CentralFrame::Point){.x = obj->second->state.x, .y = obj->second->state.y};
+				CentralFrame::Point p = (CentralFrame::Point){.x = obj->second->state.cx, .y = obj->second->state.cy};
 				
 				if (stacks.find( p ) == stacks.end()) 
 				{
@@ -540,10 +554,21 @@ Counter::Counter(Table *state)
 	
 	this->state.x = 0;
 	this->state.y = 0;
+	this->state.cx = 0;
+	this->state.cy = 0;
 	this->state.moved = false;
 	this->state.degrees = 0;
 	this->state.image = this->name;
-	this->state.overlays = nullptr;
+	
+	if ((*state).find("Overlays") != (*state).end())		
+	{	
+		Table *overlays = new Table();	
+		(*overlays) = std::get<Table>((*state)["Overlays"]);	
+		this->state.overlays = overlays;
+	}
+	else
+		this->state.overlays = nullptr;
+		
 	this->state.opacity = 1.0;
 	this->state.tag = std::get<std::string>((*state)["window"]);
 	
@@ -563,9 +588,9 @@ Counter::Counter(Table *state)
 	
 	this->counter = new QtCounter(this, pane);
 		
-	// make sure images in repository have height less than 200	
-    this->setImage(200);
-    
+	// make sure images in repository have height less than 200	???
+    this->setImage();
+   
     
       
     pane->layout()->addWidget(this->counter);
@@ -601,10 +626,13 @@ Counter::Counter(int id, Table *state)
 
 	
 	this->name = std::to_string(id);
+	this->image = this->name;
 	
 	
 	this->state.x = (int)std::get<double>((*state)["x"]);	 	
 	this->state.y = (int)std::get<double>((*state)["y"]);
+	this->state.cx = (int)std::get<double>((*state)["cx"]);	 	
+	this->state.cy = (int)std::get<double>((*state)["cy"]);
 	this->state.tag = std::get<std::string>((*state)["window"]);
 	
 	Window *window = Window::getInstance(this->state.tag.c_str());
@@ -719,10 +747,6 @@ Counter::~Counter()
 	Overlay::hooverView->setVisible(false);
 	
 	Counter::counters.erase(this->id);
-	
-
-	
-	//Window::getInstance(this->state.tag.c_str())->frame->repaint();
 	
 }
 
@@ -875,16 +899,44 @@ void Counter::setDisabled(bool disable)
 
 int Counter::findOffset(int size, std::string type)
 {	
+	
+	if (type == "vcenter")
+		return (int)std::floor((this->width - size) / 2);
+	if (type == "vleft")
+		return this->width - size;	
 	if (type == "left")
 		return this->width;
 	if (type == "hcenter")
-		return std::floor((this->height - size) / 2);
+		return (int)std::floor((this->height - size) / 2);
+	if (type == "htop")
+		return 0;	
 		
 	return 0;
 }
 
 
-
+void outTable(Counter::Table t)
+{
+	for (auto obj = t.begin(); obj != t.end(); ++obj)
+	{
+		std::visit(
+			Overload{
+				[] (int k) { printf("%d=", k);  },
+				[] (std::string k) { printf("\"%s\"=", k.c_str()); }
+			},
+			obj->first
+		);
+		std::visit(
+			Overload{
+				[] (double k) { printf("%f\n", k); },
+				[] (bool k) { (k ? printf("true\n") : printf("false\n")); },				
+				[] (std::string k) { printf("\"%s\"\n", k.c_str()); },
+				[] (Counter::Table k) { outTable(k); }
+			},
+			obj->second
+		);	
+	}
+}
 
 
 void Counter::setImage(int maxHeight)
@@ -1006,14 +1058,15 @@ void Counter::setImage(int maxHeight)
 		for (auto const &table : (*state.overlays))
 		{
 			Table trait = std::get<Table>(table.second);
-		
+	
 			auto itr = trait.find("mask");
+			
 			
 			if (itr != trait.end()) 
 			{
 				// mask	
-				
-				if (std::get<bool>(trait["apply"]))
+			
+				if (std::get<bool>(trait["apply"]) == true)
 				{
 					
 					int x = (int)std::get<double>(trait["x"]) + margin;
@@ -1035,21 +1088,38 @@ void Counter::setImage(int maxHeight)
 				
 				if (std::get<bool>(trait["apply"]))
 				{
-					int x = (int)std::get<double>(trait["x"]) + margin;
-					int y = (int)std::get<double>(trait["y"]) + margin;
+					
+					const QString text = QString::fromStdString(std::get<std::string>(trait["text"]));
+										
+					std::string color = std::get<std::string>(trait["color"]);
 					
 					QFont font;
 					font.setFamily(QString::fromStdString(std::get<std::string>(trait["font"])));
 					font.setPixelSize((int)std::get<double>(trait["size"]));
+					QFontMetrics fm(font);
+					QRect b(fm.boundingRect(text));						
+										
 					
-					std::string color = std::get<std::string>(trait["color"]);
-	
-
-					const QString text = QString::fromStdString(std::get<std::string>(trait["text"]));
+					int x = margin;
+					int y = margin;
 					
+					if (std::holds_alternative<double>(trait["x"]))
+						x += (int)std::get<double>(trait["x"]);
+					else
+						x += findOffset(b.width(), std::get<std::string>(trait["x"]));
+												
+					if (std::holds_alternative<double>(trait["y"]))
+						y += (int)std::get<double>(trait["y"]);
+					else
+						y += std::round(b.height()/2) + findOffset(b.height(), std::get<std::string>(trait["y"]));
+						
+						
 					QPainter *paint = new QPainter(&image);
-					paint->setFont(font);
+					paint->setFont(font);					
 					paint->setPen(QString::fromStdString(color));
+					//paint->setBackgroundMode(Qt::OpaqueMode);
+					//paint->setBackground(QBrush(QColor("black")));
+					paint->setRenderHint(QPainter::TextAntialiasing);
 					paint->drawText(x, y, text);
 					delete paint;
 				}
@@ -1220,30 +1290,32 @@ void Counter::setRights(Settings::OwnershipRights rights)
 
 
 
-void Counter::setGUI()
+void Counter::setGUI(const char *tag)
 {
 	
 	CentralFrame::Stacks stacks;
+	std::string window(tag);
 	
 	
 	for (auto obj = counters.begin(); obj != counters.end(); ++obj)
-	{
-		CentralFrame::Point p = (CentralFrame::Point){.x = obj->second->state.x, .y = obj->second->state.y};
+		if (obj->second->state.tag == window || "all" == window)
+		{
+			CentralFrame::Point p = (CentralFrame::Point){.x = obj->second->state.cx, .y = obj->second->state.cy};
 		
-		if (stacks.find( p ) == stacks.end()) 
-		{
-			// not found
-			CentralFrame::Stack stack = {{obj->second->state.zorder, obj->second}};
-			stacks[p] = stack;
-		} 
-		else 
-		{
-			// found			
-			CentralFrame::Stack stack = stacks.at( p );
-			stack[obj->second->state.zorder] = obj->second;
-			stacks[p] = stack;
-		}	
-	}
+			if (stacks.find( p ) == stacks.end()) 
+			{
+				// not found
+				CentralFrame::Stack stack = {{obj->second->state.zorder, obj->second}};
+				stacks[p] = stack;
+			} 
+			else 
+			{
+				// found			
+				CentralFrame::Stack stack = stacks.at( p );
+				stack[obj->second->state.zorder] = obj->second;
+				stacks[p] = stack;
+			}	
+		}
 	
 
 

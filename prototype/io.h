@@ -46,7 +46,9 @@ class IO
 		IO();
 		
 		void load_resources(std::string directory);
-		static void addPadding(std::string resourceId, int left, int top, int right, int bottom);
+		static void addPadding(std::string resourceId, QColor color, int left, int top, int right, int bottom);
+		static void addMask(std::string resourceId, QColor color, int left, int top, int width, int height);
+		static void changeImage(std::string fromImage, std::string toImage);
 		void reset();
 		void transfer_resource_keys();
 
@@ -72,6 +74,7 @@ class IO
 		void saveLog(QString file);
 		void loadGame();
 		void loadSetUp(std::string filename);
+		QString loadHtml(std::string filename);
 		
 		static std::string findSide();
 		

@@ -105,8 +105,10 @@ class Counter
 		
 		struct State				// the subset of fields needed to render the counter/card
 		{
-			int x;					
+			int x;					// the topleft cooordinate for rendering
 			int y;
+			int cx;					// the center coordinate set by the grid for stacking
+			int cy;
 			std::string tag;		// window tag of counter
 			bool moved;				// only true if trait		
 			int degrees;			// only not zero if trait
@@ -167,7 +169,7 @@ class Counter
 		Settings::OwnershipRights getRights();	
 		void setRights(Settings::OwnershipRights rights);
 		
-		static void setGUI();
+		static void setGUI(const char *tag);
 		
 		int incrementDegrees(); 
 		

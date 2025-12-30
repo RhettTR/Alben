@@ -18,6 +18,7 @@ function Zone:new(window, tag)
 	o.members = {}
 	o.allowUndefined = true
 	o.window = window
+	o.coordinatesUsed = false
 	Zones:add(tag, o)
 	return o
 end
@@ -101,12 +102,57 @@ function Zone:hasMember(id)
 	return false
 end
 
-function Zone:squareGrid(startX, startY, dx, dy)
+
+function Zone:makeSquareGrid(width, height)	
+
+	local x 
+	local y
+
+	
+	local i = 0	
+	
+	
+	while (true) do
+		 
+		x = self.dx + math.round(self.a/2) + i*self.a
+				
+		if x >= width then
+			return
+		end	
+		
+	
+		local j = 0
+		local flag = true
+		
+		while (flag) do	
+	
+			y = self.dy + math.round(self.b/2) + j*self.b
+			
+							
+			if y >= height then
+				flag = false
+			else
+				self:addGrid(self.border.x0 + math.round(x), 
+							 self.border.y0 + math.round(y),
+							 'At start')
+				j = j + 1
+			end	
+					
+		end
+		
+		i = i + 1
+		
+	end
+end
+
+
+function Zone:squareGrid(a, b, dx, dy)
 	self.gridType = 'square'
-	self.a = startX
-	self.b = startY
+	self.a = a
+	self.b = b
 	self.dx = dx
 	self.dy = dy
+	self:makeSquareGrid(self.border.x1-self.border.x0, self.border.y1-self.border.y0)
 end
 
 
@@ -125,7 +171,7 @@ function Zone:makeHexagonalGrid(width, height)
 	
 	while (true) do
 		 
-		x = leftPadding + self.border.x0 + self.a + i*(self.a + c)
+		x = self.a + i*(self.a + c)
 				
 		if x >= width then
 			return
@@ -140,12 +186,12 @@ function Zone:makeHexagonalGrid(width, height)
 			local fy
 			
 			if math.fmod(i,2) == 0 then
-				fy = -math.round(self.b / 2)
+				fy = 0
 			else
-				fy = 0	
+				fy = -math.round(self.b / 2)	
 			end 
 	
-			y = topPadding + self.border.y0 + self.b + j*self.b + fy
+			y = math.round(self.b / 2) + j*self.b + fy
 			
 					
 			if y >= height then
@@ -159,8 +205,8 @@ function Zone:makeHexagonalGrid(width, height)
 				if j + 1 < 10 then
 					cy = '0'
 				end
-				self:addGrid(math.round(x), 
-							 math.round(y), 
+				self:addGrid(self.border.x0 + math.round(x), 
+							 self.border.y0 + math.round(y), 
 							 cx .. i + 1 .. cy .. j + 1, 
 							 math.round(x), 
 							 math.round(y - (0.45*self.b)))
@@ -316,14 +362,90 @@ function Zone:makeAreaOfEffect(x, y, radius)
 end
 
 
+function Zone:getPlace(x, y)
+
+	if self.gridType == 'square' then
+	
+		--local rows = math.floor((self.border.x1 - self.border.x0) / self.a)
+	
+		--local ax = math.floor((x - self.border.x0 + self.dx) / self.a)
+		--local ay = math.floor((y - self.border.y0 + self.dy) / self.b)
+		--local n = ax + rows * ay
+			
+		--return tostring(n)
+		
+		for k, v in pairs(self.grid) do
+			if v.x == x and v.y == y then
+				return v.p
+			end
+		end
+		
+	elseif self.gridType == 'custom' then
+	
+		for k, v in pairs(self.grid) do
+			if v.x == x and v.y == y then
+				return v.p
+			end
+		end
+	
+	else
+	
+		return self.window	
+		
+	end
+
+end
+
+
+
+local function char(num)
+	return string.char(string.byte("A") + num - 1)
+end
+
+
+function Zone:printCoordinates(x, y)
+	
+	if self.gridType == 'square' then
+	
+		x = math.floor((x - self.border.x0 + self.dx) / self.a)
+		y = math.floor((y - self.border.y0 + self.dy) / self.b)
+
+		return  tostring(char(x + 1)) .. tostring(y + 1)
+	
+	elseif self.gridType == 'hex' then
+	
+		for k, v in pairs(self.grid) do
+			if v.x == x and v.y == y then
+				local letter1 = string.sub(v.p, 1, 2)	
+				local number = string.sub(v.p, 3, 4)
+				number = string.gsub(number, '^0+', '')
+				if tonumber(letter1) > 26 then
+					letter1 = tostring(tonumber(letter1) - 26)
+					return char(letter1) .. char(letter1) .. number
+				else
+					return char(letter1) .. number
+				end
+			end
+		end
+	
+	else
+	
+		return self.window
+	
+	end
+	
+	
+	
+end
+
+
+
+
 
 
 
 
 Zones = {}
-
--- does grid have x, y coordinates
-Zones.coordinatesUsed = false
 
 Zones.tags = {}
 
@@ -337,8 +459,39 @@ function Zones:get(tag)
 end
 
 
+function Zones:findZone(window, x, y)
 
-function Zones:snaptoDefault(window, id, x, y)
+	for k, v in pairs(Zones.tags) do
+					
+		if v.window == window and v:isWithinBorder(x, y) then	
+			return v
+		end
+	end	
+	
+	return nil
+
+end
+
+
+function Zones:getPlace(window, x, y)
+
+	local zone = Zones:findZone(window, x, y)
+
+	if zone == nil then
+		return 'Offboard'
+	end
+
+	if zone.coordinatesUsed then
+		return zone:printCoordinates(x, y)
+	else
+		return zone:getPlace(x, y)
+	end
+
+end
+
+
+
+function Zones:snaptoDefault(window, id, x, y, dx, dy)
 
 	local counter
  		
@@ -361,23 +514,23 @@ function Zones:snaptoDefault(window, id, x, y)
 				   	
 				   	-- a DoesNotStack counter never stacks			
 					if counter["DoesNotStack"] ~= nil then
-						return false, x , y
+						return false, x , y , x + dx , y + dy
 					end
 					if v["DoesNotStack"] ~= nil then
-						return false, x , y
-					end
+						return false, x , y , x + dx , y + dy
+					end 
 					
 					-- a card only stacks with other cards
 					if counter["Card"] ~= nil and v["Card"] == nil then
-						return false, x , y
+						return false, x , y , x + dx , y + dy
 					end
 					if counter["Card"] == nil and v["Card"] ~= nil then
-						return false, x , y
+						return false, x , y , x + dx , y + dy
 					end
 					
 					x = v["x"]
 					y = v["y"]					
-					return true, x , y
+					return true, x , y , x + dx , y + dy
 				   
 				end 
 				  	
@@ -385,23 +538,11 @@ function Zones:snaptoDefault(window, id, x, y)
 		end	
 	end
 
-	return true, x , y 
+	return true, x , y , x + dx , y + dy
 	
 end
 
 
-function Zones:findZone(window, x, y)
-
-	for k, v in pairs(Zones.tags) do
-					
-		if v.window == window and v:isWithinBorder(x, y) then	
-			return v
-		end
-	end	
-	
-	return nil
-
-end
 
 
 function Zones:doSnap(zone, dx, dy, x, y)
@@ -411,6 +552,9 @@ function Zones:doSnap(zone, dx, dy, x, y)
 	local minimum_distance = 100000
 
 	local minimumX, minimumY
+	
+	local cx = x + dx
+	local cy = y + dy
 
 	for k, v in pairs(zone.grid) do	
 	
@@ -429,40 +573,16 @@ function Zones:doSnap(zone, dx, dy, x, y)
 	
 	if minimum_distance < 100000 then
 		x = minimumX - dx
-		y = minimumY - dy			
+		y = minimumY - dy
+		cx = minimumX
+		cy = minimumY			
 	end
 	
 	
-	return true, x , y
+	return true, x , y , cx, cy
 	
 end
 
-
-function Zones:doSnapSquare(zone, dx, dy, x, y)
-	
-	local hx = math.floor(zone.dx/2)
-	local hy = math.floor(zone.dy/2)
-	
-	local ax = zone.dx * math.floor((x + dx - zone.a) / zone.dx)
-	local ay = zone.dy * math.floor((y + dy - zone.b) / zone.dy)
-	
-	local nx = -(dx - zone.a) + hx + ax
-	local ny = -(dy - zone.b) + hy + ay
-	
-	if zone:isWithinBorder(nx, ny) then
-		return true, nx, ny
-	else
-		return true, x , y  
-	end
-	
-end
-
-
-function Zones:doSnapHex(zone, dx, dy, x, y)
-	
-	return Zones:doSnap(zone, dx, dy, x, y)  
-	
-end
 
 
 function Zones:snapTo(window, id, dx, dy, x, y)
@@ -474,7 +594,7 @@ function Zones:snapTo(window, id, dx, dy, x, y)
 	if zone == nil then
 		-- problem with retreats!!
 		--return false, x , y
-		return true, x , y
+		return true, x , y , x + dx , y + dy
 	end
 	
 	local counter
@@ -489,70 +609,15 @@ function Zones:snapTo(window, id, dx, dy, x, y)
 	if zone:isWithinBorder(x + dx, y + dy) then
 		
 		if zone:hasMember(counter.Image.images[1]) then
-			if zone.gridType == 'square' then
-				return Zones:doSnapSquare(zone, dx, dy, x, y)
-			elseif zone.gridType == 'hex' then
-				return Zones:doSnapHex(zone, dx, dy, x, y)	
-			else
-				return Zones:doSnap(zone, dx, dy, x, y)
-			end
+			return Zones:doSnap(zone, dx, dy, x, y)
 		elseif zone.allowUndefined then			
-			return Zones:snaptoDefault(window, id, x, y)
+			return Zones:snaptoDefault(window, id, x, y, dx, dy)
 		else
-			return false, x , y
+			return false, x , y , x + dx, y + dy
 		end
 	end
 	
-	return Zones:snaptoDefault(window, id, x, y)
-	
-end
-
-
-
-
-
-function Zones:getPlace(window, x, y)
-
-	local squareLength = 10
-
-	local zone = Zones:findZone(window, x, y)
-
-	if zone == nil then
-		return 'Offboard'
-	end
-	
-	if zone.gridType == 'square' then
-		local ax = math.floor((x - zone.a) / zone.dx)
-		local ay = math.floor((y - zone.b) / zone.dy)
-		local n = ax + squareLength * ay		
-		return tostring(n)
-	else
-		for k, v in pairs(zone.grid) do
-			if v.x == x and v.y == y then
-				return v.p
-			end
-		end
-	end
-
-	return ''	
-
-end
-
-
-
-
-
-local function char(num)
-	return string.char(string.byte("A") + num - 1)
-end
-
-
-function Zones:printCoordinates(x, y)
-
-	x = math.floor((x + 20) / 113)
-	y = math.floor((y + 20) / 113)
-	
-	return tostring(char(y + 1)) .. tostring(x + 1)
+	return Zones:snaptoDefault(window, id, x, y, dx, dy)
 	
 end
 

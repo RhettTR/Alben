@@ -1,30 +1,22 @@
 
--- make repository window invisible
+-- repository window visiblity
 
 repository_visibility(false)
 
 
--- set log window toolbar icons
 
-local callback = "toggle_pin('logbar', 'pin')"
-add_toolbar_button('logbar', 'pin', '__unpin', '', '', callback)
-add_toolbar_separator('logbar')
-local callback = "roll_die()"
-add_toolbar_button('logbar', 'dieroll', '1d6-twister', '', 'dr', callback)
+-- specify the visual appearance of grid (minscale, radius, r, g ,b, a)
+specify_grid(0.4, 5, 255, 0, 0, 125 )
 
-toolbar_enable('logbar', 'dieroll')
+
+-- show the grid
+show_grid(false)
 
 
 
--- set default offset of stacks (6 = dx 2 = dy 2 = multiplier open stack 0 = unlimited shown)
+-- set default offset of stacks (2 = dx 4 = dy, 2 = x-multiplier 5 = y-multiplier for open stack, 0 = unlimited shown)
 
-setDefaultOffset(6, 2, 2, 0)
-
-
--- set map zoom range and default zoom (last value)
-
-set_zoom_range(130, 120, 110, 100, 90, 80, 70, 60, 100)
-
+setDefaultOffset(2, 4, 2, 5, 0)
 
 
 
@@ -33,109 +25,145 @@ set_zoom_range(130, 120, 110, 100, 90, 80, 70, 60, 100)
 -- create windows
 
 
-
-
-
-create_window('Reinforcements', 'Set-up / Reinforcements', 'Reinforcements', false, '')
-
-
--- black squares
-
-local css = "border: 1px solid black;"
-add_window_label('Reinforcements', 'IPool', 113, 290, 54, 54, '', css)
-add_window_label('Reinforcements', 'IPile', 263, 290, 54, 54, '', css)
-add_window_label('Reinforcements', 'MPool', 486, 290, 54, 54, '', css)
-add_window_label('Reinforcements', 'MPile', 635, 290, 54, 54, '', css)
-
-
--- zone
-
-local zone = Zone:new('Reinforcements', 'rfzone')
-
-zone:setBorder({x0 = 28, y0 = 50, x1 = 849, y1 = 908})
-
-zone:addMembers('ge%-cav%-%w+%-*%d*$')
-zone:addMembers('ge%-inf%-%d+$')
-zone:addMembers('ge%-mot%-%w+$')
-zone:addMembers('ge%-mot%-%w+%-%d*$')
-zone:addMembers('ge%-pz%-%w+%-%-%d+pz%-*%d*$')
-zone:addMembers('ge%-pz%-%w+-%d+pzgr-%d*$')
-
-zone:addMembers('ru%-HQ%-%w+.+$')
-zone:addMembers('ru%-inf%-%w+$')
-zone:addMembers('ru%-arm%-%d+$')
-zone:addMembers('ru%-mech%-%w+$')
-
-zone:addMember('ru-inf-??')
-zone:addMember('ru-mech-??')
-
-
-
-
-zone:addGrid(59, 424, 'Turn 1', 0, 0, Offset:new(2, 2, 3, 3))
-zone:addGrid(135, 424, 'Turn 2', 0, 0, Offset:new(2, 2, 3, 3))
-zone:addGrid(135, 538, 'Turn 2', 0, 0, Offset:new(2, 2, 3, 3))
-
-zone:addGrid(209, 424, 'Turn 3', 0, 0, Offset:new(2, 2, 3, 3))
-zone:addGrid(209, 538, 'Turn 3', 0, 0, Offset:new(2, 2, 3, 3))
-zone:addGrid(209, 593, 'Turn 3', 0, 0, Offset:new(2, 2, 3, 3))
-zone:addGrid(209, 672, 'Turn 3', 0, 0, Offset:new(2, 2, 3, 3))
-
-zone:addGrid(358, 424, 'Turn 5', 0, 0, Offset:new(2, 2, 3, 3))
-zone:addGrid(432, 424, 'Turn 6', 0, 0, Offset:new(2, 2, 3, 3))
-zone:addGrid(507, 424, 'Turn 7', 0, 0, Offset:new(2, 2, 3, 3))
-zone:addGrid(582, 424, 'Turn 8', 0, 0, Offset:new(2, 2, 3, 3))
-zone:addGrid(656, 424, 'Turn 9', 0, 0, Offset:new(2, 2, 3, 3))
-
-zone:addGrid(60, 856, '24th Army HQ')
-zone:addGrid(136, 856, '16th Army HQ')
-zone:addGrid(209, 856, '19th Army HQ')
-zone:addGrid(284, 856, '13th Army HQ')
-zone:addGrid(358, 856, '20th Army HQ')
-
-zone:addGrid(60, 89, 'Turn 1 X')
-zone:addGrid(60, 182, 'Turn 1 V')
-zone:addGrid(136, 90, 'Turn 2 W')
-zone:addGrid(209, 90, 'Turn 3 Z')
-zone:addGrid(284, 90, 'Turn 4 X')
-zone:addGrid(507, 90, 'Turn 7 X')
-zone:addGrid(582, 90, 'Turn 8 X')
-zone:addGrid(656, 90, 'Turn 9 X')
-zone:addGrid(731, 90, 'Turn 10 X')
-zone:addGrid(806, 90, 'Turn 11 X')
-
-zone:addGrid(139, 317, 'Soviet Infantry Pool', 0, 0, Offset:new(2, 2, 1, 6))
-zone:addGrid(289, 317, 'Soviet Infantry Dead Pool', 0, 0, Offset:new(2, 2, 1, 3))
-zone:addGrid(512, 317, 'Soviet Armor Pool', 0, 0, Offset:new(2, 2, 1, 6))
-zone:addGrid(661, 317, 'Soviet Armor Dead Pool', 0, 0, Offset:new(2, 2, 1, 3))
-
-
-
-
-create_window('Gy', 'Graveyard', 'Graveyard', false, '')
-
-
-
+create_window('Axis OOB', 'Axis OOB', 'G-OOB-TRC3-071104', true, '')
+create_window('Russian OOB', 'Russian OOB', 'R-OOB-72-2x-071102', true, '')
+create_window('POW', 'Prisoners Of War', 'pow_box', false, '')
+create_window('Repl', 'Replacements', 'trc3_replacement_pool', false, '')
+create_window('Airfield', 'Airfield', 'Flugplatz_box', false, '')
+create_window('Para', 'Paratroops', 'paratroop_box', false, '')
+create_window('Part', 'Partisans', 'partisan_box', false, '')
 create_window('Ch', 'Charts', '#777777', false, 'Layout')
-set_window('Ch', 70, 70, 870, 780)
+create_window('Op', 'Optional Units', 'TRC_optionalUnits', false, '')
 
-set_root_window('Ch')
+
+
+
+-- define zone for main map
+
+
+local mainzone = Zone:new('main', 'main')
+
+local a = 52.75
+local b = 90.24
+
+mainzone:setBorder({x0 = leftPadding, y0 = topPadding, 
+				    x1 = leftPadding + 3 + 3409, y1 = topPadding + 3 + 2796})
+
+	
+mainzone:hexGrid(a, b)
+mainzone.coordinatesUsed = true
+
+set_grid({mainzone.grid}, 1, 'main')
+
+
+
+
+mainzone:addMember('choochoo')
+mainzone:addMember('invasion')
+mainzone:addMember('paratroop_marker_57x57')
+mainzone:addMember('germany-sm0')
+mainzone:addMember('russia-sm0')
+mainzone:addMember('Battle05')
+
+
+mainzone:addMembers('^ge%w*')
+mainzone:addMembers('^ss%w*')
+mainzone:addMembers('^it%w*')
+mainzone:addMembers('^hu%w*')
+mainzone:addMembers('^ro%w*')
+mainzone:addMembers('^fi%w*')
+mainzone:addMembers('^Hitler')
+mainzone:addMembers('^stuka%w*')
+
+mainzone:addMembers('^ru%w*')
+mainzone:addMembers('ru%-HQ$')
+mainzone:addMembers('Stalin$')
+mainzone:addMembers('Partisan%d$')
+mainzone:addMembers('Worker%-%w+$')
+mainzone:addMembers('Worker%-%w+%-%w+$')
+mainzone:addMembers('Worker%-%w+%-%w+%-%w+$')
+mainzone:addMembers('sturm')
+
+
+
+
+-- zones in OOB
+
+local azone = Zone:new('Axis OOB', 'azone')
+
+azone:setBorder({x0 = 56, y0 = 116, x1 = 834, y1 = 1716})
+
+azone:squareGrid(59.2, 59.1, 3, 1)
+
+-- needs more work (squaregrid to get custom places)
+
+
+
+
+set_grid({azone.grid}, 1, 'Axis OOB')
+
+
+azone:addMembers('^ge%w*')
+azone:addMembers('^ss%w*')
+azone:addMembers('^it%w*')
+azone:addMembers('^hu%w*')
+azone:addMembers('^ro%w*')
+azone:addMembers('^fi%w*')
+azone:addMembers('^Hitler')
+
+
+
+local bzone = Zone:new('Russian OOB', 'bzone')
+
+bzone:setBorder({x0 = 56, y0 = 114, x1 = 895, y1 = 1535})
+
+bzone:squareGrid(59.2, 59.1, 3, 1)
+
+
+set_grid({bzone.grid}, 1, 'Russian OOB')
+
+
+
+bzone:addMembers('^ru%w*')
+bzone:addMembers('ru%-HQ$')
+bzone:addMembers('Stalin$')
+bzone:addMembers('Partisan%d$')
+bzone:addMembers('Worker%-%w+$')
+bzone:addMembers('Worker%-%w+%-%w+$')
+bzone:addMembers('Worker%-%w+%-%w+%-%w+$')
+
+
+
+
+
+
+-- set the tabbed Charts window
+
+
+set_window('Ch', 70, 70, 600, 550)
+
+set_root('Ch')
 
 root(0)
 
 	tabs(1)
 
-		tab(2, 'CRT')	
-			image_item('CRT')
+		tab(2, 'Combat')	
+			html_item('combat.html')
 		
-		tab(2, 'Terrain Effects')				
-			image_item('Terrain Effects Chart')
+		tab(2, 'Movement')				
+			html_item('movement.html')
 			
-		tab(2, 'Terrain Key')				
-			image_item('terrain_key')
-			
-			
+		tab(2, 'TRC3-Rail && Sea Movement')				
+			image_item('RailSeaMovement')
 				
+		tab(2, 'Weather')				
+			html_item('weather.html')
+		
+		tab(2, 'Historical Weather')				
+			image_item('TRC3-Historical-Weather')					
+	
+	
 			
 
 -- create custom toolbar and add buttons
@@ -143,24 +171,28 @@ root(0)
 create_toolbar('ct', 'Custom toolbar')
 
 
-add_toolbar_label('ct', 'label1', 'russian_button', 20, 20, 'padding-left:10; padding-right:10')
+add_toolbar_label('ct', 'label1', 'gr_oob_button', 20, 20, 'padding-left:10; padding-right:10')
 toolbar_enable('ct', 'label1')
 
 local css = 'font-size: 15px; border: 1px solid grey; height:20px; margin-right:4; border-radius: 2px;'
-add_toolbar_label('ct', 'label2', '', 410, 22, css)
+add_toolbar_label('ct', 'label2', '', 310, 22, css)
 toolbar_enable('ct', 'label2')
 
 
 
 
 
------------
-local turns = {'Turn 1 (3-4 July)', 'Turn 2 (5-6 July)', 'Turn 3 (7-8 July)', 'Turn 4 (9-10 July)', 
-               'Turn 5 (11-12 July)', 'Turn 6 (13-14 July)', 'Turn 7 (15-16 July)', 'Turn 8 (17-18 July)', 
-               'Turn 9 (19-20 July)', 'Turn 10 (21-22 July)', 'Turn 11 (23-24 July)', 'Turn 12 (25-26 July)'}
-local phases = {'Soviet Movement Phase', 'Soviet Combat Phase', 'Soviet Disruption Removal Phase', 
-				'Soviet Interdiction Phase', 'German Initial Movement Phase', 'German Combat Phase',
-				'German Mechanized Movement Phase', 'German Disruption Removal Phase', 'German Air Interdiction Phase'}
+
+
+-- set turn track
+
+
+local turns = {'Turn May/Jun 1941', 'Turn Jul/Aug 1941', 'Turn Sep/Oct 1941', 'Turn Nov/Dec 1941', 
+               'Turn Jan/Feb 1942', 'Turn Mar/Apr 1942', 'Turn May/Jun 1942', 'Turn Jul/Aug 1942', 'Turn Sep/Oct 1942', 'Turn Nov/Dec 1942', 
+               'Turn Jan/Feb 1943', 'Turn Mar/Apr 1943', 'Turn May/Jun 1943', 'Turn Jul/Aug 1943', 'Turn Sep/Oct 1943', 'Turn Nov/Dec 1943',
+               'Turn Jan/Feb 1944', 'Turn Mar/Apr 1944', 'Turn May/Jun 1944', 'Turn Jul/Aug 1944', 'Turn Sep/Oct 1944', 'Turn Nov/Dec 1944',
+               'Turn Jan/Feb 1945', 'Turn Mar/Apr 1945', 'Turn May/Jun 1945'}
+local phases = {' - Axis First Impulse', ' - Axis Second Impulse', ' - Soviet First Impulse', ' - Soviet Second Impuse'}
 
 
 
@@ -171,10 +203,10 @@ Globals:add('Turn', {turn = 1, phase = 1})
 function printturn()
 	local turn = Globals['Turn'].turn
 	local phase = Globals['Turn'].phase
-	if phase >= 1 and phase <=4 then
-		set_toolbar_button('ct', 'label1', 'russian_button', '')
+	if phase >= 1 and phase <=2 then
+		set_toolbar_button('ct', 'label1', 'gr_oob_button', '')
 	else
-		set_toolbar_button('ct', 'label1', 'GermanControl', '')
+		set_toolbar_button('ct', 'label1', 'russian_button', '')
 	end
 	set_toolbar_label('ct', 'label2', turns[turn] .. ' ' .. phases[phase])
 end
@@ -183,8 +215,8 @@ function nextturn()
 	local turn = Globals['Turn'].turn
 	local phase = Globals['Turn'].phase
 
-	if phase == 9 then
-		if turn + 1 > 12 then
+	if phase == 4 then
+		if turn + 1 > 25 then
 			turn = 1
 			phase = 1	
 		else
@@ -203,213 +235,75 @@ function nextturn()
 	State:addMove('Turn', 'Globals', 'turn', Globals['Turn'].turn)
 	State:addMove('Turn', 'Globals', 'phase', Globals['Turn'].phase)
 
-	reporttext('move', '<span style="color:gray;">*** Turn: ' .. turn .. ' ' .. phases[phase] .. '</span>')
+	reporttext('move', '<span style="color:gray;">*** ' .. turns[turn] .. ' ' .. phases[phase] .. '</span>')
 	
 	State:addStage()
 	
 end
 
-add_toolbar_button('ct', 'bs', 'button_step', '', 'Next turn', 'nextturn()')
+add_toolbar_button('ct', 'bs', 'StepForward32', '', 'Next turn', 'nextturn()')
 toolbar_enable('ct', 'bs')
 
 State.baseState['Turn'] = Counter:duplicate(Globals['Turn'])
 printturn()
 
-
------------
-
 add_toolbar_separator('ct')
 
 
 
-local callback = "toggle_window('Reinforcements')"
-add_toolbar_button('ct', 'Rf', 'control_button', 'Set-up / Reinforcements', 'Show/Hide window', callback)
-toolbar_enable('ct', 'Rf')
+-- define tool bar buttons
 
-local callback = "toggle_window('Gy')"
-add_toolbar_button('ct', 'gy', 'button_headstone', 'Graveyard', 'Show/Hide window', callback)
-toolbar_enable('ct', 'gy')
+local callback = "toggle_window('Axis OOB')"
+add_toolbar_button('ct', 'Axis OOB', 'gr_oob_button', 'Axis OOB', 'Show/Hide window', callback)
+toolbar_enable('ct', 'Axis OOB')
+
+local callback = "toggle_window('Russian OOB')"
+add_toolbar_button('ct', 'Russian OOB', 'russian_button', 'Russian OOB', 'Show/Hide window', callback)
+toolbar_enable('ct', 'Russian OOB')
+
+local callback = "toggle_window('Airfield')"
+add_toolbar_button('ct', 'Airfield', 'stuka_button', '', 'Show/Hide Airfield', callback)
+toolbar_enable('ct', 'Airfield')
+
+local callback = "toggle_window('Repl')"
+add_toolbar_button('ct', 'Repl', 'replacement_button', '', 'Show/Hide Replacements', callback)
+toolbar_enable('ct', 'Repl')
+
+local callback = "toggle_window('POW')"
+add_toolbar_button('ct', 'POW', 'pow_button', '', 'Show/Hide Prisoners Of War', callback)
+toolbar_enable('ct', 'POW')
+
+local callback = "toggle_window('Para')"
+add_toolbar_button('ct', 'Para', 'paratroop_button', '', 'Show/Hide Paratroopers', callback)
+toolbar_enable('ct', 'Para')
+
+local callback = "toggle_window('Part')"
+add_toolbar_button('ct', 'Part', 'partisan_button', '', 'Show/Hide Partisans', callback)
+toolbar_enable('ct', 'Part')
 
 local callback = "toggle_window('Ch')"
-add_toolbar_button('ct', 'ch', 'button_charts', 'Charts', 'Show/Hide window', callback)
-toolbar_enable('ct', 'ch')
+add_toolbar_button('ct', 'Ch', 'charts_button', '', 'Show/Hide Charts', callback)
+toolbar_enable('ct', 'Ch')
 
-local callback = "toggle_window('Repository')"
-add_toolbar_button('ct', 're', 'button_units', 'Markers', 'Show/Hide window', callback)
-toolbar_enable('ct', 're')
+local callback = "toggle_window('Op')"
+add_toolbar_button('ct', 'Op', 'optional_button', '', 'Show/Hide Optional Units', callback)
+toolbar_enable('ct', 'Op')
 
-
-
-
--- define zone for main map ::  zones must have a unique tag across windows
-
-
-local mainzone = Zone:new('main', 'main')
-
-mainzone:setBorder({x0 = 36, y0 = 38, x1 = 4643, y1 = 2864})
-
-	
-mainzone:hexGrid(51.74, 89.61)
-
-set_grid({mainzone.grid}, 1)
-
--- specify the visual appearance of grid (minscale, radius, r, g ,b, a)
-specify_grid(0.4, 5, 255, 0, 0, 255 )
-
--- show the grid
-show_grid(false)
-
-
-mainzone:addGrid(leftPadding + 477, topPadding + 43, 'German Air Interdiction', 0, 0, Offset:new(2, 2, 3, 0))
-mainzone:addGrid(leftPadding + 634, topPadding + 43, 'Soviet Interdiction')
-mainzone:addGrid(leftPadding + 786, topPadding + 43, 'Soviet Rail Cut', 0, 0, Offset:new(2, 2, 3, 0))
-
-
-local p1 = mainzone:getGrid('German Air Interdiction')
-local p2 = mainzone:getGrid('Soviet Interdiction')
-local p3 = mainzone:getGrid('Soviet Rail Cut')
-
-Repository:addTrait('German Air Interdiction', 'Move', Move:new('Remove', p1))
-Repository:addTrait('Soviet Interdiction', 'Move', Move:new('Remove', p2))
-Repository:addTrait('Soviet Rail Cut', 'Move', Move:new('Remove', p3))
+local callback = "show_menu('ct', 'Broom')"
+add_toolbar_button('ct', 'Br', 'whiskbroom_button', '', 'Show menu', callback)
+toolbar_enable('ct', 'Br')
 
 
 
 
 
-mainzone:addMembers('ge%-cav%-%w+%-*%d*$')
-mainzone:addMembers('ge%-inf%-%d+$')
-mainzone:addMembers('ge%-mot%-%w+$')
-mainzone:addMembers('ge%-mot%-%w+%-%d*$')
-mainzone:addMembers('ge%-pz%-%w+%-%-%d+pz%-*%d*$')
-mainzone:addMembers('ge%-pz%-%w+-%d+pzgr-%d*$')
-
-mainzone:addMembers('ru%-arm%-%d+$')
-mainzone:addMembers('ru%-HQ%-%w+.+$')
-mainzone:addMembers('ru%-inf%-%w+$')
-mainzone:addMembers('ru%-mech%-%w+$')
-
-mainzone:addMember('German Control')
-mainzone:addMember('German Disruption')
-mainzone:addMember('German Out of Supply')	
-mainzone:addMember('German Air Interdiction')
-mainzone:addMember('Soviet Disruption')
-mainzone:addMember('Soviet Out of Supply')	
-mainzone:addMember('Soviet Interdiction')
-mainzone:addMember('Soviet Rail Cut')
-
-mainzone:addMember('ru-inf-??')
-mainzone:addMember('ru-mech-??')
-
-
-
--- position squares on top
-
-local css = ' border: 1px solid black;'
-
-add_window_label('main', 'German Air Interdiction', leftPadding + 450, topPadding + 16, 54, 54, '', css)
-add_window_label('main', 'Soviet Air Interdiction', leftPadding + 607, topPadding + 16, 54, 54, '', css)
-add_window_label('main', 'Soviet Rail Cut', leftPadding + 759, topPadding + 16, 54, 54, '', css)
-
-
-
--- create four hidden decks that keep track of counters revealed/not revealed
-
-Deck:new('ru-inf', {}, {0,0})
-Deck:new('ru-inf-d', {}, {0,0})
-Deck:new('ru-mech', {}, {0,0})
-Deck:new('ru-mech-d', {}, {0,0})
-
-State.baseState['ru-inf'] = Counter:duplicate(Decks['ru-inf'].cards)
-State.baseState['ru-inf-d'] = Counter:duplicate(Decks['ru-inf-d'].cards)
-State.baseState['ru-mech'] = Counter:duplicate(Decks['ru-mech'].cards)
-State.baseState['ru-mech-d'] = Counter:duplicate(Decks['ru-mech-d'].cards)
 
 
 
 
--- loads the start position (done after all windows and grids defined)
+-- loads the start position (only called after all windows and zones defined)
 
 load_setup('setup.vsav')
 
 
-
-
-
-
-
-
--- create 78 untried soviet infantry and 20 untried armor/mech units
-
--- IMPORTANT: the following code is just for setup
-
-  --  after the setup is saved the following code must be removed --
---------------------------------------------------------------------
-
-
-
---[[
-
-
-local deck = Decks:get('ru-inf')
-
-for k, v in pairs(Repository) do
-	if type(k) == "string" and k ~= '__index' and type(v) ~= 'function' then	
-		local key = string.match(k, 'ru%-inf%-%w+$')		
-		if key ~= nil then	
-			deck:add(k)
-		end
-	end
-end
-
--- remove the unused (blank) counter
-table.remove(deck.cards, 30)
-
-
-
-local deck = Decks:get('ru-mech')
-
-for k, v in pairs(Repository) do
-	if type(k) == "string" and k ~= '__index' and type(v) ~= 'function' then	
-		local key = string.match(k, 'ru%-mech%-%w+$')		
-		if key ~= nil then
-			deck:add(k)
-		end
-	end
-end
-
-for k, v in pairs(Repository) do
-	if type(k) == "string" and k ~= '__index' and type(v) ~= 'function' then	
-		local key = string.match(k, 'ru%-arm%-%d+$')		
-		if key ~= nil then	
-			deck:add(k)
-		end
-	end
-end
-
-
-
--- create counters for infantry and armor pool (78 and 20)
-
-
-local point = zone:getGrid('Soviet Infantry Pool')
-
-
-for i = 1, 78 do
-	local toId = next_id()
-	local zorder = top_zorder()
-	local dx, dy = get_size('ru-inf-??')
-	copyCounter('ru-inf-??', toId, zorder, 'Reinforcements', point.x - dx, point.y - dy)
-end
-
-point = zone:getGrid('Soviet Armor Pool')
-
-for i = 1, 20 do
-	local toId = next_id()
-	local zorder = top_zorder()
-	local dx, dy = get_size('ru-mech-??')
-	copyCounter('ru-mech-??', toId, zorder, 'Reinforcements', point.x - dx, point.y - dy)
-end
-
-		
---]]
+	

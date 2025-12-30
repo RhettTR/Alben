@@ -24,6 +24,8 @@ std::map<std::string, ToolBar *> ToolBar::instances;
 
 
 
+
+
 ToolBar::ButtonAction::ButtonAction(const char *id, std::string resourceName, QString buttonText, const QString toolTip, 
 									std::function<void(void)> f, std::string luaScript) 
 {
@@ -458,7 +460,7 @@ void ToolBar::zoom(float fraction)
 	scaled->resourceScaleRotate("main", Window::getInstance("main")->frame->backgroundID);
 	
 	
-	Counter::setGUI();
+	Counter::setGUI("main");
 	
 	
 	Window::getInstance("main")->frame->repaint();
@@ -513,7 +515,7 @@ void ToolBar::zoomCoordinates(QPoint point, float newFraction)
 	
 	
 		
-	Counter::setGUI();
+	Counter::setGUI("main");
 	
 	
 	Window::getInstance("main")->frame->repaint();
@@ -578,7 +580,7 @@ void ToolBar::zoomMiddle(float newFraction)
 	
 	
 		
-	Counter::setGUI();
+	Counter::setGUI("main");
 	
 	
 	Window::getInstance("main")->frame->repaint();
@@ -657,3 +659,104 @@ void ToolBar::wheelOut(QPoint point)
 {	
 	zoomFraction(point, -0.1);	
 }
+
+
+
+ToolBar::ToolButton *ToolBar::getToolButton(const char *id)
+{
+	std::string name = std::string(id);
+	
+	for ( auto obj = ToolBar::buttons.begin(); obj != ToolBar::buttons.end(); ++obj  )
+	
+		if (obj->first == name)
+		{
+			return obj->second;
+		}
+			
+	return nullptr;
+}
+
+
+
+
+static Luau::PopupEntries popupentries;
+
+
+void ToolBar::showMenu(const char *menuid)
+{
+	
+	QMenu myMenu(this);
+	QWidget widget;
+	
+	
+	myMenu.clear();
+	
+	popupentries.clear();
+	
+
+
+	popupentries = Luau::getTraits("Global", menuid);
+		
+
+	for (auto e : popupentries)
+	{
+	 
+		const QString name = QString::fromStdString(e.entryname);
+		
+		
+		ActionData data;
+		data.entryaction = QString(e.entryaction.c_str());
+		data.entrytrait = QString(e.entrytrait.c_str());
+		data.entryactions = QString(e.entryactions.c_str());
+		
+		
+
+			
+		QAction* action = new QAction(name, this);	
+		
+		QVariant v;
+		
+		v.setValue(data);
+		action->setData(v);
+	
+
+	   
+		widget.addAction(action);
+		
+		QObject::connect( action, &QAction::triggered, this, [=]()->void{ do_activate(action); } );
+	
+	}
+	
+	
+	myMenu.addActions(widget.actions());
+	
+	myMenu.exec(QCursor::pos());
+	
+}
+
+
+
+void ToolBar::do_activate (QAction *action)
+{
+	
+	QVariant v = action->data();
+	
+	ActionData retrieved = qvariant_cast<ActionData>(v);
+	
+	const char *entryaction = retrieved.entryaction.toStdString().c_str();
+	const char *entrytrait = retrieved.entrytrait.toStdString().c_str();
+	
+	const char *window = "main";
+	
+	
+	
+		
+	for (auto obj = Counter::counters.begin(); obj != Counter::counters.end(); ++obj)		
+		Luau::doAction(window, obj->second->name.c_str(), entrytrait, entryaction);
+
+	
+	Luau::doAction("", "", "", "actionEnd");
+		
+					
+}
+

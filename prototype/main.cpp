@@ -45,10 +45,10 @@ QAction *endLogAction;
 void reload ();
 
 
-void refresh()
+/*void refresh()
 {		
 	Luau::refresh();
-}
+}*/
 
 
 void undo ()
@@ -267,10 +267,10 @@ int main(int argc, char *argv[])
     QObject::connect(reloadAction, &QAction::triggered, &reload);
     fileMenu->addAction(reloadAction);
     
-    QAction *refreshAction = new QAction("Refresh");
+    /*QAction *refreshAction = new QAction("Refresh");
     refreshAction->setShortcut(QKeySequence("Ctrl+E"));
     QObject::connect(refreshAction, &QAction::triggered, &refresh);
-    fileMenu->addAction(refreshAction);
+    fileMenu->addAction(refreshAction);*/
     
     reloadAction = new QAction("Undo");
     reloadAction->setShortcut(QKeySequence("Ctrl+Z"));
@@ -318,7 +318,7 @@ int main(int argc, char *argv[])
     
     
     window->move(250, 150);
-	window->resize(1030, 500 + menuBar->height());
+	window->resize(1120, 500 + menuBar->height());
 	
 	
 	
@@ -371,11 +371,7 @@ int main(int argc, char *argv[])
 	// default rights table
 	
 	Settings::myOwnershipRights = {0b1, 0b1, 0b1, 0b1, 0b1, 0b1, 0b1, 0b0, 0b0};
-	
-	
-	
-	window->show();
-	
+
 	
 	
 	
@@ -389,9 +385,8 @@ int main(int argc, char *argv[])
 	
     logWindow = new Window(window, "Log / Chat", "LogChat", "Layout");
     
-    
-    
-    
+
+
     
     
     l.startVM();
@@ -400,6 +395,10 @@ int main(int argc, char *argv[])
     
     scaled->resourceScaleRotate("main", window->frame->backgroundID);
 	
+    window->show();
+    if (repositoryWindow->isVisible())
+		repositoryWindow->show();
+    logWindow->show();
     
       
     int res = app.exec();   

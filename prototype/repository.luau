@@ -1,5 +1,5 @@
 
--- loads the keys
+-- load the resource ids (keys)
 
 ResourceKeys = {}
 
@@ -8,6 +8,11 @@ function setResourceKey(id)
 end
 
 get_resource()
+
+
+-- set number of counter columns in repository
+
+set_row_length(4)
 
 
 
@@ -47,11 +52,13 @@ local function assign(prefix)
 		
 	end
 		
+		
 	
 	for k, v in ipairs(result) do
 		--print('Repository["' .. v[1] .. '"] = ' .. dump(v))
 		Repository[v[1]] = Repository:new(v)
 	end
+	
 	
 	for k, v in ipairs(used) do
 		-- NOTE: a key in 'used' is not necessaraly a key in 'ResourceKeys'
@@ -59,8 +66,7 @@ local function assign(prefix)
 		if n ~= nil then
 			table.remove(ResourceKeys, n)
 		end 	
-	end 
-	
+	end
 	
 	
 end
@@ -82,14 +88,26 @@ end
 
 local function assignClass(pattern)
 
+	local result = {}
+	
 	for k, v in pairs(Repository) do
 		if type(k) == "string" and k ~= '__index' and type(v) ~= 'function' then
 			local key = string.match(k, pattern)
 			if key ~= nil then
-				create_class(Repository, k)
+				table.insert(result, Repository[key])
+				--create_class(Repository, k)
 			end
 		end
 	end
+
+	table.sort(result, function(a, b)	     
+						   return a.Image.images[1] < b.Image.images[1]
+					   end)	
+			   
+	for k, v in ipairs(result) do
+		create_class(Repository, v.Image.images[1])
+	end
+	
 	
 end
 
@@ -98,75 +116,82 @@ local function assignName(pattern)
 
 	for k, v in pairs(Repository) do
 		if type(k) == "string" and k ~= '__index' and type(v) ~= 'function' then
+		
 			local key = string.match(k, pattern)
+			
 			if key ~= nil then
+			
 				local name = ''
-				if string.match(key, '^ge')then
-					name = 'German ' 
-				elseif string.match(key, '^ru')then
-					name = 'Soviet '
-				end
-				local unit = string.match(key, '%-%w+%-(%d+)PzDiv')
-				local subunit = string.match(key, '%-%w+%-%d+PzDiv%-+(%d+)')
-				if unit ~= nil and subunit ~= nil then
-					unit = string.gsub(unit, '^0+', '')
-					subunit = string.gsub(subunit, '^0+', '')
-					name = name .. subunit .. '/' .. unit .. ' '
-				else
-					local unit = string.match(key, '%-%w+%-(%d+)Mot')
-					local subunit = string.match(key, '%-%w+%-%d+Mot%-(%d+)')
-					if unit ~= nil and subunit ~= nil then
-						unit = string.gsub(unit, '^0+', '')
-						subunit = string.gsub(subunit, '^0+', '')
-						name = name .. subunit .. '/' .. unit .. ' '
-					else
-						local unit = string.match(key, '%-%w+%-(%d+Mos)')
-						if unit ~= nil then
-							unit = string.gsub(unit, '^0+', '')		
-							name = name .. unit .. ' '
-						else	 
-							local unit = string.match(key, '%-%w+%-(%d+)')
-							if unit ~= nil then
-								unit = string.gsub(unit, '^0+', '')		
-								name = name .. unit .. ' ' 
-							else
-								local unit = string.match(key, '%-%w+%-(%w+)')
-								if unit ~= nil then
-									unit = string.gsub(unit, '^0+', '')
-									name = name .. unit .. ' '
-								end
-							end
-						end		
-					end	
-				end	
 				
-				local type = string.match(key, '%-(%w+)%-')
-				if type == 'cav' then
-					name = name .. 'Cavalery Division'
+				local nation = string.match(key, '^(%w+)')
+				if nation ~= nil then
+					if nation == 'ge'  then
+						name = 'German ' 
+					elseif nation == 'ss' then
+						name = 'German SS '
+					elseif nation == 'fi' then
+						name = 'Finnish '
+					elseif nation == 'ro' then
+						name = 'Romanian '
+					elseif nation == 'hu' then
+						name = 'Hungarian '
+					elseif nation == 'it' then
+						name = 'Italian '
+					elseif nation == 'ru' then
+						name = 'Soviet '
+					elseif nation == 'Worker' then
+						name = 'Worker '		
+					end
 				end
-				if type == 'inf' then
-					name = name .. 'Infantry Division'
+				
+				local unit = string.match(key, '^%w+%-%w+%-(%w+)')	
+				if unit ~= nil then
+					unit = string.gsub(unit, '^0+', '')
+					name = name .. unit .. ' '
 				end
-				if type == 'pz' then
-					name = name .. 'Panzer Division'
+					
+				local type = string.match(key, '^%w+%-(%w+)')
+				if type ~= nil then
+					if type == 'cav' then
+						name = name .. 'Cavalery Corps'
+					elseif type == 'inf' then
+						name = name .. 'Infantry Corps'
+					elseif type == 'pzg' then
+						name = name .. 'Panzer Corps'
+					elseif type == 'abn' then
+						name = name .. 'Airborn Corps'
+					elseif type == 'arm' then
+						name = name .. 'Armoured Corps'
+					elseif type == 'armc' then
+						name = name .. 'Armoured Corps'	
+					elseif type == 'mtn' then
+						name = name .. 'Mountain Corps'
+					elseif type == 'HQ' then
+						name = name .. 'HQ'
+					elseif type == 'art' then
+						name = name .. 'Artillery Corps'
+					elseif type == 'mec' then
+						name = name .. 'Mechanized Corps'
+					elseif type == 'Garm' then
+						name = name .. 'Armored Army'
+					elseif type == 'Gcav' then
+						name = name .. 'Guards Cavalery Corps'
+					elseif type == 'infa' then
+						name = name .. 'Infantry Army'
+					else
+						name = name .. type								
+					end
 				end
-				if type == 'mot' then
-					name = name .. 'Motorized Division'
-				end
-				if type == 'arm' then
-					name = name .. 'Armoured Division'
-				end
-				if type == 'mech' then
-					name = name .. 'Mechanized Division'
-				end
-				if type == 'HQ' then
-					name = name .. 'Army Headquarters'
-				end
-				if Repository[key] ~= nil then
-					Repository[key].name = name
-					--print(key)
-					--print(Repository[key].name)
+			
+				
+				
+				if Repository[k] ~= nil then
+					Repository[k].name = name
+					--print(k)
+					--print(Repository[k].name)
 				end 
+				
+				
 			end
 		end
 	end
@@ -180,137 +205,146 @@ end
 -- create repository
 	
 	
-	assign('ge%-cav%-%w+%-*%d*$')
-	assign('ge%-inf%-%d+$')
-	assign('ge%-mot%-%w+$')
-	assign('ge%-mot%-%w+%-%d*$')
-	assign('ge%-pz%-%w+%-%-%d+pz%-*%d*$')
-	assign('ge%-pz%-%w+-%d+pzgr-%d*$')
+	Repository["choochoo"] = Repository:new({"choochoo"})
+	Repository["invasion"] = Repository:new({"invasion"})
+	Repository["paratroop_marker_57x57"] = Repository:new({"paratroop_marker_57x57"})
+	Repository["germany-sm0"] = Repository:new({"germany-sm0"})
+	Repository["russia-sm0"] = Repository:new({"russia-sm0"})
+	Repository["Battle05"] = Repository:new({"Battle05"})
 	
-	assign('ru%-arm%-%d+$')
-	assign('ru%-HQ%-%w+.+$')
-	assign('ru%-inf%-%w+$')
-	assign('ru%-mech%-%w+$')
+	assign('ge%-inf%-%d.$')
+	assign('ge%-arm%-%w.$')
+	assign('ge%-pzg%-%d.$')
+	assign('ss%-%w*%-%d*$')
+	assign('ss%-pzg%-%w*$')		
+	assign('ge%-cav%-%d+$')
+	assign('ge%-HQ%-%w+$')
+	assign('ge%-luftwaffe$')
+	assign('ge%-mtn%-%w*$')
+	assign('it%-inf%-%d*$')
+	assign('hu%-inf%-%d*$')
+	assign('hu%-pzg%-%d*$')	
+	assign('ro%-%w*%-%d*$')
+	assign('ro%-cav$')
+	assign('ro%-arm$')
+	assign('fi%-inf%-%d*$')
+	assign('ge%-abn%-%d*$')
+	assign('ge%-art%-%d*$')
+	assign('stuka_%w$')
+	assign('Hitler$')
 	
+	assign('ru%-abn%-%d*$')
+	Repository["ru-arm-1"] = Repository:new({"ru-arm-1"})
+	Repository["ru-arm-2"] = Repository:new({"ru-arm-2"})
+	Repository["ru-arm-3"] = Repository:new({"ru-arm-3"})
+	Repository["ru-arm-4"] = Repository:new({"ru-arm-4"})
+	Repository["ru-armc-01"] = Repository:new({"ru-armc-01"})
+	Repository["ru-armc-02"] = Repository:new({"ru-armc-02"})
+	Repository["ru-armc-03"] = Repository:new({"ru-armc-03"})
+	Repository["ru-armc-04"] = Repository:new({"ru-armc-04"})
+	Repository["ru-armc-05"] = Repository:new({"ru-armc-05"})
+	Repository["ru-armc-06"] = Repository:new({"ru-armc-06"})
+	Repository["ru-armc-07"] = Repository:new({"ru-armc-07"})
+	Repository["ru-armc-08"] = Repository:new({"ru-armc-08"})
+	Repository["ru-armc-09"] = Repository:new({"ru-armc-09"})
+	Repository["ru-armc-10"] = Repository:new({"ru-armc-10"})
+	Repository["ru-armc-11"] = Repository:new({"ru-armc-11"})
+	Repository["ru-armc-12"] = Repository:new({"ru-armc-12"})
 	
-	
-	--Repository["ge-inf-005"] = Repository:new({"ge-inf-005", "ge-inf-005-1", "ge-inf-005-2", "ge-inf-005-3"})
-	
-	
-	Repository["control_button"] = Repository:new({"control_button"})
-	
-	Repository["German Control"] = Repository:new({"German Control"})
-	Repository["German Disruption"] = Repository:new({"German Disruption"})
-	Repository["German Out of Supply"] = Repository:new({"German Out of Supply"})	
-	Repository["German Air Interdiction"] = Repository:new({"German Air Interdiction"})
-	
-	Repository["Soviet Disruption"] = Repository:new({"Soviet Disruption"})
-	Repository["Soviet Out of Supply"] = Repository:new({"Soviet Out of Supply"})	
-	Repository["Soviet Interdiction"] = Repository:new({"Soviet Interdiction"})
-	Repository["Soviet Rail Cut"] = Repository:new({"Soviet Rail Cut"})
-	
-	Repository["SW-Front-1-Unit"] = Repository:new({"SW-Front-1-Unit"})
-	Repository["SW-Front-2-Units"] = Repository:new({"SW-Front-2-Units"})
-	Repository["SW-Front-3-Units"] = Repository:new({"SW-Front-3-Units"})
-	Repository["SW-Front-4-Units"] = Repository:new({"SW-Front-4-Units"})
-	Repository["SW-Front-5-Units"] = Repository:new({"SW-Front-5-Units"})
-	
-	
-	Repository["ru-inf-??"] = Repository:new({"ru-inf-??"})
-	Repository["ru-mech-??"] = Repository:new({"ru-mech-??"})
+	assign('ru%-cav%-%d*$')
+	assign('ru%-HQ$')
+	assign('Stalin$')	
+	assign('ru%-inf%-%d*$')
+	assign('ru%-arm%-1Gd$')
+	Repository["ru-cav-1Gd"] = Repository:new({"ru-cav-1Gd"})
+	assign('ru%-Garm%-%w+$')
+	assign('ru%-Gcav%-%d+$')
+	assign('ru%-infa%-%w+$')
+	assign('ru%-art%-%d+$')
+	assign('sturm$')
+	assign('Partisan%d$')
+	assign('Worker%-%w+$')
+	assign('Worker%-%w+%-%w+$')
+	assign('Worker%-%w+%-%w+%-%w+$')
 	
 	
 	
 -- set traits for all counters
 	
 	
-	assignTraits('ge%-cav%-%w+%-*%d*$', German)
-	assignTraits('ge%-inf%-%d+$', German)
-	assignTraits('ge%-mot%-%w+$', German)
-	assignTraits('ge%-mot%-%w+%-%d*$', GermanMot)
-	assignTraits('ge%-pz%-%w+%-%-%d+pz%-*%d*$', GermanArm)
-	assignTraits('ge%-pz%-%w+-%d+pzgr-%d*$', GermanArm)
+	Repository:addTraits("choochoo", Markers:new())
+	Repository:addTraits("invasion", Markers:new())
+	Repository:addTraits("paratroop_marker_57x57", Markers:new())
+	Repository:addTrait("germany-sm0", "Delete", Delete)
+	Repository:addTrait("germany-sm0", "Marker", Marker:new("germany-sm0", -20, 0, "German"))	
+	Repository:addTrait("russia-sm0", "Delete", Delete)
+	Repository:addTrait("russia-sm0", "Marker", Marker:new("russia-sm0", -20, 0, "Soviet"))	
+	Repository:addTraits("Battle05", Odds:new())
+	 	
+	assignTraits('^ge%-%w*', Axis)
+	assignTraits('^ss%w*', Axis)
+	assignTraits('^it%w*', Axis)
+	assignTraits('^hu%w*', Axis)
+	assignTraits('^ro%w*', Axis)
+	assignTraits('^fi%w*', Axis)
+	assignTraits('^Hitler', Axis)
+	assignTraits('^stuka_%w', Stukas)
 	
-	assignTraits('ru%-arm%-%d+$', SovietArm)
-	assignTraits('ru%-HQ%-%w+.+$', SovietHQ)
-	assignTraits('ru%-inf%-%w+$', SovietInf)
-	assignTraits('ru%-mech%-%w+$', SovietArm)
-
-	
-	--Repository:addTraits("ge-inf-005", German:new())
-	
-	
-	
-	
-	
-	Repository:addTrait('ru-HQ-13th-Army-Remezov', 'AreaOfEffect', AreaOfEffect:new('hex', 4, 'red', 0.2))
-	Repository:addTrait('ru-HQ-16th-Army-Lukin', 'AreaOfEffect', AreaOfEffect:new('hex', 3, 'red', 0.2))
-	Repository:addTrait('ru-HQ-19th-Army-Koniev', 'AreaOfEffect', AreaOfEffect:new('hex', 5, 'red', 0.2))
-	Repository:addTrait('ru-HQ-20th-Army-Kurochkin', 'AreaOfEffect', AreaOfEffect:new('hex', 4, 'red', 0.2))
-	Repository:addTrait('ru-HQ-21st-Army-Gerisamenko', 'AreaOfEffect', AreaOfEffect:new('hex', 2, 'red', 0.2))
-	Repository:addTrait('ru-HQ-22th-Army-Yershakov', 'AreaOfEffect', AreaOfEffect:new('hex', 3, 'red', 0.2))
-	Repository:addTrait('ru-HQ-24th-Army-Rakutin', 'AreaOfEffect', AreaOfEffect:new('hex', 2, 'red', 0.2))
-	Repository:addTrait('ru-HQ-28th-Army-Kashalov', 'AreaOfEffect', AreaOfEffect:new('hex', 2, 'red', 0.2))
-	Repository:addTrait('ru-HQ-29th-Army-Maslennikov', 'AreaOfEffect', AreaOfEffect:new('hex', 3, 'red', 0.2))
-	Repository:addTrait('ru-HQ-30th-Army-Khomenko', 'AreaOfEffect', AreaOfEffect:new('hex', 3, 'red', 0.2))
-	Repository:addTrait('ru-HQ-31st-Army-Dolmatov', 'AreaOfEffect', AreaOfEffect:new('hex', 2, 'red', 0.2))
-	Repository:addTrait('ru-HQ-32nd-Army-Vishnevsky', 'AreaOfEffect', AreaOfEffect:new('hex', 2, 'red', 0.2))
-	Repository:addTrait('ru-HQ-33th-Army-Onuprienko', 'AreaOfEffect', AreaOfEffect:new('hex', 2, 'red', 0.2))
-	Repository:addTrait('ru-HQ-49th-Army-Zakharkin', 'AreaOfEffect', AreaOfEffect:new('hex', 3, 'red', 0.2))
-	Repository:addTrait('ru-HQ-Reserve-Army-Rokassovski', 'AreaOfEffect', AreaOfEffect:new('hex', 5, 'red', 0.2))
+	assignTraits('^ru%-%w*', Soviet)
+	assignTraits('^Stalin', Soviet)
+	assignTraits('^Partisan%d$', Soviet)
+	assignTraits('Worker%-%w+$', Soviet)
+	assignTraits('Worker%-%w+%-%w+$', Soviet)
+	assignTraits('Worker%-%w+%-%w+%-%w+$', Soviet)
+	assignTraits('sturm$', Stukas)
 	
 	
-	
-	Repository:addTrait('ru-inf-??', 'Reveal', Reveal:new())
-	Repository:addTrait('ru-inf-??', 'MarkMoved', MarkMoved:new())
-	Repository:addTrait('ru-inf-??', 'Take2', Take:new(2))
-	Repository:addTrait('ru-inf-??', 'Take3', Take:new(3))
-	Repository:addTrait('ru-mech-??', 'Reveal', Reveal:new())
-	Repository:addTrait('ru-mech-??', 'MarkMoved', MarkMoved:new())
-	
-	
-	Repository:addTrait('German Disruption', 'Delete', Delete)
-	Repository:addTrait('German Disruption', 'OnlyOneInStack', OnlyOneInStack)
-	Repository:addTrait('Soviet Disruption', 'Delete', Delete)
-	Repository:addTrait('Soviet Disruption', 'OnlyOneInStack', OnlyOneInStack)
-	Repository:addTrait('German Out of Supply', 'Delete', Delete)
-	Repository:addTrait('German Out of Supply', 'OnlyOneInStack', OnlyOneInStack)
-	Repository:addTrait('Soviet Out of Supply', 'Delete', Delete)
-	Repository:addTrait('Soviet Out of Supply', 'OnlyOneInStack', OnlyOneInStack)
-	
-	
-	Repository:addTrait('German Control', 'Marker', Marker:new('German Control', -20, -10, 'German'))
 	
 
 	
 -- set display name for all counters
 
+	assignName('^ge%-%w*%-%w*')
+	assignName('^ss%-%w*%-%w*')
+	assignName('^fi%-%w*%-%w*')
+	assignName('^ro%-%w*%-%w*')
+	assignName('^hu%-%w*%-%w*')
+	assignName('^it%-%w*%-%w*')
 	
-	assignName('ge%-cav%-%w+%-*%d*$')
-	assignName('ge%-inf%-%d+$')
-	assignName('ge%-mot%-%w+$')
-	assignName('ge%-mot%-%w+%-%d*$')
-	assignName('ge%-pz%-%w+%-%-%d+pz%-*%d*$')
-	assignName('ge%-pz%-%w+-%d+pzgr-%d*$')
+	Repository['ge-abn-2'].name = 'German 2 Airborn Division'
+	Repository['ge-luftwaffe'].name = 'German Luftwaffe Corps'
+	Repository['stuka_c'].name = 'Stuka Army Group Center'
+	Repository['stuka_n'].name = 'Stuka Army Group North'
+	Repository['stuka_s'].name = 'Stuka Army Group South'
 	
-	assignName('ru%-arm%-%d+$')
-	assignName('ru%-HQ%-%w+.+$')
-	assignName('ru%-inf%-%w+$')
-	assignName('ru%-mech%-%w+$')
+	Repository['hu-pzg-1'].name = 'Hungerian 1 Mechanized Corps'
+	Repository['ro-cav'].name = 'Romanian Cavalery Corps'
+	Repository['ro-arm'].name = 'Romanian Panzer Corps'
 	
-	Repository['ge-mot-DR-02'].name = '2/DR Motorized Division'
-	Repository['ge-mot-DR-03'].name = '3/DR Motorized Division'
-	Repository['ge-mot-DR-04'].name = '4/DR Motorized Division'
 	
-	Repository['ru-inf-??'].name = 'Soviet Unrevealed Infantry Division'
-	Repository['ru-mech-??'].name = 'Soviet Unrevealed Armored Division'
+	
+	assignName('^ru%-%w*%-%w*')
+	
+	assignName('^Worker%-%w*')
+	
+	Repository['Worker-Slalino'].name = 'Worker Stalino'
+	Repository['ru-HQ'].name = 'Stavka'
+	Repository['sturm'].name = 'Sturmovik'
+	
+	Repository['choochoo'].name = 'Railhead Marker'
+	Repository['invasion'].name = 'Invasion Marker'
+	Repository['paratroop_marker_57x57'].name = 'Paratroop Drop Marker'
+	Repository['germany-sm0'].name = 'German Control Marker'
+	Repository['russia-sm0'].name = 'Soviet Control Marker'
+	Repository['Battle05'].name = 'Battle Marker'
+	
 	
 
 		
 -- set the content of the repository window
 
 
-set_root_window('Repository')
+set_root('Repository')
 
 
 root(0)	
@@ -318,55 +352,110 @@ root(0)
 		
 	listbox(1)
 	
+		
 		listitem(2, "Markers")
-			create_class(Repository, "German Control")
-			create_class(Repository, "German Disruption")
-			create_class(Repository, "German Out of Supply")	
-			create_class(Repository, "German Air Interdiction")
-			create_class(Repository, "Soviet Disruption")
-			create_class(Repository, "Soviet Out of Supply")	
-			create_class(Repository, "Soviet Interdiction")
-			create_class(Repository, "Soviet Rail Cut")
-			create_class(Repository, "ru-inf-??")
-			create_class(Repository, "ru-mech-??")
-			create_class(Repository, "SW-Front-1-Unit")
-			create_class(Repository, "SW-Front-2-Units")
-			create_class(Repository, "SW-Front-3-Units")
-			create_class(Repository, "SW-Front-4-Units")
-			create_class(Repository, "SW-Front-5-Units")
+		
+			listbox(3)
+				
+				listitem(4, "Railhead")			
+					create_class(Repository, "choochoo")
+				listitem(4, "Invasion")	
+					create_class(Repository, "invasion")
+				listitem(4, "AirDrop")		
+					create_class(Repository, "paratroop_marker_57x57")
+				listitem(4, "Axis Control")	
+					create_class(Repository, "germany-sm0")
+				listitem(4, "Soviet Control")
+					create_class(Repository, "russia-sm0")
+				listitem(4, "Battle")
+					create_class(Repository, "Battle05")			
 					
-		listitem(2, "German Panzer")	
-			assignClass('ge%-pz%-%w+%-%-%d+pz%-*%d*$')
+		listitem(2, "German")
+			assignClass('Hitler$')
+			assignClass('ge%-luftwaffe$')			
+			assignClass('ge%-abn%-%d*$')
+			assignClass('ge%-art%-%d*$')
+			assignClass('stuka_%w$')
+					
+		listitem(2, "German Infantry")	
+			assignClass('ge%-inf%-%d.$')
 			
-		listitem(2, "German PzGr")	
-			assignClass('ge%-pz%-%w+-%d+pzgr-%d*$')
+		listitem(2, "German Armor")	
+			assignClass('ge%-arm%-%w.$')
+			assignClass('ge%-pzg%-%d.$')
+		
+		listitem(2, "German SS")	
+			assignClass('ss%-%w*%-%d*$')
+			assignClass('ss%-pzg%-%w*$')	
 			
-		listitem(2, "German Motorized")
-			assignClass('ge%-mot%-%w+$')
-			assignClass('ge%-mot%-%w+%-%d*$')
+		listitem(2, "German Cavalary")	
+			assignClass('ge%-cav%-%d+$')	
 			
-		listitem(2, "German Cavalry")
-			assignClass('ge%-cav%-%w+%-*%d*$')	
+		listitem(2, "German HQ")	
+			assignClass('ge%-HQ%-%w+$')
 			
-		listitem(2, "German Infantry")
-			assignClass('ge%-inf%-%d+$')
+		listitem(2, "German Mountain")			
+			assignClass('ge%-mtn%-%w*$')
 			
-		listitem(2, "Soviet Armor")
-			assignClass('ru%-arm%-%d+$')
+		listitem(2, "Italian")	
+			assignClass('it%-inf%-%d*$')
 			
-		listitem(2, "Soviet Mechanized")
-			assignClass('ru%-mech%-%w+$')	
-	
-		listitem(2, "Soviet Infantry")
-			assignClass('ru%-inf%-%w+$')
-	
-		listitem(2, "Soviet HQ")
-			assignClass('ru%-HQ%-%w+.+$')
+		listitem(2, "Hugarian")	
+			assignClass('hu%-inf%-%d*$')
+			assignClass('hu%-pzg%-%d*$')
 			
-
-
-
-
+		listitem(2, "Rumanian")	
+			assignClass('ro%-%w*%-%d*$')
+			assignClass('ro%-cav$')
+			assignClass('ro%-arm$')
+			
+		listitem(2, "Finnish")		
+			assignClass('fi%-inf%-%d*$')
+		
+		
+		listitem(2, "Soviet")	
+			assignClass('ru%-abn%-%d*$')
+			assignClass('ru%-art%-%d+$')
+			assignClass('Partisan%d$')
+			assignClass('ru%-HQ$')
+			assignClass('Stalin$')
+			assignClass('sturm$')	
+			
+		listitem(2, "Soviet Armor")			
+			create_class(Repository, "ru-arm-1")
+			create_class(Repository, "ru-arm-2")
+			create_class(Repository, "ru-arm-3")
+			create_class(Repository, "ru-arm-4")
+			create_class(Repository, "ru-armc-01")
+			create_class(Repository, "ru-armc-02")
+			create_class(Repository, "ru-armc-03")
+			create_class(Repository, "ru-armc-04")
+			create_class(Repository, "ru-armc-05")
+			create_class(Repository, "ru-armc-06")
+			create_class(Repository, "ru-armc-07")
+			create_class(Repository, "ru-armc-08")
+			create_class(Repository, "ru-armc-09")
+			create_class(Repository, "ru-armc-10")
+			create_class(Repository, "ru-armc-11")
+			create_class(Repository, "ru-armc-12")	
+			
+		listitem(2, "Soviet Cavalary")	
+			assignClass('ru%-cav%-%d*$')
+			
+		listitem(2, "Soviet Infantry")	
+			assignClass('ru%-inf%-%d*$')
+			
+		listitem(2, "Soviet Guard")	
+			assignClass('ru%-arm%-1Gd$')
+			create_class(Repository, "ru-cav-1Gd")
+			assignClass('ru%-Garm%-%w+$')
+			assignClass('ru%-Gcav%-%d+$')
+			assignClass('ru%-infa%-%w+$')
+			
+		listitem(2, "Soviet Workers")			
+			assignClass('Worker%-%w+$')
+			assignClass('Worker%-%w+%-%w+$')
+			assignClass('Worker%-%w+%-%w+%-%w+$')
 
 	
 return Repository
