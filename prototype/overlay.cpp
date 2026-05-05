@@ -10,12 +10,14 @@ extern Scale *scaled;
 int Overlay::border = 9;
 Overlay *Overlay::overlay = nullptr;;
 
-
+// 5 is default, max columns set by set_row_length
 int Overlay::FlowLayout::maxColumns = 5;
 
 
 Overlay::StackFrame *Overlay::hooverView = nullptr;
 Overlay::StackOpen *Overlay::openView = nullptr;
+
+
 
 
 
@@ -40,7 +42,7 @@ Overlay::FlowLayout::~FlowLayout()
 
 int Overlay::FlowLayout::count() const
 {
-    return itemList.size();
+    return itemList.count();
 }
 
 
@@ -52,7 +54,7 @@ QSize Overlay::FlowLayout::sizeHint() const
 
 QSize Overlay::FlowLayout::minimumSize() const
 {
-	
+    
 	if (itemList.count() == 0)
 		return QSize(0,0);
 	
@@ -135,10 +137,10 @@ QLayoutItem *Overlay::FlowLayout::itemAt(int index) const
 
 QLayoutItem *Overlay::FlowLayout::takeAt(int index)
 {
-    if (index >= 0 && index < itemList.size())
+    if (index >= 0 && index < itemList.count())
         return itemList.takeAt(index);
         
-    return nullptr;
+    return 0;
 }
 
 
@@ -157,7 +159,7 @@ int Overlay::FlowLayout::doLayout(const QRect &rect, bool measure) const
 	 
     if (itemList.count() == 0)
 		return 0;
-	
+ 	
 		
 	int height = 0;
     int totalHeight = 0;
@@ -169,11 +171,11 @@ int Overlay::FlowLayout::doLayout(const QRect &rect, bool measure) const
 	int incx = rect.width() / (n < FlowLayout::maxColumns? n : FlowLayout::maxColumns);	
 	int incy = rect.height() / std::ceil(n / (float)FlowLayout::maxColumns);
 	
-	
-	int x = rect.x() + incx/2;
-    int y = rect.y() + incy/2;
-      
-    
+
+    int x = rect.x();
+    int y = rect.y();
+     
+	    
     int items = 0;
     
   
@@ -183,7 +185,8 @@ int Overlay::FlowLayout::doLayout(const QRect &rect, bool measure) const
          
         if (items == FlowLayout::maxColumns)
 		{           
-            x = rect.x() + incx/2;
+            
+            x = rect.x();
             y += incy;
             
             totalHeight += height;
@@ -191,15 +194,14 @@ int Overlay::FlowLayout::doLayout(const QRect &rect, bool measure) const
             
             items = 0;          
         }
-             
-		
-			
-		
-		
-		QRect current(QPoint(x - (item->sizeHint().width()/2), 
-							 y - (item->sizeHint().height()/2)), 
-					  item->sizeHint());
-		   	   
+             		
+	
+
+		QRect current(QPoint(x, 
+							 y), 
+					  item->sizeHint());			  
+					  
+
 		      	   
 		if (!measure)
 		{	
@@ -209,7 +211,7 @@ int Overlay::FlowLayout::doLayout(const QRect &rect, bool measure) const
 			
         x += incx;
         
-        
+     
         height = qMax(height, item->sizeHint().height());
         totalHeight = qMax(totalHeight, height);
         
@@ -263,19 +265,23 @@ Overlay::StackFrame::StackFrame(QWidget *parent) : QLabel(parent)
 void Overlay::StackFrame::moveThis(QPoint hotspot, int w, int h)
 {
 	
-	if (hotspot.y() - h > 0)
+	int vscroll = Overlay::overlay->scrollArea->verticalScrollBar()->value();
+		
+	
+	if (hotspot.y() - h - vscroll > 0)
 		hotspot += QPoint(0, -h);
 	else
-		hotspot += QPoint(0, -h + std::abs(hotspot.y() - h));
-		
+		hotspot += QPoint(0, -h + std::abs(hotspot.y() - h - vscroll));
 	
 	
-	int width = Overlay::overlay->scrollArea->horizontalScrollBar()->width();
-	int scroll = Overlay::overlay->scrollArea->horizontalScrollBar()->value();
 		
-	if (hotspot.x() + w > scroll + width)
-		hotspot -= QPoint(std::abs((hotspot.x() + w) - (scroll + width)), 0);
-		
+	int step = Overlay::overlay->scrollArea->horizontalScrollBar()->pageStep();	
+	int hscroll = Overlay::overlay->scrollArea->horizontalScrollBar()->value();
+	
+	if (step - (hotspot.x() - hscroll + w) < 0)
+		hotspot += QPoint(-std::abs(step - (hotspot.x() - hscroll + w)), 0);
+	
+	 
 	 
 	this->move(hotspot);
 	
@@ -327,10 +333,9 @@ void Overlay::StackFrame::setImages(CentralFrame::Stack stack)
 	}
 	
 	
-	bool cards = stack.begin()->second->table.find("Card") != stack.begin()->second->table.end();
+	bool card = stack.begin()->second->table.find("Card") != stack.begin()->second->table.end();
 	
 	
-
 	
 	// loop stack and create row(s) of counter images		
 		
@@ -341,10 +346,10 @@ void Overlay::StackFrame::setImages(CentralFrame::Stack stack)
 		icon->setStyleSheet("border-style: none");
 		
 		
-		if (obj->second->baseBuffer.height() > 300)
+		if (obj->second->baseBuffer.height() > 350)
 		{
 			
-			QImage base = obj->second->baseBuffer.scaledToHeight( 300, Qt::SmoothTransformation);
+			QImage base = obj->second->baseBuffer.scaledToHeight( 350, Qt::SmoothTransformation);
 			
 			icon->resize(base.width(), base.height());			
 			icon->setPixmap(QPixmap::fromImage(base));
@@ -356,16 +361,12 @@ void Overlay::StackFrame::setImages(CentralFrame::Stack stack)
 			icon->setPixmap(QPixmap::fromImage(obj->second->baseBuffer));
 		}
 		
-		if (!cards)
+		if (!card)
 			layout->addWidget(icon);
 		else
 		{
-			// only show face up cards
-			Counter::Table table = Luau::getTraits("main", obj->second->id);
-			
-			int index = (int)std::get<double>(std::get<Counter::Table>((table)["Image"])["imageIndex"]);
-				
-			if (index == 1)
+			// show only top card, it is the last in stack
+			if (obj->second == prev(stack.end())->second)
 				layout->addWidget(icon);
 		}	
 		

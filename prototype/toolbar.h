@@ -19,8 +19,7 @@ class ToolBar : public QToolBar
 			public:
 				std::string id;
 				ButtonAction(const char *id, std::string resourceName, QString buttonText, const QString toolTip,
-							 std::function<void(void)>, const std::string);
-				
+							 std::function<void(void)>, const std::string);	
 		};
 		
 		class ToolButton : public QToolButton
@@ -29,7 +28,6 @@ class ToolBar : public QToolBar
 				std::string id;
 				ToolButton(const char *id, std::string resourceName, const QString toolTip,
 						   std::function<void(void)>, const std::string);
-				
 		};
 		
 		class Label : public QLabel
@@ -62,13 +60,15 @@ class ToolBar : public QToolBar
 				MapSizeAction(QObject *parent);
 		};
 	
-		ToolBar(std::string tag, const QString title, QScrollArea *scrollArea = nullptr);
+		ToolBar(std::string window, std::string tag, const QString title, int height, QScrollArea *scrollArea = nullptr);
 		~ToolBar();
 		static ToolBar *getInstance(const char *instance);
-		ToolButton *getToolButton(const char *id);
+		
+		
 		void reset();
 		std::string tag;
 		bool toolbarPinned;
+		std::string window;
 		void addImageButton(const char *id, std::string resourceName, QString buttonText, const QString toolTip, std::function<void(void)>, std::string = "");
 		void setImageButton(std::string id, std::string resourceName, QString buttonText);
 		void setLabelImage(std::string id, std::string resourceName, QString buttonText);
@@ -104,7 +104,10 @@ class ToolBar : public QToolBar
 		void zoomIndex(int inc);
 	
 		static std::map<std::string, ToolBar *> instances;
-		std::map<std::string, ToolButton *> buttons;
+		static std::map<std::string, ToolButton *> toolButtons;
+		static std::map<std::string, ButtonAction *> actionButtons;
+		ToolBar::ToolButton *getToolButton(std::string id);
+		ToolBar::ButtonAction *getActionButton(std::string id);
 		
 		
 };

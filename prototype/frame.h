@@ -29,19 +29,7 @@ class CentralFrame : public QFrame
 				Button(const QString &text, QWidget *parent);
 		};
 		
-		class Area : public QLabel
-		{
-			public:	
-				Area(CentralFrame *parent);
-				~Area();
-				CentralFrame *parent;
-				Counter *counter;
-				void showRightClickMenu(Counter *counter);
-				void execute(QAction *action);
-				bool findCounter(QPoint point, Counter *&counter);
-		};
 			
-		
 		
 		
 		
@@ -53,20 +41,23 @@ class CentralFrame : public QFrame
 		Window *window;
 		//
 		float scaleFraction;
+		int startWidth;
+		int startHeight;
 		std::string backgroundID;
 		QColor backgroundColor;
 		
 		bool anySelected(Counter *counter, Counter *&selected, int &selectedPos);
 		void toggleOpenStack(Counter *counter, int sign);
 		void closeAllOpenStacks();
+		void zoomFraction(float amount, bool set);
 		void selectCounter(Counter *counter);
 		void setBackground(std::string background);
-		void setGrid(Counter::Table *grid);
+		void setGrid(std::string zone, Counter::Table *grid);
+		void setBorders(std::string zone, Counter::Table *borders);
 		
 		
 		static bool openStackoffset;
 		static bool facingMatters;
-		static Area *area;
 		static bool showGrid;
 		static QColor gridColor;
 		static int gridRadius;
@@ -126,7 +117,6 @@ class CentralFrame : public QFrame
 			int hy;
 		} GridPoint;
 		
-		typedef struct std::vector<GridPoint> GridCoordiantes;
 		
 		
 		
@@ -136,7 +126,9 @@ class CentralFrame : public QFrame
 			std::string name;	// id string of counter moved 
 			std::string tag;	// window tag of counter
 			int x;				// position of counter moved
-			int y; 
+			int y;
+			int cx;
+			int cy; 
 			int dx;				// multi-stack differernce from source stack dragged
 			int dy;
 		} Move;
@@ -152,9 +144,8 @@ class CentralFrame : public QFrame
 		virtual void dragEnterEvent(QDragEnterEvent *event);
 		virtual void dropEvent(QDropEvent *event);
 		virtual void dragMoveEvent(QDragMoveEvent *event);
-		virtual void resizeEvent(QResizeEvent* event);
 		virtual void wheelEvent(QWheelEvent *event);	
-		virtual void paintEvent (QPaintEvent *event);
+		virtual void paintEvent(QPaintEvent *event);
 		
 		
 		
@@ -164,8 +155,8 @@ class CentralFrame : public QFrame
 		void selectStack(Counter *counter);			
 		void unselect();
 		QImage selectedGhostImage(Counter *counter, QRect &totalRect);
-		GridCoordiantes gridCoordinates;
-		static Moved countersDeleted;
+		std::map<std::string, std::vector<GridPoint>> gridCoordinates;
+		std::map<std::string, std::vector<Point>> borders;
 		
 		
 		

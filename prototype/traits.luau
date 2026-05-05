@@ -12,10 +12,6 @@ function Image:new (images, imageIndex)
 	--- fields
 	o.images = images
 	o.imageIndex = imageIndex
-	--if #images > 1 then
-	--	o.menuname = "Flip"
-	--	o.menuclick = "actionFlip"
-	--end
 	return o
 end
 
@@ -46,10 +42,25 @@ end
 
 
 
+Flip = {}
+
+function Flip:new(id)
+	local o = {}
+	if id ~= nil then	
+		if #Repository[id].Image.images > 1 then
+			o.menuname = "Flip"
+			o.menuclick = "actionFlip"
+		end
+	end
+	return o
+end
 
 
---create_mask('MovedMarker', '__moved', 'left', 'hcenter')
-create_mask('MovedMarker', '__moved', 'vleft', 'htop')
+
+
+
+create_mask('MovedMarker', '__moved', 'left', 'hcenter')
+
 
 
 
@@ -217,10 +228,52 @@ WhenMoved = {}
 
 function WhenMoved:new()
 	local o = {}
-	setmetatable(o, self)
-	self.__index = self
 	o.action = 
 		function()
+		
+			local ap = Counter:findId('warstatus_ap')
+			local cp = Counter:findId('warstatus_cp')
+			local combined = Counter:findId('warstatus_combined')
+		
+			if not ap or not cp or not combined then
+				return
+			end
+			
+			
+			local zone = Zones:get('grt')
+			
+			-- find turn for warstatus_ap and warstatus_cp
+			local n = tonumber(zone:getCoordinate(Counter[ap].cx, Counter[ap].cy))		
+			if n == nil then
+				return
+			end									
+			local m = tonumber(zone:getCoordinate(Counter[cp].cx, Counter[cp].cy)) 
+			if m == nil then
+				return
+			end	
+			
+						
+			-- find position for sum
+			
+			local cx, cy = zone:setCoordinate(n + m)
+			
+			if cx == -1 then
+				return
+			end
+				
+			-- move warstatus_combined
+				
+			local dx, dy = get_corner(Counter[combined].Image.images[1])
+			local zorder = top_zorder()
+			
+			reportmove(combined, Counter[combined].name, 'main', 'main', 
+					   Counter[combined].cx, Counter[combined].cy, cx, cy)
+					
+			Counter:move('main', combined, zorder, cx - dx, cy - dy, cx, cy)
+			
+			update_class(Counter, combined)
+			
+				
 			
 		end
 	o.movetrigger = function(id) Counter[id].WhenMoved.action() end
@@ -250,7 +303,7 @@ Delete = {
 	menuname = "Delete",
 	menutrait = "Delete",
 	menuclick = "actionDelete",
-	menushow = function(window, id) return window == 'main' end
+	menushow = function(window, id) return window ~= 'Repository' end
 } 
 
 
@@ -296,21 +349,17 @@ end
 
 
 
-Area = {
-	menuDelete = {menuname = "Delete all markers here", menuclick = "actionDeleteAll"},
-	menuATrench = {menuname = "Place AP Trench", menuid = "Allied/ap_trench1"}
-}
-
 
 Marker = {}
 
-function Marker:new(name, dx, dy, side)
+function Marker:new(name, dx, dy, side, stackplace)
 	local o = {}
 	o.marker = name
+	o.place = stackplace
 	o.renderOffset = {dx = dx, dy = dy}
 	o.Side = side
-	--o.Delete = Delete
-	--o.OnlyOneInStack = OnlyOneInStack
+	o.Delete = Delete
+	o.OnlyOneInStack = OnlyOneInStack
 	o.CantBeMoved = CantBeMoved
 	return o
 end
@@ -318,24 +367,27 @@ end
 
 Move = {}
 
-function Move:new(window, trait, name, point)
+function Move:new(trait, window, zone, point, name, action)
 	local o = {}
-	o.x = point.x
-	o.y = point.y
+	setmetatable(self, self)
+	self.__index = self 
+	o.zone = zone
+	o.point = point
 	o.window = window
 	o.menuname = name
 	o.menuclick = "actionMove"
 	o.menutrait = trait
-	o.menushow = function(window, id) return window == 'main' end
+	o.menushow = action
 	return o
 end
 
 
 MoveAll = {}
 
-function MoveAll:new(zone, name)
+function MoveAll:new(tag, name)
 	local o = {}
-	o.zoneTag = zone	
+	-- tag is zone moved to
+	o.tag = tag	
 	o.menuname = name
 	o.menuclick = "actionMoveAll"
 	return o
@@ -344,10 +396,13 @@ end
 
 MoveStack = {}
 
-function MoveStack:new(name, point)
+function MoveStack:new(from, to, name)
 	local o = {}
-	o.x = point.x
-	o.y = point.y
+	-- from is grid or deck id moved from
+	-- to is the position moved to
+	o.id = from
+	o.cx = to.x
+	o.cy = to.y
 	o.menuname = name
 	o.menuclick = "actionMoveStack"
 	return o
@@ -365,6 +420,31 @@ function Offset:new(cx, cy, xm, ym, sh)
 	o.shown = sh			-- number of counters with offset in a stack, 0=unlimited
 	return o
 end
+
+
+Card = {}
+
+function Card:new()
+	local o = {}
+	o.deckId = ''
+	o.actionUp = {}
+	o.actionDown = {}
+	return o 
+end
+
+
+Draw = {}
+
+function Draw:new(action)
+	local o = {}
+	o.menuname = 'Draw'
+	o.menuclick = 'actionDraw'
+	o.menutrait = 'Draw'
+	o.menushow = action
+	return o 
+end
+
+
 
 
 Reveal = {}
@@ -395,19 +475,27 @@ function StepLoss:new()
 end
 
 
+Shadow = {}
+
+function Shadow:new(shadow)
+	local o = {}
+	setmetatable(o, self)
+	self.__index = self
+	o.shadow = shadow
+	return o
+end	
+
+
+
+
 SubMenu = {}
 
-function SubMenu:new(title)
+function SubMenu:new(title, actions)
 	local o = {}
 	setmetatable(self, self)
 	self.__index = self
 	o.menuname = title
-	o.menuactions = [[North, ,actionMoveN:
-					  North-West, ,actionMoveNW:
-					  South-West, ,actionMoveSW:
-					  South, ,actionMoveS:
-					  South-East, ,actionMoveSE:
-					  North-East, ,actionMoveNE]]
+	o.menuactions = actions
 	o.menutrait = "SubMenu"
 	o.menushow = function(window, id) return window == 'main' end
 	return o 
@@ -429,39 +517,9 @@ function PlaceMarker:new(name, trait, marker)
 end
 
 
-Take = {}
-
-function Take:new(number)
-	local o = {}
-	setmetatable(self, self)
-	self.__index = self
-	o.menuname = 'Take '..number
-	o.menuclick = 'actionTake'..number
-	o.menutrait = 'Take'..number
-	o.menushow = function(window, id) return window == 'Reinforcements' end
-	return o
-end
 
 
 
-
---- define menu table
-
-Broom = {}
-
-function Broom:new()
-	local o = {}
-	o.options = {
-		supply = {menuname = "Remove All Out-Of-Supply Markers", menutrait = 'supply', menuclick = "actionToggleA"},
-		freeRail = {menuname = "Remove All Free Rail Markers", menutrait = 'freeRail', menuclick = "actionToggleA"},
-		rail = {menuname = "Remove All Rail Movement Markers", menutrait = 'rail', menuclick = "actionToggleR"},	
-		autoVictory = {menuname = "Remove Automatic Victory Markers", menutrait = 'autoVictory', menuclick = "actionToggleA"},
-		removeAll = {menuname = "Remove All Markers", menutrait = 'removeAll', menuclick = "actionToggleX"}	
-	}
-	return o
-end
-
-Globals:add('Broom', Broom:new())
 
 
 
@@ -469,91 +527,54 @@ Globals:add('Broom', Broom:new())
 --- define counter and card traits
 
 
-Stukas = {}
 
-function Stukas:new()
-	local o = {}
-	setmetatable(o, self)
-	self.__index = self
-	o.airfield = Move:new('Airfield', 'airfield', 'To Airfield', {x = 250 + math.random(-200, 200), y = 157 + math.random(-75, 75)})
-	return o
-end
-
-
-Markers = {}
-
-function Markers:new ()
-	local o = {}
-	setmetatable(self, self)
-	self.__index = self
-	o.Delete = Delete
-	o.Clone = Clone:new()	
-	return o
-end
-
-
-
-Odds = {}
-
-function Odds:new()
-	local o = Markers:new()
-	setmetatable(o, self)
-	self.__index = self
-	o.Overlays = Overlays:new()
-	o.Overlays:add('number', Label:new('1', 'sans', 24, 'black', 'vcenter', 'hcenter'))
-	o.Overlays:add('odds', Label:new('1:1', 'arial', 12, 'black', 'vcenter', 47))
-	o.Label = o.Overlays:set('Label', 'odds', 'Set Odds')
-	o.Increase = o.Overlays:inc('Increase', 'number', 1, 'Increase')
-	o.Decrease = o.Overlays:inc('Decrease', 'number', -1, 'Decrease')
-	return o
-end
+areaActions = [[Central Control, control_cp, actionPlace:
+				Allied Control, control_ap, actionPlace:
+				Place Central Trench, cp_trench1, actionPlace:
+				Place Allied Trench, ap_trench1, actionPlace:
+				Trench Modification, trench_mod, actionPlace:
+				Fort Besieged, fort_besieged, actionPlace:
+				Fort Destroyed, fort_destroyed, actionPlace:
+				Fort Destroyed (mini), fort_destroyed_mini, actionPlace:
+				Out of Supply (Allied), oos_ap, actionPlace:
+				Out of Supply (Central), oos_cp, actionPlace:
+				Delete all markers, , actionRemoveMarkers]]
 
 
 Piece = {}
 
-function Piece:new ()
+function Piece:new (id)
 	local o = {}
 	setmetatable(self, self)
 	self.__index = self
-	o.MarkMoved = MarkMoved:new()
-	o.Overlays = Overlays:new()
-	o.Overlays:add('train_marker_black_50', Mask:new('train_marker_black_50', 4, 4))
-	o.Overlays:add('train_marker_blue_50', Mask:new('train_marker_blue_50', 4, 4))
-	o.Overlays:add('av_force_layer', Mask:new('av_force_layer', 0, 0))	
-	o.Overlays:add('supply', Mask:new('supply', 0, 0))
-	o.Overlays:add('top', Label:new('', 'arial', 12, 'black', 'vcenter', 0))
-	o.freeRail = o.Overlays:show('freeRail', 'train_marker_black_50', 'Free Rail Movement')
-	o.rail = o.Overlays:show('rail', 'train_marker_blue_50', 'Rail Movement (6/3)')
-	o.autoVictory = o.Overlays:show('autoVictory', 'av_force_layer', 'Automatic Victory')
-	o.supply = o.Overlays:show('supply', 'supply', 'Out Of Supply')
-	o.label = o.Overlays:set('label', 'top', 'Change Label')
-	o.prisoners = Move:new('POW', 'prisoners', 'Prisoners Of War', {x = 100 + math.random(-35, 35), y = 100 + math.random(-35, 35)})
-	o.replace = Move:new('Repl', 'replace', 'To Replacement Pool', {x = 150, y = 150})
-
+	o.Flip = Flip:new(id)
+	o.SubMenu = SubMenu:new('Area', areaActions)
 	return o
 end
 
 
-Axis = {}
+Army = {}
 
-function Axis:new ()
-	local o = Piece:new()
-	setmetatable(o, self)
+function Army:new (id)
+	local o = Piece:new(id)
+	setmetatable(self, {__index = Piece})
 	self.__index = self
-	o.rail = o.Overlays:show('rail', 'train_marker_blue_50', 'Rail Movement (6/3)')
+	o.Shadow = Shadow:new('shadow_lg_blurred')
 	return o
 end
 
 
-Soviet = {}
+Corps = {}
 
-function Soviet:new ()
-	local o = Piece:new()
-	setmetatable(o, self)
+function Corps:new (id)
+	local o = Piece:new(id)
+	setmetatable(self, {__index = Piece})
 	self.__index = self
-	o.rail = o.Overlays:show('rail', 'train_marker_blue_50', 'Rail Movement (5)')
+	o.Shadow = Shadow:new('shadow_blurred')
 	return o
 end
+
+
 
 
 

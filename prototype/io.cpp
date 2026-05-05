@@ -15,6 +15,7 @@
 
 
 extern IO *io;
+extern ToolBar *mainToolBar;
 
 
 using namespace std;
@@ -27,14 +28,626 @@ std::fstream IO::fs;
 unsigned long long IO::_ownershipKey;
 bool IO::stepping;
 bool IO::recording;
+IO::ConnectDialog *IO::netDialog;
+IO::Net *IO::server;
+
+int IO::intType;
+int IO::stringType;
+int IO::boolType;
+int IO::doubleType;
+int IO::tableType;
+
+
+
+IO::ConnectDialog::ConnectDialog(QWidget *parent) : QDialog(parent)
+{
+	
+	this->setWindowTitle("Connect to peer");
+	this->setSizeGripEnabled(false);
+	
+	this->setStyleSheet("QLineEdit {background-color : white;} \
+					     QLabel {background-color : transparent; color : white} \
+					     QPlainTextEdit {border: 2px solid gray; border-style: inset; \
+							 font: normal normal normal 15px/1.4 Arial; color: grey;}");
+
+	
+	QGridLayout *gridLayout = new QGridLayout(this);
+
+	
+	gridLayout->setContentsMargins(QMargins(20,10,20,10));
+	
+	
+	
+	
+	QLabel *portlabel = new QLabel(this);
+	portlabel->setText("Port:");
+	
+	port = new QLineEdit(this);
+	port->setMaximumWidth(45);
+	port->setText("6067");
+	
+	QPushButton *listen = new QPushButton(this);
+	listen->setText("Listen");
+	QObject::connect(listen, &QPushButton::clicked, [=]() { IO::server->listen(); });
+	
+	QPushButton *sync = new QPushButton(this);
+	sync->setText("Synchronize");
+	QObject::connect(sync, &QPushButton::clicked, [=]() { IO::server->confirm(); }); 
+	
+	
+	QLabel *iplabel = new QLabel(this);
+	iplabel->setText("IP:");
+	
+	ip = new QLineEdit(this);
+	ip->setText("127.0.0.1");
+	ip->setMinimumWidth(125);
+	
+	QLabel *prt = new QLabel(this);
+	prt->setText("Port:");
+	
+	portc = new QLineEdit(this);
+	portc->setMaximumWidth(45);
+	portc->setText("6067");
+	
+	QPushButton *connect = new QPushButton(this);
+	connect->setText("Connect");
+	QObject::connect(connect, &QPushButton::clicked, [=]() { IO::server->connect(); });
+	
+	QPushButton *disconnect = new QPushButton(this);
+	disconnect->setText("Disconnect");
+	QObject::connect(disconnect, &QPushButton::clicked, [=]() { IO::server->disconnect(); });  
+	
+	messages = new QPlainTextEdit(this);
+	messages->setReadOnly(true);
+	messages->setMinimumHeight(100);
+	
+	
+	gridLayout->addWidget(portlabel, 0, 2, Qt::AlignRight);
+	gridLayout->addWidget(port, 0, 3, Qt::AlignLeft);
+	gridLayout->addWidget(listen, 0, 4, Qt::AlignLeft);
+	gridLayout->addWidget(sync, 0, 5, Qt::AlignLeft);
+	
+	gridLayout->addWidget(iplabel, 1, 0, Qt::AlignRight);
+	gridLayout->addWidget(ip, 1, 1, Qt::AlignLeft);
+	gridLayout->addWidget(prt, 1, 2, Qt::AlignRight);
+	gridLayout->addWidget(portc, 1, 3, Qt::AlignLeft);
+	gridLayout->addWidget(connect, 1, 4, Qt::AlignLeft);
+	gridLayout->addWidget(disconnect, 1, 5, Qt::AlignLeft);
+	
+	gridLayout->addWidget(messages, 2, 0, 1, -1);
+	
+	
+	this->setFixedSize(450, 250);
+}
+
+
+IO::ConnectDialog::~ConnectDialog()
+{
+}
+
+
+void IO::ConnectDialog::paintEvent (QPaintEvent *event)
+{
+	QPainter painter(this);
+	
+	QImage image = io->getImage("__background");
+	painter.drawImage(0,0,image); 
+}
+
+
+
+
+
+
+
+
+IO::Net::Net(QObject *parent) : QObject(parent)
+{
+	server = new QTcpServer(this);
+	socket = new QTcpSocket(this);
+	//socket->open(QIODeviceBase::ReadWrite);
+	
+	QObject::connect(socket, &QTcpSocket::connected, this, [=]() { onConnected(); });
+	QObject::connect(socket, &QTcpSocket::errorOccurred, this, [=]() { onError(); });
+	QObject::connect(socket, &QTcpSocket::bytesWritten, this, &IO::Net::onWritten);
+	QObject::connect(socket, &QTcpSocket::readyRead, this, [=]() { onReadyRead(); });
+	
+	
+
+	buffsize = 4*1024;
+    
+	// sets internal socket buffersize	
+    socket->setReadBufferSize(buffsize);
+    
+    	
+
+		 
+}
+
+IO::Net::~Net()
+{
+	delete server;
+	delete socket;
+}
+
+
+
+void IO::Net::outTable(Counter::Table t)
+{
+	for (auto obj = t.begin(); obj != t.end(); ++obj)
+	{
+		std::visit(
+			Overload{
+				[] (int k) { printf("%d=", k);  },
+				[] (std::string k) { printf("\"%s\"=", k.c_str()); }
+			},
+			obj->first
+		);
+		std::visit(
+			Overload{
+				[] (double k) { printf("%f\n", k); },
+				[] (bool k) { (k ? printf("true\n") : printf("false\n")); },				
+				[] (std::string k) { printf("\"%s\"\n", k.c_str()); },
+				[this] (Counter::Table k) { outTable(k); }
+			},
+			obj->second
+		);	
+	}
+}
+
+
+
+bool IO::Net::checkPort(QString portString)
+{
+	if (!portString.isEmpty())
+	{
+		bool ok;
+		int port = portString.toInt(&ok);
+		
+		if (!ok)
+			Luau::error(23, 0);
+		else 
+		
+		// crude port test, use a non-well-known, non-assigned port 
+		// https://www.iana.org/assignments/service-names-port-numbers/service-names-port-numbers.xhtml?&page=98
+		// the default port 6067 is at time of writing unassigned
+		
+		if (port < 1024 || port > 65535)
+			Luau::error(24, 0);			
+		else
+			return true;
+	}
+	else
+		Luau::error(22, 0);
+		
+	return false;	
+}
+
+
+void IO::Net::listen()
+{	
+	
+	if (socket->state() == QAbstractSocket::UnconnectedState)
+	{
+		if (checkPort(netDialog->port->text()))
+		{
+			if (!server->isListening())
+			{
+				int port = netDialog->port->text().toInt();
+				
+				bool ok = server->listen(QHostAddress::Any, port);
+				
+				if (!ok)
+				{
+					netDialog->messages->appendPlainText("Error when trying to listen to port " + QString::number(port));
+					return;
+				}
+				
+				netDialog->messages->appendPlainText("Listening on port " + QString::number(server->serverPort()) + "...");
+				
+				QObject::connect(server, &QTcpServer::newConnection, this, [this]() { this->onConnection(); });
+			}
+			else
+				netDialog->messages->appendPlainText("Server is already listening");
+				//Luau::error(26, 0);
+		}
+	}
+	else
+		netDialog->messages->appendPlainText("Already connected");
+}
+
+
+void IO::Net::confirm()
+{
+	if (socket->state() != QAbstractSocket::UnconnectedState)
+		Luau::confirm();
+	else
+		netDialog->messages->appendPlainText("There is no connection");
+}
+
+
+void IO::Net::sync()
+{
+	if (socket->state() != QAbstractSocket::UnconnectedState)
+		Luau::synchronize();
+	else
+		netDialog->messages->appendPlainText("There is no connection");
+}
+
+
+void IO::Net::onConnection()
+{
+    if (server->hasPendingConnections())
+    {
+        delete this->socket;
+        this->socket = server->nextPendingConnection();
+        //this->socket->open(QIODeviceBase::ReadWrite);
+        
+        QObject::connect(socket, &QTcpSocket::stateChanged, this, [=]() { onStateChanged(); });
+        QObject::connect(socket, &QTcpSocket::readyRead, this, [=]() { onReadyRead(); });
+        QObject::connect(socket, &QTcpSocket::errorOccurred, this, [=]() { onError(); });
+		QObject::connect(socket, &QTcpSocket::bytesWritten, this, &IO::Net::onWritten);
+        
+
+        QHostAddress address = QHostAddress(socket->peerAddress());
+        
+        bool ok;
+        quint32 ip4 = address.toIPv4Address(&ok);
+        if (ok)
+			netDialog->messages->appendPlainText("Connected to " + QHostAddress(ip4).toString());
+		else
+			netDialog->messages->appendPlainText("Connected to " + address.toString());
+			
+		mainToolBar->setImageButton("connection", "__connected", "");
+		
+		// as server ask opponent to sync with your map
+		Luau::ask();
+    }
+}
+
+
+void IO::Net::connect()
+{	
+	if (socket->state() == QAbstractSocket::UnconnectedState)
+	{
+		if (checkPort(netDialog->portc->text()))
+		{
+			QHostAddress address = QHostAddress(netDialog->ip->text());
+			if (address.isNull())
+			{
+				Luau::error(25, 1, netDialog->ip->text().toStdString().c_str());
+				return;
+			}
+			
+			socket->connectToHost(address, netDialog->portc->text().toUShort());
+		
+		}
+	}
+	else
+		netDialog->messages->appendPlainText("Already connected");
+		//Luau::error(27, 0);		
+}
+
+
+void IO::Net::disconnect()
+{	
+	if (socket->state() != QAbstractSocket::UnconnectedState)
+	{
+		socket->disconnectFromHost();
+		netDialog->messages->appendPlainText("Disconnected from " + netDialog->ip->text());
+		
+		mainToolBar->setImageButton("connection", "__disconnected", "");
+	}
+	else
+	
+		netDialog->messages->appendPlainText("There is no connection");
+		//Luau::error(28, 0);
+}
+
+
+
+// QDataStream serialization of std::strings
+ 
+QDataStream& operator <<(QDataStream& out, const std::string &in) 
+{
+	QByteArray raw;
+	raw.setRawData(in.data(), in.size());
+	out << raw;
+	return out;
+}
+
+QDataStream& operator >>(QDataStream &in, std::string &out)
+{
+	char* data;
+	in >> data;
+	if (data)
+		out = data;		
+	delete[] data;
+	return in;
+}
+
+
+
+void IO::Net::writeTable(Counter::Table table)
+{
+	
+	for (auto obj = table.begin(); obj != table.end(); ++obj)
+	{
+		std::visit(
+			Overload{
+				[this] (int k) { *pstream << IO::intType; *pstream << k; },
+				[this] (std::string k) { *pstream << IO::stringType; *pstream << k; }
+			},
+			obj->first
+		);
+		std::visit(
+			Overload{
+				[this] (double k) { *pstream << IO::doubleType; *pstream << k; },
+				[this] (bool k) { *pstream << IO::boolType; *pstream << k; },				
+				[this] (std::string k) { *pstream << IO::stringType; *pstream << k; },
+				[this] (Counter::Table k) { *pstream << IO::tableType; *pstream << (qint32)k.size(); writeTable(k); }
+			},
+			obj->second
+		);	
+	}
+	
+}
+
+
+void IO::Net::writeData(Counter::Table table, qint32 tableSize, qint32 type)
+{
+	
+    if (socket->state() == QAbstractSocket::ConnectedState)
+    {			
+		QDataStream stream(socket);	
+		
+		this->pstream = &stream;
+			
+		
+		*pstream << tableSize;
+		*pstream << type;
+		*pstream << (qint32)table.size();
+
+		
+		writeTable(table);
+			
+    }
+    
+}
+
+
+bool IO::Net::connected()
+{
+	return socket->state() == QAbstractSocket::ConnectedState;
+}
+
+
+Counter::Table IO::Net::readTable(qint32 keys)
+{
+	
+	
+	Counter::Leftside left;
+	Counter::Rightside right;
+	Counter::Table table;
+	
+	
+	
+	
+	for (qint32 i = 0; i < keys; i++)
+	{
+		
+		
+		if (pstream->atEnd())	
+			return table;
+			
+			
+		int type;	
+		*pstream >> type;  
+		
+			
+		if (type == IO::stringType)
+		{
+			std::string key;
+			*pstream >> key;
+			left = key;
+		}
+		else
+			if (type == IO::intType)
+			{
+				int key;
+				*pstream >> key;			
+				left = key;
+			}
+		else
+			netDialog->messages->appendPlainText("Error: reading key " + QString::number(type));
+		
+		
+		
+		// value
+		
+		
+		*pstream >> type;
+		
+		
+		if (type == IO::boolType)
+		{
+			bool value;
+			*pstream >> value;	
+			right = value;
+		}
+		else
+			if (type == IO::stringType)
+			{
+				std::string key;
+				*pstream >> key;
+				right = key;
+			}
+			else
+				if (type == IO::doubleType)				
+				{
+					double value;
+					*pstream >> value;
+					right = value;
+				}
+				else
+					if (type == IO::tableType)
+					{
+						qint32 s;
+						*pstream >> s;						
+						right = readTable(s);						
+					}
+					else
+						netDialog->messages->appendPlainText("Error: reading value");
+
+
+		
+		table[left] = right;
+	
+	}
+	
+	
+	return table;
+	
+	
+}        
+
+
+
+void IO::Net::onReadyRead()
+{  
+
+	QDataStream stream(socket);
+		
+	this->pstream = &stream;
+	
+	
+	
+	// table size is first 4 bytes (qint32)
+	// type (1=update 2=sync) is last 4 bytes (qint32)
+	
+	QByteArray buffer = socket->peek(8);
+	
+	if (buffer.size() < 8)
+	{
+		printf("error\n");
+		return;
+	}
+	
+	
+		
+	qint32 tableSize = qFromBigEndian<quint32>((uchar*)buffer.first(4).data());
+	qint32 type = qFromBigEndian<quint32>((uchar*)buffer.last(4).data());
+	
+	
+	
+	
+	// 12 extra bytes for tableSize, type and keys
+	
+	if (socket->bytesAvailable() < tableSize + 12)
+	{
+		bool res = this->socket->waitForReadyRead(5000);
+		if (res == false)
+		{
+			Luau::error(35, 1, 5000);
+			return; 
+		}
+	}	
+	
+	
+	
+	
+
+	if (type == 1)
+	{
+		
+		while (socket->bytesAvailable() > 0)	
+		{
+			stream >> tableSize;	
+
+			stream >> type;
+				
+			qint32 keys;
+			stream >> keys;
+
+			Counter::Table table = readTable(keys);			
+			Luau::updateCounter(table);				
+		}
+		
+	}
+		
+	
+	if (type == 2)
+	{
+		stream >> tableSize;	
+		
+		stream >> type;
+		
+		qint32 keys;
+		stream >> keys;
+
+		Counter::Table table = readTable(keys);
+		Luau::loadCounter(table);
+		Luau::done();
+	}
+		
+	
+
+   
+}
+
+
+
+void IO::Net::onStateChanged()
+{
+
+    QHostAddress address = QHostAddress(socket->peerAddress());
+    
+    if (socket->state() == QAbstractSocket::UnconnectedState)
+	{	
+  
+		bool ok;
+		quint32 ip4 = address.toIPv4Address(&ok);
+		if (ok)
+			netDialog->messages->appendPlainText(QHostAddress(ip4).toString() + " disconnected");
+		else
+			netDialog->messages->appendPlainText(address.toString() + " disconnected");
+		
+		mainToolBar->setImageButton("connection", "__disconnected", "");	
+		
+	}	
+	
+}
+
+
+void IO::Net::onConnected()
+{
+    netDialog->messages->appendPlainText("Connected to " + netDialog->ip->text());
+    mainToolBar->setImageButton("connection", "__connected", "");
+}
+
+void IO::Net::onError()
+{
+	netDialog->messages->appendPlainText(socket->errorString());
+	mainToolBar->setImageButton("connection", "__disconnected", "");
+}
+
+void IO::Net::onWritten(qint64 bytes)
+{
+	//netDialog->messages->appendPlainText("Successfully wrote " + QString::number(bytes) + " bytes");
+}
+
+
+
+
 
 
 
 	
-void IO::close()
+void IO::closeGame()
 {
 	Luau::deleteAll();
 	Luau::resetState();
+	Luau::resetBase();
 	Luau::logReset();
 	Window::getInstance("main")->frame->closeAllOpenStacks();
 	
@@ -81,25 +694,6 @@ IO::LoadGame::LoadGame(std::string fileName)
 					Luau::setTurn(turn);
 				}
 					
-					
-				if (key == "deck")
-				{
-					// read number of keys in this table
-					std::size_t size; 
-					
-					fs.read(reinterpret_cast<char*>(&size), sizeof size);
-					
-					if (size > 0)
-					{	
-					
-						// read table
-						Counter::Table table = loadTable(size);
-					
-						Luau::loadDeck(table);
-						
-					}
-					
-				}		
 				
 					
 				if (key == "counter")
@@ -222,14 +816,14 @@ Counter::Table IO::LoadGame::loadTable(std::size_t keys)
 			return table;
 		
 			
-		if ((int)type == stringType)
+		if ((int)type == IO::stringType)
 		{
 			std::string key;
 			std::getline(fs, key, '\0');
 			left = key;
 		}
 		else
-			if ((int)type == intType)
+			if ((int)type == IO::intType)
 			{
 				int key;
 				fs.read(reinterpret_cast<char*>(&key), sizeof(key));			
@@ -244,7 +838,7 @@ Counter::Table IO::LoadGame::loadTable(std::size_t keys)
 		fs.read(reinterpret_cast<char*>(&type), 1);
 		
 		
-		if ((int)type == boolType)
+		if ((int)type == IO::boolType)
 		{
 			char value;
 			fs.read(reinterpret_cast<char*>(&value), 1);
@@ -254,21 +848,21 @@ Counter::Table IO::LoadGame::loadTable(std::size_t keys)
 				right = false; 
 		}
 		else
-			if ((int)type == stringType)
+			if ((int)type == IO::stringType)
 			{
 				std::string value;
 				std::getline(fs, value, '\0');
 				right = value;
 			}
 			else
-				if ((int)type == doubleType)				
+				if ((int)type == IO::doubleType)				
 				{
 					double value;
 					fs.read(reinterpret_cast<char*>(&value), sizeof value);
 					right = value;
 				}
 				else
-					if ((int)type == tableType)
+					if ((int)type == IO::tableType)
 					{
 						std::size_t s;
 						fs.read(reinterpret_cast<char*>(&s), sizeof s);	
@@ -300,12 +894,12 @@ void IO::loadGame()
 	
 	QString fileName = QFileDialog::getOpenFileName(nullptr, "Open Game",
 													activeDirectory,
-													"Load Files (*.vsav *.vlog);;All Files(*.*)");
+													"Load Files (*.gsav *.glog);;All Files(*.*)");
 	
 	
 	if (!fileName.isNull())
 	{
-		close();		
+		closeGame();		
 	
 		LoadGame *load = new LoadGame(fileName.toStdString());	
 		delete load;
@@ -329,7 +923,7 @@ void IO::loadSetUp(string filename)
 	
 
 	
-	string completeFileName = "./setups/" + base.toStdString() + ".vsav";
+	string completeFileName = "./setups/" + base.toStdString() + ".gsav";
 	
 	LoadGame *load = new LoadGame(completeFileName);	
 	delete load;
@@ -418,7 +1012,15 @@ IO::IO()
 									// openssl prime -generate -bits 32 -hex
 									
 	//_ownershipKey = 0xddb49da1;
-									
+	
+	IO::intType = 1;
+	IO::stringType = 2;
+	IO::boolType = 3;
+	IO::doubleType = 4;
+	IO::tableType = 5;
+							
+	
+		
 	
 }
 
@@ -426,14 +1028,37 @@ IO::IO()
 
 QImage& IO::getImage(string str)
 {	
+	try
+    {
+        _resources.at(str);
+    }
+    catch (const std::out_of_range &e)
+    {
+        Luau::error(7, 1, str.c_str()); 
+        std::exit(1);
+    }
+    
+    
 	return _resources[str].image;
 }
 
 
 QSize IO::getSize(string str)
 {
+	try
+    {
+        _resources.at(str);
+    }
+    catch (const std::out_of_range &e)
+    {
+        Luau::error(7, 1, str.c_str()); 
+        std::exit(1);
+    }
+	
+	
 	return _resources[str].size;
 }
+
 
 bool IO::isResource(string str)
 {
@@ -505,28 +1130,58 @@ void IO::load_resources(string directory)
 				string filename = string(i->path().relative_path().generic_string());
 	
 				
-				
-				QImageReader reader(QString::fromStdString(filename));
-								
-				_resources[substr].size = reader.size();
-			
-				
-				/*
-				QImage image(reader.size(), QImage::Format_ARGB32);
+						
 				
 				if (i->path().extension() == ".svg")
 				{
-					QSvgRenderer renderer(QString(i->path().c_str()));
+		
+					
+					QSvgRenderer renderer(QString::fromStdString(filename));
+					
+					
+					
+					QImage image(renderer.defaultSize(), QImage::Format_ARGB32);
+						
 					image.fill(Qt::transparent);
-					QPainter *painter = new QPainter(&image);
-						renderer.render(painter);
-					delete painter;
+							
+				   
+					QPainterPath path;
+					path.moveTo(23.0, 23.0);
+					path.arcTo(0.0, 0.0, 46.0, 46.0, 90.0, 90.0);
+					path.lineTo(0.0, 479.0);
+					path.arcTo(0.0, 479.0, 46.0, 46.0, 180.0, 90.0);
+					path.lineTo(329.0, 525.0);
+					path.arcTo(329.0, 479.0, 46.0, 46.0, -90.0, 90.0);
+					path.lineTo(375.0, 23.0);
+					path.arcTo(329.0, 0.0, 46.0, 46.0, 0.0, 90.0);
+					path.lineTo(23.0, 0.0);
+
+				
+					
+					QPainter painter(&image);
+					painter.setClipPath(path);
+					painter.setRenderHint(QPainter::Antialiasing);
+					painter.setRenderHint(QPainter::TextAntialiasing);
+					painter.setRenderHint(QPainter::SmoothPixmapTransform);
+					renderer.render(&painter);
+					
+					
+					_resources[substr].size = image.size();
+					_resources[substr].image = image;
+					 
 				}
 				else
-				*/ 
-				QImage image = reader.read();
+				{
 
-				_resources[substr].image = image;
+					QImageReader reader(QString::fromStdString(filename));
+					QImage image = QImage(reader.size(), QImage::Format_ARGB32_Premultiplied);
+					image.load(QString::fromStdString(filename));
+									
+					_resources[substr].size = image.size();
+					_resources[substr].image = image;
+					
+				}
+		
 				
 			}
 		}
@@ -596,6 +1251,15 @@ void IO::changeImage(std::string fromImage, std::string toImage)
 }
 
 
+bool IO::connected()
+{
+	return server->connected();
+}
+
+
+
+
+
 void IO::reset()
 {
 	
@@ -656,12 +1320,13 @@ QString IO::saveGame(QString saveAs, QString saveTo, QString suffix)
 										 
 	dialog.setDefaultSuffix(suffix);
 	dialog.setAcceptMode(QFileDialog::AcceptSave);
+	//dialog.setFileMode():
 										 
 	QStringList fileNames;
 	
 	if (dialog.exec() == QFileDialog::Accepted)
 	{
-		
+	
 		fileNames = dialog.selectedFiles();
 		
 		if (fileNames.count() == 0)
@@ -677,10 +1342,10 @@ QString IO::saveGame(QString saveAs, QString saveTo, QString suffix)
 		
 		
 		
-		fs.open(fileNames[0].toStdString(), ios::binary | ios::out);
+		fs.open(fileNames[0].toStdString(), ios::binary | ios::out | ios::trunc);
 		
 		
-		
+	
 		
 		// save turn and phase
 		
@@ -691,32 +1356,8 @@ QString IO::saveGame(QString saveAs, QString saveTo, QString suffix)
 		
 		fs.write(reinterpret_cast<const char*>(&turn.turn), sizeof turn.turn);
 		fs.write(reinterpret_cast<const char*>(&turn.phase), sizeof turn.phase);
-        
+	      
 		
-		
-		// save decks
-		
-		Counter::Table keys = Luau::getDecks();
-		
-		
-		for (auto const& [k, v] : keys)
-		{
-			std::string key = "deck";
-			fs.write(key.c_str(), key.size() + 1);
-			
-			
-			std::string index = std::get<std::string>(v);
-			
-			
-			Counter::Table table = Luau::getDeck(index.c_str());
-			
-			std::size_t s = table.size();
-			fs.write(reinterpret_cast<const char*>(&s), sizeof s);		
-			
-			
-			saveTable(table);
-			
-		}
 		
 		
 		

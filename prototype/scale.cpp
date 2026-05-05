@@ -9,7 +9,6 @@ extern IO *io;
 
 
 
-//float Scale::scaleFraction = 1.0;
 int Scale::rotation = 0;
 float Scale::minScaleGrid = 0.4;
 
@@ -201,10 +200,12 @@ void Scale::resourceScaleRotate(std::string tag, std::string name)
 	_scaledResources[name].size = QSize(imageScaled.width(), imageScaled.height());
 	
 	
-	
-	Window::getInstance("main")->container->setFixedSize(getScaledSize(Window::getInstance(tag.c_str())->frame->backgroundID));
-	Window::getInstance("main")->frame->setFixedSize(getScaledSize(Window::getInstance(tag.c_str())->frame->backgroundID));
-	Overlay::overlay->setFixedSize(getScaledSize(Window::getInstance(tag.c_str())->frame->backgroundID));
+	if (tag == "main")
+	{
+		Window::getInstance("main")->container->setFixedSize(getScaledSize(Window::getInstance("main")->frame->backgroundID));
+		Window::getInstance("main")->frame->setFixedSize(getScaledSize(Window::getInstance("main")->frame->backgroundID));
+		Overlay::overlay->setFixedSize(getScaledSize(Window::getInstance("main")->frame->backgroundID));
+	}
 	
 	
 }

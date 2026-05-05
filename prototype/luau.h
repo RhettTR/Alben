@@ -30,11 +30,17 @@ class Luau
 		static PopupEntries getTraits(const char *tag, const char *id);
 		static Counter::Table getTraits(const char *window, int id);
 		static Counter::Table getTrait(const char *window, const char *id);
+		static bool findTrait(const char *id, const char *trait, const char *field, std::string &value);
 		static Counter::Table getDecks();
 		static Counter::Table getDeck(const char *id);
 		static Turn getTurn();
 		static void setTurn(Turn turn);
-		static void doAction(const char *window, const char *id, const char *trait, const char *name);
+		static void noAction(bool value);
+		static void ifAction();
+		static void updateId();
+		static void updateTopZorder();
+		static void updateBottomZorder();
+		static void doAction(const char *window, const char *id, const char *trait, const char *name, const char *actionId = nullptr);
 		static void doEvent(const char *eventName, const char *id, const char *trait, const char *key, int value);
 		static void doLog(const char *key, const char *text);
 		static bool doTest(const char *tag, const char *trait, const char *id);
@@ -56,24 +62,30 @@ class Luau
 		static void refresh();
 		static void undo();
 		static void redo();
-		static void copyCounter(const char *fromId, const char *toId, int zorder, const char *window, int x, int y, int cx, int cy);
-		static void moveCounter(const char *window, const char *id, int x, int y, int cx, int cy);
+		static void copyCounter(std::string fromId, const char *toId, int zorder, std::string window, int x, int y, int cx, int cy);
+		static void moveCounter(const char *window, const char *id, int zorder, int x, int y, int cx, int cy);
 		static void copyCard(const char *fromId, const char *toId, const char *oldtoId, int zorder, int x, int y);
 		static int  loadCounter(Counter::Table table);
+		static void updateCounter(Counter::Table table);
+		static void ask();
+		static void confirm();
+		static void synchronize();
+		static void done();
 		static void loadDeck(Counter::Table table);
 		static void loadLog(Counter::Table table);
 		static void setResourceKey(const char *id);
-		static void updatePos(const char *window, const char *id, int x, int y, int cx, int cy);
+		static void updatePos(const char *window, const char *id, int zorder, int x, int y, int cx, int cy);
 		static void updateMoved(const char *id, bool moved);
 		static void updateSide(const char *side);
 		static void saveStage();
 		static void deleteAll();
 		static void resetState();
+		static void resetBase();
 		static void getRange(int &savedPointer, int &stagePointer);
 		static void logReset();
 		static void logStep(bool oneStep);
 		static void logAbort();
-		static QString mapPlace(const char *window, int dx, int dy, int x, int y);
+		static QString mapPlace(const char *window, int cx, int cy);
 		
 		
 		
@@ -83,6 +95,7 @@ class Luau
 		
 		void compileScript();
 		static void callbackScript(std::string script);
+		static void error(int no, int count, ...);
 		
 		void startVM();
 		void closeVM();

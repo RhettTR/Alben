@@ -15,7 +15,7 @@ savedPointer = 0
 
 function State:addMove (id, trait, key, value, subkey)
 	State.stagePointer = State.stagePointer + 1
-	State.stageStack[State.stagePointer] = {id = id, trait = trait, key = key, value = value, subkey = subkey}
+	State.stageStack[State.stagePointer] = { id = id, trait = trait, key = key, value = value, subkey = subkey }
 end
 
 function State:addCreate (id, trait)
@@ -25,22 +25,175 @@ end
 
 function State:addText (key, text)
 	State.stagePointer = State.stagePointer + 1
-	State.stageStack[State.stagePointer] = {id = '', trait = 'text', key = key, value = text}
+	State.stageStack[State.stagePointer] = { id = '', trait = 'text', key = key, value = text }
 end
 
 function State:addStage ()
 	State.stagePointer = State.stagePointer + 1
-	State.stageStack[State.stagePointer] = {id = "end"}
+	State.stageStack[State.stagePointer] = { id = "end" }
 	toolbar_enable('main', '__undo')
+	if net_connected() then
+		State:sendStage()
+	end
+end
+
+
+
+function State:sendStage ()
+
+	--for j = 1, State.stagePointer do
+	--	print(State.stageStack[j].id, State.stageStack[j].trait)
+	--end
+
+	local currentStage = State.stagePointer
+		
+	local i = State:findLastStage()
+	
+	for j = i + 1, currentStage do
+		
+		send_table(State.stageStack, j, 1)
+		
+	end
+	
+	State.stagePointer = currentStage
+	 
+	
+end
+
+
+function State:recieveTable (table)
+
+	if table.trait == 'text' then
+		State:addText(table.key, table.value)
+		return
+	end
+	
+
+	
+	
+	if table.id == 'end' then
+	
+		State.stagePointer = State.stagePointer + 1
+		State.stageStack[State.stagePointer] = {id = "end"}
+		
+		local currentStage = State.stagePointer
+			
+		local i = State:findLastStage()
+	
+		-- execute moves of recieved stage
+		State:executeUntil(State.stageStack, i + 1, currentStage)
+		
+		State.stagePointer = currentStage
+		
+		
+		Counter:generateGUI()
+		
+		
+		toolbar_enable('main', '__undo')
+		
+		
+
+		
+	elseif table.trait == 'Counter' then
+		State:addMove (table.id, table.trait, table.key, table.value)
+
+	
+	
+	
+	
+	elseif table.trait == 'Rotate' then		
+		State:addMove (table.id, table.trait, table.key, table.value)
+
+	
+	elseif table.trait == 'MarkMoved' then
+		State:addMove (table.id, table.trait, table.key, table.value)
+
+	
+	elseif table.trait == 'Overlays' then	
+		Counter[id].Overlays[Counter[id][key].id][subkey] = value
+
+	
+	elseif table.trait == 'Image' then
+		State:addMove (table.id, table.trait, table.key, table.value)
+
+	
+	elseif table.trait == 'Globals' then
+		State:addMove (table.id, table.trait, table.key, table.value)
+
+	
+	elseif table.trait == 'Create' then
+		State.stagePointer = State.stagePointer + 1	
+		State.stageStack[State.stagePointer] = { id = table.id, trait = table.trait, table = Counter:duplicate(table.table) }
+
+	
+	elseif table.trait == 'Delete' then		
+		State:addMove (table.id, table.trait)
+
+	
+	
+	elseif table.trait == 'deletestages' then
+		State:deleteNextStages()
+
+	
+	elseif table.trait == 'updateid' then
+		inc_id()
+
+	
+	elseif table.trait == 'updatetopzorder' then
+		inc_top_zorder()
+
+	
+	elseif table.trait == 'updatebottomzorder' then
+		inc_bottom_zorder()
+
+	
+	elseif table.trait == 'undo' then
+		State:undo()
+
+	
+	elseif table.trait == 'redo' then
+		State:redo()
+
+	
+	elseif table.trait == 'confirm' then
+		local answer = ask_sync()
+		if answer then
+			State:resetState()
+			toggle_painting()
+			local table = { trait = "sync" }
+			send_table({table}, 1, 1)
+		end
+
+	
+	elseif table.trait == 'sync' then
+		State:resetState()
+		sync()
+		
+
+	
+	elseif table.trait == 'done' then
+		nextsync()
+
+	
+	elseif table.trait == 'syncend' then
+		reset_idz()
+		toggle_painting()
+		Counter:generateGUI()
+
+	end
+	
+	
+	 
+	
 end
 
 
 
 function State:findLastStage ()
 	
-	for i = State.stagePointer - 1, 1, -1 do	
-		value = State.stageStack[i]
-		if value.id == 'end' then
+	for i = State.stagePointer - 1, 1, -1 do
+		local value = State.stageStack[i]
+		if  value.id == 'end' then
 			State.stagePointer = i;
 			return i
 		end
@@ -94,11 +247,18 @@ function State:resetState()
 	
 	
 	State.stagePointer = 0 
+
+end
+
+
+function State:resetBase()
 	
 	State.baseState = nil
 	State.baseState = {}
 	
 end
+
+
 
 
 function State:reset()	
@@ -107,7 +267,7 @@ function State:reset()
 		
 	for key, value in pairs(Counter) do
 			
-		if type(key) == "string" and type(value) ~= 'function' and key ~= '__index' then
+		if type(key) == "string" and type(value) ~= 'function' and key ~= '__index' and value.deleted == false then
 		
 			delete_class(key)
 			
@@ -116,16 +276,6 @@ function State:reset()
 			end	
 			
 		end	
-	end
-	
-	for key, value in pairs(Decks) do
-		
-		if type(key) == "string" and type(value) ~= 'function' and key ~= '__index' then
-			local deck = Decks[key]
-			if State.baseState[key] ~= nil then
-				deck.cards = Counter:duplicate(State.baseState[key])
-			end	
-		end
 	end
 	
 	for key, value in pairs(Globals) do
@@ -143,12 +293,13 @@ end
 function State:executeUntil(stack, from, to)
 	
 	for i = from, to do
-			
+				
 		local trait = stack[i].trait
 		local id = stack[i].id
 		local key
 		local value
 		local subkey
+
 	
 		
 		if trait ~= 'Create' then
@@ -156,9 +307,8 @@ function State:executeUntil(stack, from, to)
 			value = stack[i].value
 			subkey = stack[i].subkey	
 		end
-		
-			
-		
+
+	
 		if trait == 'text' then
 			if is_painting() then
 				log_print(value)
@@ -189,13 +339,13 @@ function State:executeUntil(stack, from, to)
 			Globals[id][key] = value
 		end
 		
-		if trait == 'Decks' then
-			local deck = Decks[id]
-			deck.cards = Counter:duplicate(value)
+		if trait == 'Card' then
+			Counter[id][trait][key] = value
 		end
 		
 		if trait == 'Create' then
 			setCounter(id, stack[i].table)
+			-- hook
 			dropped(stack[i].table.window, stack[i].table.Image.images[1], id, stack[i].table.x, stack[i].table.y)
 		end
 		
@@ -232,7 +382,10 @@ function State:undo()
 	end
 	
 	
-	if #State.stageStack > 0 then	
+	if #State.stageStack > 0 then
+		--for j = 1, State.stagePointer do
+		--	print(State.stageStack[j].id, State.stageStack[j].trait)
+		--end	
 		toolbar_enable('main', '__redo')
 	end
 	
@@ -251,7 +404,7 @@ function State:undo()
 	
 	toggle_painting()
 	
-	
+
 	
 	-- print log of redone move
 	for j = i + 1, currentStage do
@@ -267,6 +420,7 @@ function State:undo()
 	if i == 0 then
 		toolbar_disable('main', '__undo')
 	end
+	
 	
 end
 
@@ -295,7 +449,6 @@ function State:redo()
 	
 	
 	toggle_painting()
-	
 	
 	
 	-- print log of redone move
@@ -376,6 +529,7 @@ function Log:abort()
 	stop_stepping()
 	
 	State:resetState()
+	State:resetBase()
 	
 	for id, v in pairs(Counter) do
 		if type(id) == "string" and id ~= '__index' and type(v) ~= 'function' then
@@ -391,6 +545,10 @@ function undo()
 
 	State:undo()
 	
+	-- net
+	local table = {id = '', trait = 'undo'}
+	send_table({table}, 1, 1)
+	
 	-- hook
 	undohook()
 	
@@ -399,6 +557,10 @@ end
 function redo()
 
 	State:redo()
+	
+	-- net
+	local table = {id = '', trait = 'redo'}
+	send_table({table}, 1, 1)
 	
 end
 

@@ -34,7 +34,8 @@ float Counter::alpha = 1.0;
 
 bool Counter::haveOffset = true;	// true = unopened stack has offset
 //QString Counter::selectionColor = QString("#bc145e");
-QString Counter::selectionColor = QString("red");
+QString Counter::selectionColor = QString("yellow");
+int Counter::selectionSize = 5;
 bool Counter::hooverShowMap = false;
 bool Counter::hooverShowPlace = false;
 
@@ -82,8 +83,7 @@ Counter::QtCounter::~QtCounter()
 	delete this->timer;
 }
 
- 
- 
+
  
 void Counter::QtCounter::showRightClickMenu(QtCounter *counter)
 {
@@ -122,6 +122,7 @@ void Counter::QtCounter::showRightClickMenu(QtCounter *counter)
 		ActionData data;
 		data.entryaction = QString(e.entryaction.c_str());
 		data.entrytrait = QString(e.entrytrait.c_str());
+		data.entryid = QString(e.entryid.c_str());
 		data.entryactions = QString(e.entryactions.c_str());
 		
 		
@@ -135,26 +136,29 @@ void Counter::QtCounter::showRightClickMenu(QtCounter *counter)
 					
 			
 			QString str = data.entryactions.simplified();
-			str = str.replace(" ","");
 		
 			QStringList entries = str.split(':');
 			
 			
 					
-			for (const auto& item : entries )
+			for (auto& item : entries )
 			{
 				
 				
-				// entries come as menuname, menutrait, menuaction
+				// entries come as menuname, menuid, menuaction
 				
 				QStringList entry = item.split(',');
 				
+				entry[0] = entry[0].trimmed();
+				entry[1] = entry[1].trimmed();
+				entry[2] = entry[2].trimmed();
 		
 				QAction* action = new QAction(entry[0], counter);
 			
 				ActionData actionData;
-				actionData.entrytrait = entry[1];
+				actionData.entryid = entry[1];
 				actionData.entryaction = entry[2];
+				
 			
 				QVariant v;
 				
@@ -172,8 +176,6 @@ void Counter::QtCounter::showRightClickMenu(QtCounter *counter)
 		{
 			
 			QAction* action = new QAction(name, counter);
-	
-	
 			
 			
 			QVariant v;
@@ -181,10 +183,11 @@ void Counter::QtCounter::showRightClickMenu(QtCounter *counter)
 			v.setValue(data);
 			action->setData(v);
 		
-			
+
 			if (e.entrytest)
 				if (!Luau::doTest(counter->owner->state.tag.c_str(), e.entrytrait.c_str(), counter->owner->name.c_str())) 
 					action->setEnabled(false);
+	
 				
 			
 			//action->setShortcut(QKeySequence("Ctrl+D"));
@@ -206,7 +209,90 @@ void Counter::QtCounter::showRightClickMenu(QtCounter *counter)
 }
 
 
+				
+void Counter::QtCounter::do_activate (QAction *action)
+{
+	QVariant v = action->data();
+	
+	ActionData retrieved = qvariant_cast<ActionData>(v);
+	
+	std::string entryaction = retrieved.entryaction.toStdString();
+	std::string entrytrait = retrieved.entrytrait.toStdString();
+	std::string entryid = retrieved.entryid.toStdString();
+	
+	const char *window = this->owner->state.tag.c_str();
+	
+	
+	
+	CentralFrame::Stacks stacks;
 
+	
+	if (this->owner->selected && entryaction != "actionSelect")	// select is always individual
+	{
+		// generate stacks of selected
+		
+		for (auto obj = counters.begin(); obj != counters.end(); ++obj)
+		{
+			if (obj->second->selected == true)
+			{
+				CentralFrame::Point p = (CentralFrame::Point){.x = obj->second->state.cx, .y = obj->second->state.cy};
+				
+				if (stacks.find( p ) == stacks.end()) 
+				{
+					// not found
+					CentralFrame::Stack stack = {{obj->second->state.zorder, obj->second}};
+					stacks[p] = stack;
+				} 
+				else 
+				{
+					// found			
+					CentralFrame::Stack stack = stacks.at( p );
+					stack[obj->second->state.zorder] = obj->second;
+					stacks[p] = stack;
+				}
+			}	
+		}
+	}	
+	else
+	{
+		CentralFrame::Point p = (CentralFrame::Point){.x = this->owner->state.cx, .y =  this->owner->state.cy};
+				
+		CentralFrame::Stack stack = {{this->owner->state.zorder, this->owner}};
+		stacks[p] = stack;
+	}
+		
+	
+	
+	// do action 
+	
+
+	Luau::noAction(true);
+	
+	for (auto const& [point, stack] : stacks)
+		for ( auto obj = stack.begin(); obj != stack.end(); ++obj )
+		{
+			if (entryaction == "actionPlace")
+			
+				// action places counter entryid on this counter
+				
+				Luau::doAction(obj->second->state.tag.c_str(), 
+							   obj->second->name.c_str(), 
+							   entrytrait.c_str(), 
+							   "actionPlace",
+							   entryid.c_str());				
+			else
+			
+				Luau::doAction(obj->second->state.tag.c_str(), 
+							   obj->second->name.c_str(), 
+							   entrytrait.c_str(), 
+							   entryaction.c_str());		
+		}
+		
+		
+	Luau::ifAction();	
+		
+					
+}
 
 
 
@@ -309,7 +395,7 @@ void Counter::QtCounter::hooverAction()
 	
 
 	Counter *counter = stack.begin()->second;
-	
+
 	QSize s = QSize(0,0);
 	
 	
@@ -350,10 +436,8 @@ void Counter::QtCounter::hooverAction()
 	
 	if (Counter::hooverShowPlace)
 		t = Overlay::hooverView->setPlace(Luau::mapPlace(counter->state.tag.c_str(),
-														 std::round(counter->width/2) + counter->margin, 
-														 std::round(counter->height/2) + counter->margin,
-														 counter->state.x, 
-														 counter->state.y));
+														 counter->state.cx, 
+														 counter->state.cy));
 	
 		
 	
@@ -377,7 +461,7 @@ void Counter::QtCounter::hooverAction()
     
     QSize size = Overlay::hooverView->layout->minimumSize();
     
-   
+  
    
 	Overlay::hooverView->grid->resize(size.width(), size.height());
 	
@@ -385,11 +469,12 @@ void Counter::QtCounter::hooverAction()
 	
 	// 4 is double the hoover view border height
 	int heightBox = height > size.height() + 4 ? height : size.height() + 4;
+ 	
+ 	// 2 for symmetry
+	Overlay::hooverView->resize(width + size.width() + 2, heightBox);
 	
-	Overlay::hooverView->resize(width + size.width(), heightBox);
 	
-	
-	
+
 	
 	QPoint pnt = this->popupPoint + this->pos();
 	
@@ -438,71 +523,6 @@ void Counter::QtCounter::leaveEvent (QEvent *e)
 	
 
 
-				
-void Counter::QtCounter::do_activate (QAction *action)
-{
-	QVariant v = action->data();
-	
-	ActionData retrieved = qvariant_cast<ActionData>(v);
-	
-	const char *entryaction = retrieved.entryaction.toStdString().c_str();
-	const char *entrytrait = retrieved.entrytrait.toStdString().c_str();
-	
-	const char *window = this->owner->state.tag.c_str();
-	
-	
-	
-	CentralFrame::Stacks stacks;
-
-	
-	if (this->owner->selected && (strcmp(entryaction, "actionSelect") != 0))	// select is always individual
-	{
-		// generate stacks of selected
-		
-		for (auto obj = counters.begin(); obj != counters.end(); ++obj)
-		{
-			if (obj->second->selected == true)
-			{
-				CentralFrame::Point p = (CentralFrame::Point){.x = obj->second->state.cx, .y = obj->second->state.cy};
-				
-				if (stacks.find( p ) == stacks.end()) 
-				{
-					// not found
-					CentralFrame::Stack stack = {{obj->second->state.zorder, obj->second}};
-					stacks[p] = stack;
-				} 
-				else 
-				{
-					// found			
-					CentralFrame::Stack stack = stacks.at( p );
-					stack[obj->second->state.zorder] = obj->second;
-					stacks[p] = stack;
-				}
-			}	
-		}
-	
-	
-		// do action on all selected
-		
-		for (auto const& [point, stack] : stacks)	
-			for ( auto obj = stack.begin(); obj != stack.end(); ++obj )
-				Luau::doAction(window, obj->second->name.c_str(), entrytrait, entryaction);
-				
-		Luau::doAction("", "", "", "actionEnd");
-		
-	}
-	else	
-	{	
-		// else do action on unselected this
-				
-		Luau::doAction(window, this->owner->name.c_str(), entrytrait, entryaction);
-		
-		if (strcmp(window, "main") == 0)  // oh oh
-			Luau::doAction("", "", "", "actionEnd");
-	}
-					
-}
-
 
 void Counter::QtCounter::paintEvent (QPaintEvent *e)
 {
@@ -517,6 +537,30 @@ void Counter::QtCounter::paintEvent (QPaintEvent *e)
 }
 
 
+
+
+void outTable(Counter::Table t)
+{
+	for (auto obj = t.begin(); obj != t.end(); ++obj)
+	{
+		std::visit(
+			Overload{
+				[] (int k) { printf("%d=", k);  },
+				[] (std::string k) { printf("\"%s\"=", k.c_str()); }
+			},
+			obj->first
+		);
+		std::visit(
+			Overload{
+				[] (double k) { printf("%f\n", k); },
+				[] (bool k) { (k ? printf("true\n") : printf("false\n")); },				
+				[] (std::string k) { printf("\"%s\"\n", k.c_str()); },
+				[] (Counter::Table k) { outTable(k); }
+			},
+			obj->second
+		);	
+	}
+}
 
 
 
@@ -559,6 +603,8 @@ Counter::Counter(Table *state)
 	this->state.moved = false;
 	this->state.degrees = 0;
 	this->state.image = this->name;
+	this->state.scale = 1.0;
+	
 	
 	if ((*state).find("Overlays") != (*state).end())		
 	{	
@@ -571,6 +617,7 @@ Counter::Counter(Table *state)
 		
 	this->state.opacity = 1.0;
 	this->state.tag = std::get<std::string>((*state)["window"]);
+	this->state.scale = std::get<double>((*state)["scale"]);;
 	
 	
 	this->width = io->getSize(this->state.image).width();
@@ -587,13 +634,17 @@ Counter::Counter(Table *state)
 	
 	
 	this->counter = new QtCounter(this, pane);
+	
+	this->hasShadow = false;
+
 		
-	// make sure images in repository have height less than 200	???
+	
     this->setImage();
-   
     
-      
+    
+	
     pane->layout()->addWidget(this->counter);
+    
     //
     pane->resize(pane->layout()->minimumSize());
 
@@ -628,15 +679,16 @@ Counter::Counter(int id, Table *state)
 	this->name = std::to_string(id);
 	this->image = this->name;
 	
-	
+
 	this->state.x = (int)std::get<double>((*state)["x"]);	 	
 	this->state.y = (int)std::get<double>((*state)["y"]);
 	this->state.cx = (int)std::get<double>((*state)["cx"]);	 	
 	this->state.cy = (int)std::get<double>((*state)["cy"]);
 	this->state.tag = std::get<std::string>((*state)["window"]);
+	this->state.scale = 1.0;
 	
 	Window *window = Window::getInstance(this->state.tag.c_str());
-	
+		
 	this->parentWindow = window;
 	
 	
@@ -676,7 +728,9 @@ Counter::Counter(int id, Table *state)
 	if ((*state).find("Visibility") != (*state).end())		
 		this->state.opacity = (float)std::get<double>(std::get<Table>((*state)["Visibility"])["opacity"]);
 	else
-		this->state.opacity = 1.0;	
+		this->state.opacity = 1.0;
+		
+			
 
 	
 	
@@ -692,6 +746,17 @@ Counter::Counter(int id, Table *state)
 	this->selected = false;
 	this->doesNotStack = ((*state).find("DoesNotStack") != (*state).end());
 	this->disabled = false;
+	this->hasShadow = false;
+	
+	
+	std::string value;
+	
+	if (Luau::findTrait(this->name.c_str(), "Shadow", "shadow", value))
+	{
+		this->hasShadow = true;
+		this->shadow = value;
+	}	
+	
 	
 	
 	this->_ownershipField = 0;
@@ -771,10 +836,37 @@ void Counter::deleteAll()
 }
 
 
+int Counter::incId()
+{
+	return ++Counter::_id;
+}
+
+int Counter::incTopZorder()
+{
+	return ++Counter::_lastZorder;
+}
+
+int Counter::incBottomZorder()
+{
+	return --Counter::_bottomZorder;
+}
+
+
 int Counter::nextId()
 {
 	
-	return ++Counter::_id;
+	int id = Counter::incId();
+	
+	for ( auto obj = counters.begin(); obj != counters.end(); ++obj )
+		if (obj->second->id == id)
+		{
+			Luau::error(20, 2, id, obj->second->image);
+			std::exit(1); 
+		}
+		
+	Luau::updateId();
+	
+	return id;
 	
 }
 
@@ -782,7 +874,19 @@ int Counter::nextId()
 int Counter::topZorder()
 {
 	
-	return ++Counter::_lastZorder;
+	int zorder = Counter::incTopZorder();
+	
+	for ( auto obj = counters.begin(); obj != counters.end(); ++obj )
+		if (obj->second->state.zorder == zorder)
+		{
+			Luau::error(19, 2, zorder, obj->second->image);
+			std::exit(1); 
+		}
+		
+	Luau::updateTopZorder();	
+		
+	
+	return zorder;
 	
 }
 
@@ -790,7 +894,18 @@ int Counter::topZorder()
 int Counter::bottomZorder()
 {
 	
-	return --Counter::_bottomZorder;
+	int zorder = Counter::incBottomZorder();
+	
+	for ( auto obj = counters.begin(); obj != counters.end(); ++obj )
+		if (obj->second->state.zorder == zorder)
+		{
+			Luau::error(19, 2, zorder, obj->second->image);
+			std::exit(1); 
+		}
+		
+	Luau::updateBottomZorder();	
+	
+	return zorder;
 	
 }
 
@@ -809,46 +924,81 @@ void Counter::resetId()
 
 void Counter::resetZorder()
 {
-	// find highest zorder in loaded game
-	// set _lastZorder to greater than highest
+	// find highest and lowest zorder in loaded game
 	
 	int max = 0;
+	int min = 0;
 	
 	for ( auto obj = counters.begin(); obj != counters.end(); ++obj  )
+	{
 		if (obj->second->state.zorder > max) 
 			max = obj->second->state.zorder;
+		if (obj->second->state.zorder < min) 
+			min = obj->second->state.zorder;
+	}
 		
 	Counter::_lastZorder = max;	
+	Counter::_bottomZorder = min;
+		
 }
 
 
 Counter* Counter::findObj(const char *id)
 {
 	
-	string findName = string(id);
+	string str(id);
+	int iid = std::stoi(str);
 	
 	
-	for ( auto obj = counters.begin(); obj != counters.end(); ++obj  )
+	auto it = counters.find(iid); 
 	
-		if (obj->second->name == findName)
-			return obj->second;
+	if (it != counters.end()) 
+		return it->second;
+		
+		
+	auto st = repository.find(str); 
 	
+	if (st != repository.end()) 
+		return st->second;
+		
 	
-	for ( auto obj = repository.begin(); obj != repository.end(); ++obj  )
-	
-		if (obj->second->name == findName)
-			return obj->second;
-	
-			
-	return nullptr;
+		
+	// id not found; exit
+	Luau::error(33, 1, id);		
+	std::exit(1);
 	
 }
 
 
-QSize Counter::getSize(Counter *counter)
+QSize Counter::getCorner(int id)
 {
-	return QSize(std::round(counter->width/2) + counter->margin, 
-				 std::round(counter->height/2) + counter->margin); 
+	return QSize(std::round(Counter::counters[id]->width/2) + Counter::counters[id]->margin, 
+				 std::round(Counter::counters[id]->height/2) + Counter::counters[id]->margin); 
+}
+
+
+QSize Counter::getCorner(std::string id)
+{
+	return QSize(std::round(Counter::repository[id]->width/2) + Counter::repository[id]->margin, 
+				 std::round(Counter::repository[id]->height/2) + Counter::repository[id]->margin); 
+}
+
+
+int Counter::getTop(std::string window, int cx, int cy)
+{
+	
+	CentralFrame::Stack stack;
+	
+	for (auto obj = counters.begin(); obj != counters.end(); ++obj)
+		if (obj->second->state.tag == window)
+			if (obj->second->state.cx == cx && obj->second->state.cy == cy)
+				stack[obj->second->state.zorder] = obj->second;
+		
+	if (stack.empty())
+		return 0;
+	else
+		return stack[std::prev(stack.end())->first]->id;
+		
 }
 
 
@@ -915,31 +1065,10 @@ int Counter::findOffset(int size, std::string type)
 }
 
 
-void outTable(Counter::Table t)
-{
-	for (auto obj = t.begin(); obj != t.end(); ++obj)
-	{
-		std::visit(
-			Overload{
-				[] (int k) { printf("%d=", k);  },
-				[] (std::string k) { printf("\"%s\"=", k.c_str()); }
-			},
-			obj->first
-		);
-		std::visit(
-			Overload{
-				[] (double k) { printf("%f\n", k); },
-				[] (bool k) { (k ? printf("true\n") : printf("false\n")); },				
-				[] (std::string k) { printf("\"%s\"\n", k.c_str()); },
-				[] (Counter::Table k) { outTable(k); }
-			},
-			obj->second
-		);	
-	}
-}
 
 
-void Counter::setImage(int maxHeight)
+
+void Counter::setImage()
 {
 	
 	
@@ -992,11 +1121,7 @@ void Counter::setImage(int maxHeight)
 	
 	this->counter->clearMask();
 	
-	
 	//
-		
-		
-	QImage baseImage = io->getImage(this->state.image);
 	
 	
 	
@@ -1004,11 +1129,33 @@ void Counter::setImage(int maxHeight)
 		
 	image.fill(Qt::transparent);
 	
+	
+	
+	// render any shadow
+	
+	if (this->hasShadow)
+	{
+		
+		QImage shadow = io->getImage(this->shadow);
+	
+		QPainter *paint = new QPainter(&image);
+		paint->setRenderHint(QPainter::SmoothPixmapTransform);			
+		paint->drawImage(margin - 3, margin - 3, shadow);					
+		delete paint;
+			
+	}
+	
+	
+		
+		
+	QImage baseImage = io->getImage(this->state.image);
+	
+	
 	QPainter *paint = new QPainter(&image);			
 	paint->drawImage(margin, margin, baseImage);						
 	delete paint;
 	
-	
+
 		
 	// selected
 	
@@ -1017,13 +1164,13 @@ void Counter::setImage(int maxHeight)
 		
 		QPainter *paint = new QPainter(&image);
 		QPen pen = QPen(QColor::fromString(Counter::selectionColor));
-		pen.setWidth(2);
-		//pen.setWidth(3);		
+		int width = Counter::selectionSize;
+		pen.setWidth(width);		
 		pen.setCapStyle(Qt::SquareCap);
 		paint->setPen(pen);
-		// 1.5 is middle of line width 3; width +3 pen size 
-		//QRectF rect = QRectF(margin-1.5, margin-1.5, this->width+3.0, this->height+3.0);
-		QRectF rect = QRectF(margin-1.0, margin-1.0, this->width+2.0, this->height+2.0);
+		// 1.5 is middle of line width 3; pen size
+		QRectF rect = 
+			QRectF(margin-((float)width/2.0), margin-((float)width/2.0), this->width+width, this->height+width);
 		paint->drawRect(rect);			
 		delete paint;
 		
@@ -1180,11 +1327,13 @@ void Counter::setImage(int maxHeight)
 	
 	float scaleFraction;
 	 
-	//if (this->state.tag == "Repository")
-		scaleFraction = Window::getInstance("main")->frame->scaleFraction;
-	//else
-		//scaleFraction = Window::getInstance(this->state.tag.c_str())->frame->scaleFraction;
-	
+	if (this->state.tag == "Repository")
+		// counters in repository are scaled individually
+		scaleFraction = this->state.scale;
+	else
+		scaleFraction = Window::getInstance(this->state.tag.c_str())->frame->scaleFraction;
+		
+
 	
 	
 	this->scaledWidth = this->width * scaleFraction;
@@ -1194,20 +1343,17 @@ void Counter::setImage(int maxHeight)
 	
 	QSize scaledSize(std::round(image.width() * scaleFraction), 
 					 std::round(image.height() * scaleFraction));
-	
+
 	this->scaledBuffer = image.scaled( scaledSize, Qt::KeepAspectRatio, Qt::SmoothTransformation);
 		
 	
-	if (this->parentWindow->tag == "main")	
-	{	
-		this->counter->resize(scaledSize);
-		this->counter->setMask(QBitmap::fromImage(this->scaledBuffer.createAlphaMask()));
-	}
-	else	
-	{	this->counter->setMinimumSize(image.width(), image.height());	
-		this->counter->setMask(QBitmap::fromImage(this->baseBuffer.createAlphaMask()));
-	}
+	this->counter->resize(scaledSize);
 	
+	
+	// major bug ... takes away alpha  ... needs rewriting
+	//this->counter->setMask(QBitmap::fromImage(this->scaledBuffer.createAlphaMask()));
+	// createHeuristicMask()
+		
 
 	
 		
@@ -1248,12 +1394,7 @@ void Counter::setImage(int maxHeight)
 
 
 	
-	if (this->parentWindow->tag == "main")	
-		this->counter->setPixmap(QPixmap::fromImage(this->scaledBuffer));		
-		
-	else
-		this->counter->setPixmap(QPixmap::fromImage(this->baseBuffer));		
-		
+	this->counter->setPixmap(QPixmap::fromImage(this->scaledBuffer));
 	
 	
 	
@@ -1300,6 +1441,7 @@ void Counter::setGUI(const char *tag)
 	for (auto obj = counters.begin(); obj != counters.end(); ++obj)
 		if (obj->second->state.tag == window || "all" == window)
 		{
+			
 			CentralFrame::Point p = (CentralFrame::Point){.x = obj->second->state.cx, .y = obj->second->state.cy};
 		
 			if (stacks.find( p ) == stacks.end()) 
@@ -1310,7 +1452,7 @@ void Counter::setGUI(const char *tag)
 			} 
 			else 
 			{
-				// found			
+				// found		
 				CentralFrame::Stack stack = stacks.at( p );
 				stack[obj->second->state.zorder] = obj->second;
 				stacks[p] = stack;
@@ -1332,10 +1474,10 @@ void Counter::setGUI(const char *tag)
 	
 	
 	for (auto const& [zorder, stack] : zordered)	
-		for ( auto obj = stack.begin(); obj != stack.end(); ++obj  )
+		for (auto const& [id, counter] : stack)
 		{
-			obj->second->setImage();
-			obj->second->counter->raise();
+			counter->setImage();
+			counter->counter->raise();
 		}
 	
 }

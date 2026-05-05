@@ -53,8 +53,16 @@ class Window : public QMainWindow
 		{
 			public:
 				Pane(QWidget *parent = nullptr);
+				void setZoom(float amount);
+				std::string imageID;
 			protected:
-				virtual void resizeEvent(QResizeEvent* e);
+				virtual void resizeEvent(QResizeEvent* event);
+				virtual void wheelEvent(QWheelEvent *event);
+			private:
+				void zoomFraction(float amount, bool set);
+				void wheelIn();
+				void wheelOut();
+				float scaleFraction;				
 		};
 		
 		
@@ -91,16 +99,17 @@ class Window : public QMainWindow
 		class Label : public QLabel
 		{
 			public:
-				Label(std::string tag, Window *parent, int x, int y, int w, int h, std::string resourecName, QString styleSheet);
+				Label(Window *parent, std::string tag, int x, int y, int w, int h, std::string resourecName);
 					
 				int x;
 				int y;
 				int w;
 				int h;
-				std::string tag;			
-				void setText(std::string text);	
+							
+				void setText(QString text);	
 				std::string get();
 				QImage backgroundImage;
+				std::string tag;
 				Window *parent;
 				
 			protected:	
@@ -124,20 +133,25 @@ class Window : public QMainWindow
 		class PushButton : public QPushButton
 		{
 			public:
-				PushButton(std::string widget, QImage image, QString text, int x, int y, std::string luaScript,
-								Window *parent = nullptr);
+				PushButton(Window *window, std::string tag, std::string resourceName, QString text, 
+								int x, int y, std::string luaScript);
 						
 				int x;
-				int y;				
-				QImage image;
-				Window *parent;				
+				int y;
+				std::string resourceId;
+				std::string tag;
+				Window *window;
+				
+			protected:	
+				virtual void mousePressEvent(QMouseEvent *event);	
+						
 		};
 		
 		
 		
 		
 		
-		Window(QWidget *parent, QString title, std::string tag, std::string type);
+		Window(QWidget *parent, QString title, std::string tag, std::string type, bool anyScroll, int w, int h);
 		~Window();
 		
 		
@@ -151,8 +165,12 @@ class Window : public QMainWindow
 		void addAWidget(std::string key,  QWidget *value);
 		static Window *instance;
 		QWidget *container;
-		void setWidgets(int height = 0);
-		bool zooming;
+		void setWidgets();
+		void setOptions(QString font, int fontSize, std::string weight, std::string color);
+		QString font;
+		int fontSize;
+		enum QFont::Weight weight;
+		QColor color;
 		
 		
 		
@@ -165,12 +183,16 @@ class Window : public QMainWindow
 		
 		//
 		std::string tag;
+		std::string title;
 		
 		
 		QScrollArea *scrollArea;	
 		
 		
 		CentralFrame *frame;
+		
+		float minZoom;
+		float maxZoom;
 		
 		// repository
 		
@@ -189,6 +211,8 @@ class Window : public QMainWindow
 		void comboItem(int level, std::string text);
 		void imageItem(std::string imageID);
 		void htmlItem(std::string filename);
+		void scaleFrame(float amount);
+		void scalePane(float amount);
 		
 		
 		QList<Pane*> paneList;
@@ -212,6 +236,7 @@ class Window : public QMainWindow
 	
 		static std::map<std::string, Window *> instances;
 		std::stack<std::any> panes;
+	
 		
 		
 };

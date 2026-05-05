@@ -6,6 +6,7 @@ Repository = {}
 
 
 
+
 function Repository:new (images)
 	local o = {}	
 	setmetatable(o, self)
@@ -13,6 +14,7 @@ function Repository:new (images)
 	o.Image = Image:new(images, 1)
 	o.x = 0
 	o.y = 0
+	o.scale = 1.0
 	o.name = images[1]
 	o.window = 'Repository'
 	return o
@@ -60,6 +62,24 @@ function Repository:incrementDegrees (id, increment)
 end
 
 
+function Repository:hasTrait(table, trait)
+	for k, v in pairs(table) do	
+		if type(k) == "string" and k ~= '__index' and type(v) ~= 'function' then			
+			if k == trait then
+				return true
+			end
+			if type(v) == 'table' and (v.deleted == nil or v.deleted == false) then
+				local result = Repository:hasTrait(v, trait)
+				if result == true then
+					return true
+				end
+			end
+		end	
+	end
+	return false
+end
+
+
 
 Counter = {}
 
@@ -76,7 +96,7 @@ function Counter:new (id, images, imageIndex, zorder, window, x, y, cx, cy)
 	o.cy = cy
 	o.zorder = zorder
 	o.deleted = false
-	o.window = window
+	o.window = window	
 	return o
 end
 
@@ -149,59 +169,95 @@ function Counter:select (id)
 	end
 end
 
-function Counter:move (window, id, x, y, cx, cy)
-	
+
+function Counter:move (window, id, zorder, x, y, cx, cy)
 
 	local counter
-	
-	if Counter[id] ~= nil then
+
+	if Counter[id] ~= nil then	
 		counter = Counter[id]
 	else
 		counter = Repository[id]
 	end
 	
+
 	
 	
-	if (counter[id].window == window) then
+	if (counter.window == window) then
 		
-		updatePos(window, id, x, y, cx, cy)
+		
+		updatePos(window, id, zorder, x, y, cx, cy)
+		
 		State:addMove(id, "Counter", "x", x)
 		State:addMove(id, "Counter", "y", y)
 		State:addMove(id, "Counter", "cx", cx)
 		State:addMove(id, "Counter", "cy", cy)
-		State:addMove(id, "Counter", "window", window)		
-		update_class(Counter, id)
+		State:addMove(id, "Counter", "zorder", zorder)
+		State:addMove(id, "Counter", "window", window)
 	
-	elseif counter[id].window == 'Repository' then
-	
-		local toId = next_id()
-		local zorder = top_zorder()
-		copyCounter(id, toId, zorder, window, x, y, cx, cy)
-		State:addCreate(toId, 'Create')
 	
 	else
 	
-		-- moved to another window
 		
-		-- delete counter in old window and create updated counter in new window
+		if Counter:hasTrait(counter, 'Marker') then		
+			if counter.Marker.place == 'bottom' then 
+				zorder = bottom_zorder()
+			else
+				zorder = top_zorder()
+			end
+		else
+			zorder = top_zorder()		
+		end	
+	
+	
+		if (counter.window == 'Repository') then
+
+			local toId = next_id()
+			copyCounter(id, toId, zorder, window, x, y, cx, cy)
+			State:addCreate(toId, 'Create')
+			
+			-- has to be here for zorder			
+			setGUI(window)
+			
+		else
 		
-		Counter:delete(id)
-		delete_class(id)
+			-- moved to another window
+			
+			-- delete counter in old window and create updated counter in new window
 		
+			Counter:delete(id)
+			delete_class(id)
+			
+			--local zorder = top_zorder()
+			
+			updatePos(window, id, zorder, x, y, cx, cy)
 		
-		updatePos(window, id, x, y, cx, cy)
-		
-		local zorder = top_zorder()	
-		Counter[id].zorder = zorder
-		Counter[id].deleted = false
-		
-		
-		create_class_copy(Counter, id)			
-		State:addCreate(id, 'Create')
-		
-	end	
+			Counter[id].deleted = false		
+			
+			create_class_copy(Counter, id)
+			
+					
+			State:addCreate(id, 'Create')
+			
+		end
+	end
+	
+	
+	if Counter:hasTrait(counter[id], 'Card') then
+		local deck = Decks:find(cx, cy)
+		if deck ~= nil then
+			counter[id].Card.deckId = deck.id
+			counter[id].Card.actionUp = deck.actionUp
+			counter[id].Card.actionDown = deck.actionDown
+			State:addMove (id, 'Card', 'deckId', deck.id)
+			State:addMove (id, 'Card', 'actionUp', deck.actionUp)	
+			State:addMove (id, 'Card', 'actionDown', deck.actionDown)
+		end
+	end
+
 		
 end
+
 
 function Counter:findId(stringId)
 	for k, v in pairs(Counter) do	
@@ -232,6 +288,23 @@ function Counter:findTrait(table, trait)
 	return nil
 end
 
+function Counter:hasTrait(table, trait)
+	for k, v in pairs(table) do	
+		if type(k) == "string" and k ~= '__index' and type(v) ~= 'function' then			
+			if k == trait then
+				return true
+			end
+			if type(v) == 'table' and (v.deleted == nil or v.deleted == false) then
+				local result = Counter:hasTrait(v, trait)
+				if result == true then
+					return true
+				end
+			end
+		end	
+	end
+	return false
+end
+
 
 function Counter:setTrait(table, name, trait)
 	table[name] = trait
@@ -246,8 +319,8 @@ function Counter:getStackSize(window, pos)
 	for k, v in pairs(Counter) do
 		if type(k) == "string" and k ~= '__index' and type(v) ~= 'function' and v.deleted == false then
 			if Counter[k].window == window then		
-				local dx, dy = get_size(v.Image.images[1])
-				if v.x + dx == pos.x and v.y + dy == pos.y then
+				--local dx, dy = get_size(v.Image.images[1])
+				if v.cx == pos.x and v.cy + dy == pos.y then
 					res = res + 1
 				end
 			end
@@ -256,18 +329,21 @@ function Counter:getStackSize(window, pos)
 	return res
 end
 
-function Counter:inStack(window, id, counter)
-	local ex, ey = get_size(Counter[id].Image.images[1])	
-	for k, v in pairs(Counter) do
+function Counter:MarkerInStack(window, cx, cy, trait, resourceid)	
+	for k, v in pairs(Counter) do	
 		if type(k) == "string" and k ~= '__index' and type(v) ~= 'function' and v.deleted == false then
-			if Counter[id].window == Counter[k].window then
-				if counter == v.Image.images[1] then		
-					local dx, dy = get_size(v.Image.images[1])
-					if v.x + dx == Counter[id].x + ex and v.y + dy == Counter[id].y + ey then
-						return true
+
+			if Counter[k].window == window then
+				if cx == v.cx and cy == v.cy then		
+					if Counter:hasTrait(Counter[k], 'Marker') then
+						local table = Counter:findTrait(Counter[k], 'Marker')
+						if Counter:hasTrait(table, trait) and table.marker == resourceid then
+							return true
+						end
 					end
 				end
 			end
+			
 		end	
 	end
 	return false
@@ -296,21 +372,20 @@ function Counter:merge(o, loaded)
     return o
 end
 
---[[
+
 function Counter:refresh()
 	
 	local id
 	local x
 	local y
+	local cx
+	local cy
 	local name
 	local imageIndex
+	local deleted
 	local window
 	local zorder
-	local markmoved
-	local degrees
-	local opacity 
-	local table
-	local deleted
+	
 	
 	
 	local keys = {}
@@ -331,67 +406,54 @@ function Counter:refresh()
 	
 		local k = keys[i]
 		 
-		if type(k) == "string" and k ~= '__index' and type(v) ~= 'function' then
 		
-			-- save state
 		
-			id = Counter[k].id
-			x = Counter[k].x
-			y = Counter[k].y
-			name = Counter[k].Image.images[1]
-			imageIndex = Counter[k].Image.imageIndex
-			window = Counter[k].window
-			zorder = Counter[k].zorder
-			markmoved = Counter[k].MarkMoved ~= nil and Counter[k].MarkMoved.moved
-			if Counter[k].Rotate ~= nil then
-				degrees = Counter[k].Rotate
-			else
-				degrees = 0	 
-			end
-			if Counter[k].Visibility ~= nil then
-				opacity = Counter[k].Visibility.opacity
-			else
-				opacity = 1.0	
-			end
-			deleted = Counter[k].deleted
+		-- save state
+	
+		id = Counter[k].id
+		x = Counter[k].x
+		y = Counter[k].y
+		cx = Counter[k].cx
+		cy = Counter[k].cy
+		name = Counter[k].Image.images[1]
+		imageIndex = Counter[k].Image.imageIndex
+		deleted = Counter[k].deleted
+		window = Counter[k].window
+		zorder = Counter[k].zorder
 		
 	
-	
-			-- reset counter
-			
-			Counter[k] = nil			
-			Counter[k] = Counter:duplicate(Repository[name])
-			
-			
-			-- reinstall state
 
-			Counter[k].id = id
-			Counter[k].x = x 
-			Counter[k].y = y 
-			Counter[k].Image.imageIndex = imageIndex			
-			Counter[k].window = window
-			Counter[k].zorder = zorder
-			
-			if Counter[k].MarkMoved ~= nil then
-				Counter[k].MarkMoved.moved = markmoved
-			end	
-			if Counter[k].Rotate ~= nil then		
-				Counter[k].Rotate.degrees = degrees
-			end
-			if Counter[k].Visibility ~= nil then
-				Counter[k].Visibility.opacity = opacity
-			end	
-			Counter[k].deleted = deleted 
+
+		-- reset counter
+		
+		Counter[k] = nil
+		Counter[k] = Counter:duplicate(Repository[name])
+		
+		
+		-- reinstall state
+
+		Counter[k].id = id
+		Counter[k].x = x 
+		Counter[k].y = y
+		Counter[k].cx = cx 
+		Counter[k].cy = cy  
+		Counter[k].Image.imageIndex = imageIndex
+		Counter[k].deleted = deleted			
+		Counter[k].window = window
+		Counter[k].zorder = zorder
 		
 			
-		end
+			
+		
+			
+		
 		
 		
 	end
 	
 	
 end
---]]
+
 
 
 function Counter:generateGUI()
@@ -400,7 +462,8 @@ function Counter:generateGUI()
 		
 		if type(k) == "string" and k ~= '__index' and type(v) ~= 'function' and v.deleted == false then
 		
-			update_class(Counter, k)			
+			update_class(Counter, k)
+			-- hook			
 			moved(Counter[k].window, k, Counter[k].x, Counter[k].y)
 					
 		end
@@ -434,18 +497,28 @@ function Decks:add(id, o)
 	Decks[id] = o
 end
 
+function Decks:is(id)
+	return Decks[id] ~= nil
+end
+
 function Decks:get(id)
-	return Decks[id]
+	if Decks[id] ~= nil then
+		return Decks[id]
+	else
+		error(13, id)
+		return nil
+	end
 end
 
 function Decks:find(x, y)
 	for k, v in pairs(Decks) do
 		if type(v) ~= 'function' then	
-			if v.x == x and v.y == y then
+			if v.cx == x and v.cy == y then
 				return v
 			end
 		end
 	end
+	--error(21, x, y)
 	return nil
 end
 
@@ -474,66 +547,95 @@ end
 
 Deck = {}
 
-function Deck:new (id, move, gridpoint)	
+function Deck:new (id, actionUp, actionDown, gridpoint)	
 	local o = {}
 	setmetatable(o, self)
 	self.__index = self
 	o.id = id
-	o.cards = {}
-	o.x = gridpoint.x
-	o.y = gridpoint.y	
-	o.moveto = move
+	o.cx = gridpoint.x
+	o.cy = gridpoint.y
+	o.actionUp = actionUp
+	o.actionDown = actionDown
 	Decks:add(id, o)
 	return o
 end	
 
 
-function Deck:add(card)
-	table.insert(self.cards, card)
-end
-
-function Deck:remove(id)
-	local n
-	for k,v in pairs(self.cards) do
-		if v == tonumber(id) then 	
-			n = k
-		end
-	end
-	table.remove(self.cards, n)	
-end
-
-function Deck:draw(andDelete)
-	if #self.cards == 0 then
-		return nil
-	end	
-	
-	local n = math.random(1, #self.cards)
-	local toId = self.cards[n]
-	table.remove(self.cards, n)
-	if andDelete then
-		delete_class(toId)
-	end 
-	return toId
-end
-
 function Deck:load(id, table)
-	local o = Deck:new(id, {}, {0,0})
+	local o = Deck:new(id, {}, {}, {x = 0,y = 0})
 	o = Counter:merge(o, table)
 	return o
 end
 
 
+function Deck:draw(window, zone, pos)
+
+	
+	-- the available cards to draw from
+	
+	local cards = {}
+
+	for k,v in pairs(Counter) do
+		if type(k) == "string" and k ~= '__index' and type(v) ~= 'function' and v.deleted == false then
+		
+			local trait = Counter[v.id].Card
+			
+			if trait ~= nil then
+				-- 2 face down
+				if trait.deckId == self.id and Counter[v.id].Image.imageIndex == 2 then
+					table.insert(cards, v.id)
+				end
+			end
+			
+		end
+	end
 
 
-Card = {}
 
-function Card:new(deck)
-	local o = {}
-	-- 1 face up, 2 face down (default)
-	o.deck = deck
-	o.face = 2
-	return o 
-end
+	if #cards == 0 then
+		return 
+	end
+	
+	setNoAction(false)
+	
+	
+	local n = math.random(1, #cards)
+	local card = cards[n]
+
+		
+	
+	local z = Zones:get(zone)
+	local p = z:getGrid(pos)
+		
+	
+			
+	local dx, dy = get_corner(card)
+	local zorder = top_zorder()
+	
+	
+			
+	Counter[card].Image.imageIndex = 1
+	
+	State:addMove (card, 'Image', 'imageIndex', Counter[card].Image.imageIndex)
+	
+	
+	Counter:move(window, card, zorder, p.x - dx, p.y - dy, p.x, p.y)
+
+	
+		
+	
+	reporttext('move', Repository[Counter[card].Image.images[2]].name .. ' is drawn in the <span style="color:DarkSlateGray;">'
+				   .. get_title(window) .. '</span> window')
+				   
+		
+	
+		
+	Counter:generateGUI()	
+	
+	
+end		
+
+
 
 
 

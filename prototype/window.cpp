@@ -7,7 +7,9 @@
 
 
 extern IO *io;
+extern Window *repositoryWindow;
 extern Window *logWindow;
+extern Scale *scaled;
 
 
 std::string Window::rootTag; 
@@ -65,7 +67,7 @@ void Window::LineEdit::keyPressEvent(QKeyEvent *e)
 
 
 
-Window::Window(QWidget *parent, QString title, std::string tag, std::string type) : QMainWindow(parent)
+Window::Window(QWidget *parent, QString title, std::string tag, std::string type, bool anyScroll, int w, int h) : QMainWindow(parent)
 {
 	
 	this->setWindowTitle(title);
@@ -74,21 +76,32 @@ Window::Window(QWidget *parent, QString title, std::string tag, std::string type
     instances[tag] = this;
     
     this->tag = tag;
-    this->zooming = false;
+    this->font = "Sans Serif";
+    this->fontSize = 12;
+    this->weight = QFont::Normal;
+    this->color = "#000000";
+    this->minZoom = 0.2;
+    this->maxZoom = 2.0;
+    this->title = title.toStdString();
     
     
     // top level window
     if (parent == nullptr)
     {
-		this->scrollArea = new QScrollArea;
-		setCentralWidget(scrollArea);
+		if (anyScroll)
+		{
+			this->scrollArea = new QScrollArea;
+			setCentralWidget(scrollArea);
 		
-		this->container = new QWidget(this);
-		container->setAcceptDrops(true);
-			
-		this->scrollArea->setWidget(container);
-	
-		this->frame = new CentralFrame(container, this, type, this->scrollArea);
+			this->container = new QWidget(this);
+			container->setAcceptDrops(true);
+				
+			this->scrollArea->setWidget(container);
+			this->frame = new CentralFrame(container, this, type, this->scrollArea);
+		}
+		else
+			this->frame = new CentralFrame(parent, this, type);
+		
 		
 		this->frame->setObjectName("centralFrame");
 	}
@@ -111,11 +124,11 @@ Window::Window(QWidget *parent, QString title, std::string tag, std::string type
 		setAutoFillBackground(true);
 		
 		this->move(70, 100);   
-		this->resize(450, 300);   
-		this->frame->resize(450, 300);  
+		this->resize(w, h);   
 		
 		
-		//this->show();
+		this->setMinimumSize(QSize(300,200)); 
+		
 	}
 	else
 	if (tag == "LogChat")
@@ -130,7 +143,8 @@ Window::Window(QWidget *parent, QString title, std::string tag, std::string type
 		
 		
 		
-		ToolBar *bar = new ToolBar("logbar", "Toolbar", nullptr);
+		ToolBar *bar = new ToolBar(this->tag, "logbar", "Toolbar", 37, nullptr);
+		bar->setIconSize(QSize(32, 37));
 		this->addToolBar(Qt::TopToolBarArea, bar);
 		
 		
@@ -149,25 +163,43 @@ Window::Window(QWidget *parent, QString title, std::string tag, std::string type
 		
 		
 		this->move(300, 750);   
-		this->resize(800, 250);   
-		this->frame->resize(800, 250);
+		this->resize(w, h);   
 		this->frame->backgroundColor = "white";
 
-			 
-		//this->show();
+
 	}
 	else
 	{
-		this->scrollArea = nullptr;
-		this->container = nullptr;
 		
-		this->frame = new CentralFrame(parent, this, type);
-		setCentralWidget(this->frame);
+		if (anyScroll)
+		{
+			this->scrollArea = new QScrollArea;
+			this->scrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+			this->scrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+				
+			this->setCentralWidget(this->scrollArea);
+			
+			QScrollBar *horizontalScrollBar = this->scrollArea->horizontalScrollBar();
+			
+			this->frame = new CentralFrame(parent, this, type, this->scrollArea);
+			this->scrollArea->setWidget(this->frame);
+			//this->resize(w, h + horizontalScrollBar->height());
+			this->resize(w, h);
+		}	
+		else	
+		{	
+			this->scrollArea = nullptr;	
+			this->frame = new CentralFrame(parent, this, type);
+			setCentralWidget(this->frame);
+			this->resize(w, h);
+		}
+		
+		
 		
 	}
     
     
-	setAcceptDrops(true); 		
+	//setAcceptDrops(true); 		
 	
 }
 
@@ -196,8 +228,11 @@ Window *Window::getInstance(const char *instance)
 			Window::instance = obj->second;
 			return obj->second;
 		}
-			
-	return nullptr;
+
+	name = "'" + name + "'";
+	
+	Luau::error(8, 1, name.c_str()); 
+	std::exit(1);
 	
 }
 
@@ -209,6 +244,59 @@ void Window::showWindow()
 		this->show();
 	else
 		this->hide();	
+}
+
+
+void Window::setOptions(QString font, int fontSize, std::string weight, std::string color)
+{ 
+	QFontDatabase database; 
+	
+	QStringList families = database.families();
+	
+	//for (auto f : families)
+	//	printf("%s\n", f.toStdString().c_str());
+	
+	if (!families.contains(font))
+	{
+		Luau::error(9, 1, font.toStdString().c_str());
+		std::exit(1);
+	}
+	else
+		this->font = font;
+	
+	this->fontSize = fontSize;
+	
+	
+	
+	std::unordered_map<std::string, enum QFont::Weight> 
+		m{{"Thin", QFont::Thin}, {"ExtraLight", QFont::ExtraLight}, 
+		  {"Light", QFont::Light}, {"Normal", QFont::Normal}, 
+		  {"Medium", QFont::Medium},{"DemiBold", QFont::DemiBold}, 
+		  {"Bold", QFont::Bold}, {"ExtraBold", QFont::ExtraBold},
+		  {"Black", QFont::Black}};
+		  
+	auto it = m.find(weight);
+	
+	if (it != m.end()) 
+		this->weight = it->second;
+	else 
+	{ 
+		Luau::error(10, 1, weight.c_str());
+		std::exit(1);
+	}
+	
+	// https://doc.qt.io/qt-6/qcolor.html#fromString
+	QAnyStringView aColor = QString::fromStdString(color);
+	
+	if (QColor::isValidColorName(aColor))
+		this->color = QColor::fromString(aColor);
+	else
+	{
+		Luau::error(11, 1, color.c_str());
+		std::exit(1);
+	}	
+		
+		
 }
 
 
@@ -247,7 +335,7 @@ void Window::addAWidget(std::string key,  QWidget *value)
 
 
 
-void Window::setWidgets(int height)
+void Window::setWidgets()
 {
 	
 	float fraction;
@@ -256,25 +344,8 @@ void Window::setWidgets(int height)
 		return;
 		
 	
-	if (height == 0)
-		fraction = Window::getInstance(this->tag.c_str())->frame->scaleFraction;	
-	else
-	{	
-		
-		if (this->size().height() == 0)
-			return;	
-					
 	
-		float factor = (float)height / (float)this->frame->size().height();
-		
-		
-		if (factor > 1.0)
-			factor = 1.0;
-			
-		
-		fraction = factor;	
-	}
-	
+	fraction = this->frame->scaleFraction;	
 
 	
 	for (Widgets::iterator it = widgets.begin(); it != widgets.end(); it++)
@@ -283,22 +354,24 @@ void Window::setWidgets(int height)
 		
 		if (pushbutton != nullptr)
 		{	
-			QImage base =
-				QImage(pushbutton->image.width(), pushbutton->image.height(), QImage::Format_ARGB32_Premultiplied);
+			
+			QImage image = io->getImage(pushbutton->resourceId);
+			QSize size = io->getSize(pushbutton->resourceId);
+			
+			QSize scaledSize = size * fraction;
 		
-			base.fill(Qt::transparent);
+	
+			QImage imageScaled = image.scaled( scaledSize, Qt::KeepAspectRatio, Qt::SmoothTransformation); 
 			
-			QPainter *paint = new QPainter(&base);	
-			paint->setRenderHint(QPainter::Antialiasing);
-			paint->setRenderHint(QPainter::TextAntialiasing);
-			paint->setRenderHint(QPainter::SmoothPixmapTransform);
-			paint->scale((qreal)fraction, (qreal)fraction);	
-			paint->drawImage(0, 0, pushbutton->image);		
-			delete paint;
+			pushbutton->setIcon(QIcon(QPixmap::fromImage(imageScaled)));
+			pushbutton->resize(scaledSize);
 			
-			pushbutton->setIcon(QIcon(QPixmap::fromImage(base)));									      
-									  
-			pushbutton->move((int)(pushbutton->x * fraction), (int)(pushbutton->y * fraction));
+			// what crap
+				
+			pushbutton->move((int)std::round( pushbutton->x * fraction), 
+							 (int)std::round( pushbutton->y * fraction));	
+							 
+	
 		}
 		
 		
@@ -357,13 +430,7 @@ void Window::resizeEvent(QResizeEvent* event)
 	
 	QMainWindow::resizeEvent(event);
 	
-	if (zooming)
-		setWidgets(event->size().height());
 		
-	
-		
-	
-	//if (this->tag == "Repository")
 	if (this->frame->layout() != nullptr)
 	{	
 		QLayoutItem *item = this->frame->layout()->itemAt(0);
@@ -374,10 +441,7 @@ void Window::resizeEvent(QResizeEvent* event)
 			widget->resize(event->size());
 		}
 	}		
-		
 	
-	
-	//this->frame->setBackground();
 	
 	event->accept();
 	
@@ -387,17 +451,17 @@ void Window::resizeEvent(QResizeEvent* event)
 
 
 
-Window::Label::Label(std::string tag, Window *parent, int x, int y,  int w, int h, std::string resourecName, 
-						QString styleSheet) : QLabel((QWidget *)parent->frame), x(x), y(y), w(w), h(h)
+Window::Label::Label(Window *parent, std::string tag, int x, int y, int w, int h, std::string resourceName) : 
+					 QLabel((QWidget *)parent->frame), x(x), y(y), w(w), h(h)
 {
 	
-	if (resourecName.empty())
+	if (resourceName.empty())
 	{
 		this->resize(w, h);			
 	}
 	else
 	{
-		this->backgroundImage = io->getImage(resourecName);
+		this->backgroundImage = io->getImage(resourceName);
 		this->setPixmap(QPixmap::fromImage(backgroundImage));
 		this->resize(this->pixmap().size());	
 	}	
@@ -407,32 +471,44 @@ Window::Label::Label(std::string tag, Window *parent, int x, int y,  int w, int 
 	
 		
 		
-	this->setStyleSheet(styleSheet);
+	//this->setStyleSheet(styleSheet);
+	
 	
 	this->parent = parent;
 	this->tag = tag;
 	
 	
 	parent->addAWidget(tag, this);
+	
 
 }
 
 
-void Window::Label::setText(std::string text)
+void Window::Label::setText(QString text)
 {
 	QImage image = QImage(this->w, this->h, QImage::Format_ARGB32_Premultiplied);
-		
+	
 	image.fill(Qt::transparent);
 	
+	
+	
 	QPainter *paint = new QPainter(&image);
+	
 	paint->setRenderHint(QPainter::TextAntialiasing);
-	paint->setFont(QFont("Serif", 30, QFont::Bold));
-	paint->setPen(Qt::black);
-	paint->drawText(0, 0, this->w, this->h, Qt::AlignCenter, QString::fromStdString(text));		
+	
+	paint->setFont(QFont(this->parent->font, this->parent->fontSize, this->parent->weight));
+	paint->setPen(QPen(QColor(this->parent->color)));
+	
+	paint->drawText(0, 0, this->w, this->h, Qt::AlignCenter, text);
+	
+	
 	delete paint;
+	
+	
 	
 	this->backgroundImage = image;	
 	this->setPixmap(QPixmap::fromImage(image));
+	this->resize(this->w, this->h);
 	
 	this->parent->setWidgets();
 	
@@ -447,6 +523,7 @@ std::string Window::Label::get()
 
 void Window::Label::mousePressEvent (QMouseEvent * event) 
 {
+	QLabel::mousePressEvent(event);
 	event->accept();
 }
 
@@ -475,21 +552,34 @@ bool Window::CheckBox::get()
 
 
 
-Window::PushButton::PushButton(std::string widget, QImage image, QString text, int x, int y, std::string luaScript, 
-						       Window *parent) : QPushButton(QIcon(QPixmap::fromImage(image)), text, (QWidget *)parent->frame), x(x), y(y)
+Window::PushButton::PushButton(Window *window, std::string tag, std::string resourceName, QString text, int x, int y, 
+								std::string luaScript) : QPushButton(window->frame), x(x), y(y)
 {
-	this->setStyleSheet("QPushButton {border : 0; background: transparent}");	
+	this->setStyleSheet("border: 0; background: transparent");
+	
+	QImage image = io->getImage(resourceName);
+	this->setIcon(QIcon(QPixmap::fromImage(image)));	
 	this->setIconSize(image.rect().size());
+	
 	QObject::connect(this, &QPushButton::clicked, [=]()->void{ Luau::callbackScript(luaScript); });
 	
-	this->image = image;
-	this->parent = parent;
+	this->resourceId = resourceName;
+	this->window = window;
+	this->tag = tag;
 	
-	parent->addAWidget(widget, this);
-	
-	
+	window->addAWidget(tag, this);	
 
 }
+
+
+void Window::PushButton::mousePressEvent (QMouseEvent * event) 
+{
+	QPushButton::mousePressEvent(event);
+	event->accept();
+}
+
+
+
 
 
 
@@ -501,6 +591,7 @@ Window::Pane::Pane(QWidget *parent) : QLabel(parent)
 	palette.setColor(QPalette::Window, Qt::white);
 	this->setPalette(palette);	
 	setAutoFillBackground(true);
+	this->scaleFraction = 1.0;
 	
 	setContentsMargins(0, 0, 0, 0);
 	
@@ -511,6 +602,110 @@ void Window::Pane::resizeEvent(QResizeEvent* event)
 {
    QLabel::resizeEvent(event);
 }
+
+
+
+void Window::Pane::setZoom(float amount)
+{
+	zoomFraction(amount, true);
+}
+
+void Window::Pane::zoomFraction(float amount, bool set)
+{	
+	
+	for (int i = 0; i < this->layout()->count(); i++) 
+	{	
+		
+		QLayoutItem* item = this->layout()->itemAt(i);		
+		QWidget *widget = item->widget();
+		
+		if (widget != nullptr)
+		{
+			Counter::QtCounter *counter = dynamic_cast<Counter::QtCounter*>(widget);
+			
+			if (counter != nullptr)
+			{
+				
+				float scaleFraction = (set ? 0 : counter->owner->state.scale);
+		
+				if (scaleFraction + amount <= 0.2 || 
+					scaleFraction + amount > 1.0)
+					continue;
+				
+				if (set)
+					counter->owner->state.scale = amount;
+				else 
+					counter->owner->state.scale = scaleFraction + amount;
+				
+				counter->owner->setImage();
+				
+			}
+			else
+			{
+			
+				QLabel *label = dynamic_cast<QLabel*>(widget);
+				
+				if (label != nullptr)
+				{
+					if (set)
+						this->scaleFraction = amount;
+					else	
+						this->scaleFraction = this->scaleFraction + amount;	
+					
+					if (this->scaleFraction > 1.0)
+						this->scaleFraction = 1.0;
+					if (this->scaleFraction < 0.2)
+						this->scaleFraction = 0.2;	
+										
+					
+					if (io->isResource(this->imageID))
+					{
+						QImage image = io->getImage(this->imageID);
+						QSize size(std::round(io->getSize(this->imageID).width() * this->scaleFraction), 
+								   std::round(io->getSize(this->imageID).height() * this->scaleFraction));
+						QImage imageScaled = image.scaled(size, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+						label->resize(size);
+						label->setPixmap( QPixmap::fromImage(imageScaled) );
+					}
+					
+				}
+				
+			}
+		}
+		
+	}
+	
+			
+}
+
+void Window::Pane::wheelIn()
+{
+	zoomFraction(0.05, false);
+}
+
+void Window::Pane::wheelOut()
+{	
+	zoomFraction(-0.05, false);	
+}
+
+
+void Window::Pane::wheelEvent(QWheelEvent *event)
+{
+	
+	if (this->layout() != nullptr)
+	{	
+		int amount = event->angleDelta().y();
+					
+		if (amount > 0)		
+			wheelIn();		
+		else		
+			wheelOut();	
+	}
+	
+	event->accept();
+}
+
+
 
 
 
@@ -970,6 +1165,8 @@ void Window::imageItem(std::string imageID)
 {
 
 	Pane *pane = this->getParent();
+	
+	pane->imageID = imageID;
     
 	
 	QImage image = io->getImage(imageID);
@@ -1008,6 +1205,19 @@ void Window::htmlItem(std::string filename)
 
 	pane->layout()->addWidget(text);
 	
+}
+
+
+void Window::scaleFrame(float amount)
+{
+	this->frame->zoomFraction(amount, true);
+}	
+
+	
+void Window::scalePane(float amount)
+{
+	Window::Pane *pane = this->getParent();
+	pane->setZoom(amount);
 }	
 
 	

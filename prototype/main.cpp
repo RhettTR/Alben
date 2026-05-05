@@ -34,21 +34,21 @@ Window *logWindow;
 
 
 
-//QWidget *container;
-
 ToolBar *mainToolBar;
 QAction *beginLogAction;
 QAction *endLogAction;
 
 
 
+
+
 void reload ();
 
 
-/*void refresh()
+void refresh()
 {		
 	Luau::refresh();
-}*/
+}
 
 
 void undo ()
@@ -65,6 +65,11 @@ void redo ()
 void clearMoved ()
 {
 	Counter::clearMoved();
+}
+
+void net ()
+{
+	IO::netDialog->setVisible(!IO::netDialog->isVisible());
 }
 
 void settings () 
@@ -87,7 +92,7 @@ void cancel ()
 
 void close ()
 {
-	io->close();
+	io->closeGame();
 }
 
 void load ()
@@ -97,7 +102,7 @@ void load ()
 
 void save ()
 {
-	io->saveGame("Save Game As", "Save Files (*.vsav);;All Files(*.*)", "vsav");
+	io->saveGame("Save Game As", "Save Files (*.gsav);;All Files(*.*)", "gsav");
 }
 
 
@@ -111,7 +116,7 @@ void beginLog ()
 	if (IO::stepping)
 		return;
 	
-	file = io->saveGame("Save Log As", "Save Files (*.vlog);;All Files(*.*)", "vlog");	
+	file = io->saveGame("Save Log As", "Save Files (*.glog);;All Files(*.*)", "glog");	
 	if (file.isNull() || file.isEmpty())
 		return; 
 	beginLogAction->setEnabled(false);
@@ -147,12 +152,6 @@ void abortLog()
 	Luau::logAbort();
 }
 
-void windows()
-{
-	logWindow->show();
-	logWindow->activateWindow();
-}
-
 
 
 
@@ -160,7 +159,8 @@ class MainWindow : public Window
 {
 	public:
 		
-		MainWindow() : Window(nullptr, "Window", "main", "notype")
+		// main window gets size by its background
+		MainWindow() : Window(nullptr, "GameTop", "main", "notype", true, 0, 0)
 		{
 		}
 		
@@ -222,8 +222,13 @@ int main(int argc, char *argv[])
     
     std::srand(std::time({})); // seed for random generator
     
+    
 
     window = new MainWindow();
+    
+    // io.h
+    IO::netDialog = new IO::ConnectDialog(window);
+    IO::server = new IO::Net();
 	
 	
 	QMenuBar *menuBar = window->menuBar();
@@ -267,10 +272,10 @@ int main(int argc, char *argv[])
     QObject::connect(reloadAction, &QAction::triggered, &reload);
     fileMenu->addAction(reloadAction);
     
-    /*QAction *refreshAction = new QAction("Refresh");
+    QAction *refreshAction = new QAction("Refresh");
     refreshAction->setShortcut(QKeySequence("Ctrl+E"));
     QObject::connect(refreshAction, &QAction::triggered, &refresh);
-    fileMenu->addAction(refreshAction);*/
+    fileMenu->addAction(refreshAction);
     
     reloadAction = new QAction("Undo");
     reloadAction->setShortcut(QKeySequence("Ctrl+Z"));
@@ -343,7 +348,7 @@ int main(int argc, char *argv[])
 	
 	// tool bar
 	
-	mainToolBar = new ToolBar("main", "System toolbar", window->scrollArea);
+	mainToolBar = new ToolBar("main", "main", "System toolbar", 24, window->scrollArea);
 	mainToolBar->setIconSize(QSize(32, 24));
 	window->addToolBar(Qt::TopToolBarArea, mainToolBar);
 	
@@ -364,7 +369,11 @@ int main(int argc, char *argv[])
 	mainToolBar->addSeparator();
 	mainToolBar->addImageButton("__movedicon", "__movedicon", "", "Delete all moved-makers", &clearMoved);
 	mainToolBar->enabled("__movedicon", true);
-	
+	QWidget* spacer = new QWidget();
+	spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+	mainToolBar->addWidget(spacer);
+	mainToolBar->addImageButton("connection", "__disconnected", "", "Connect to net", &net);
+	mainToolBar->enabled("connection", true);
 
 	
 	
@@ -378,12 +387,12 @@ int main(int argc, char *argv[])
    
 	// create repository window
 	
-    repositoryWindow = new Window(window, "Counters", "Repository", "Layout");
+    repositoryWindow = new Window(window, "GT Repository", "Repository", "Layout", false, 550, 400);
     
     
     // create log / chat window
 	
-    logWindow = new Window(window, "Log / Chat", "LogChat", "Layout");
+    logWindow = new Window(window, "GT Log / Chat", "LogChat", "Layout", false, 800, 250);
     
 
 
@@ -398,7 +407,8 @@ int main(int argc, char *argv[])
     window->show();
     if (repositoryWindow->isVisible())
 		repositoryWindow->show();
-    logWindow->show();
+	if (logWindow->isVisible())
+		logWindow->show();
     
       
     int res = app.exec();   

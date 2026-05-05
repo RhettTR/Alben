@@ -34,6 +34,7 @@ template <class... Fs> Overload(Fs...) -> Overload<Fs...>;
 struct ActionData {
 	QString entryaction;
 	QString entrytrait;
+	QString entryid;
 	QString entryactions;
 };
 
@@ -116,6 +117,7 @@ class Counter
 			int zorder;				// position in a stack
 			Table *overlays;		// masks & labels if any
 			float opacity;			// opacity 0.0 to 1.0 (full)
+			float scale;			// counter's scale in repository 0.1 to 1.0
 									
 		};
 		
@@ -147,7 +149,10 @@ class Counter
 		
 		static void deleteAll();
 		
-		static int nextId();
+		static int incId();
+		static int incTopZorder();
+		static int incBottomZorder();
+		static int nextId();		
 		static int topZorder();
 		static int bottomZorder();
 		static void resetId();
@@ -156,10 +161,12 @@ class Counter
 		static void toggleSelect(const char *id);
 		static void clearMoved();
 		static void setDisabled(bool disable);
-		static QSize getSize(Counter *counter);
+		static QSize getCorner(int id);
+		static QSize getCorner(std::string id);
+		static int getTop(std::string window, int cx, int cy);
 		
 		
-		void setImage(int maxHeight = 0);
+		void setImage();
 		void setPos(int x, int y);
 		int findOffset(int size, std::string type);
 				
@@ -182,6 +189,7 @@ class Counter
 		static float alpha;
 		static bool  haveOffset;
 		static QString selectionColor;
+		static int selectionSize;
 		static bool  hooverShowMap;
 		static bool  hooverShowPlace;
 		
@@ -190,6 +198,8 @@ class Counter
 		bool selected;			// true if this counter is selected
 		bool doesNotStack;		// true if stacking is prohibited
 		bool disabled;			// true prevent selection, moving and right-click
+		bool hasShadow;			// true if a shadow is used
+		std::string shadow;		// resource id of shadow
 		
 		
 				

@@ -3,11 +3,12 @@
 Zone = {}
 
 
-function Zone:new(window, tag)
+function Zone:new(window, tag, name)
 	local o = {}
 	setmetatable(o, self)
 	self.__index = self
 	o.tag = tag
+	o.name = (name == nil and 'Off-grid') or name
 	o.border = {}
 	o.grid = {}
 	o.gridType = 'custom'
@@ -32,29 +33,100 @@ function Zone:setAllowed(value)
 	self.allowUndefined = value
 end
 
-function Zone:setBorder(square)
-	self.border = square
+function Zone:addBorder(point)
+	table.insert(self.border, point)
 end
 
 function Zone:isWithinBorder(x, y)
-	return x >= self.border.x0 and x <= self.border.x1 and 
-		   y >= self.border.y0 and y <= self.border.y1	   
+
+	
+	-- https://stackoverflow.com/questions/217578/how-can-i-determine-whether-a-2d-point-is-within-a-polygon
+	
+	
+	local j = #self.border
+	local inside = false
+	
+	for i = 1 , #self.border do 
+	
+		local a = (self.border[i].y > y) ~= (self.border[j].y > y)
+		
+		local b = false;
+		
+		if a then
+			b = x < (self.border[j].x - self.border[i].x) * (y - self.border[i].y) / (self.border[j].y - self.border[i].y) + self.border[i].x;
+		end	
+		
+		if a and b then 
+			inside = not inside
+		end	
+		
+		j = i
+	
+	end
+	
+	return inside
+	  	   
 end
 
-function Zone:addGrid(x, y, p, hx, hy, offset)
-	table.insert(self.grid, {p = p == nil and '' or p, 
-							 hx = hx == nil and 0 or hx,
-							 hy = hy == nil and 0 or hy,
-							 offset = offset == nil and {} or offset,
-							 x = x, y = y})
+function Zone:addGrid(x, y, name, hx, hy, offset)
+	if self:isWithinBorder(x, y) then
+		table.insert(self.grid, {name = name == nil and '' or name, 
+								 hx = hx == nil and 0 or hx,
+								 hy = hy == nil and 0 or hy,
+								 offset = offset == nil and {} or offset,
+								 x = x, y = y})
+		return true
+	else
+		return false	
+	end							 
 end
 
 function Zone:getGrid(p)
-	for k, v in pairs(self.grid) do	
-		if v.p == p then
-			return v
-		end	
+	if type(p) == "string" then
+		for k, v in pairs(self.grid) do
+			if v.name ~= nil then
+				if p == v.name then				
+					return v
+				end
+			end
+		end
+	else
+		for k, v in pairs(self.grid) do	
+			if p == k then			
+				return v
+			end
+		end
 	end
+	error(6, p)
+	return nil
+end
+
+function Zone:getGridName(x, y)
+	if self:isWithinBorder(x, y) then
+		for k, v in pairs(self.grid) do
+			if v.x == x and v.y == y then			
+				return v.name
+			end
+		end
+	end
+	error(34, x, y)
+	return ''							 
+end
+
+function Zone:setGridName(n, name)
+	if self.grid[n] ~= nil then
+		self.grid[n].name = name
+		return
+	end
+	error(12, n, name)
+end
+
+function Zone:setGridOffset(n, offset)
+	if self.grid[n] ~= nil then
+		self.grid[n].offset = offset
+		return
+	end
+	error(12, n, name)
 end
 
 function Zone:isGrid(x, y)
@@ -103,56 +175,79 @@ function Zone:hasMember(id)
 end
 
 
-function Zone:makeSquareGrid(width, height)	
+function Zone:makeSquareGrid(minx, miny, width, height)	
 
-	local x 
+	local x
 	local y
 
 	
-	local i = 0	
+	local j = 0
+	local place = 0	
 	
 	
 	while (true) do
 		 
-		x = self.dx + math.round(self.a/2) + i*self.a
-				
-		if x >= width then
+		y = math.round(self.dy/2) + j*self.dy
+		
+		if y >= miny + height then		
 			return
 		end	
 		
 	
-		local j = 0
+		local i = 0
 		local flag = true
 		
 		while (flag) do	
 	
-			y = self.dy + math.round(self.b/2) + j*self.b
+			x = math.round(self.dx/2) + i*self.dx
 			
 							
-			if y >= height then
+			if x >= minx + width then
 				flag = false
-			else
-				self:addGrid(self.border.x0 + math.round(x), 
-							 self.border.y0 + math.round(y),
-							 'At start')
-				j = j + 1
+			else									
+				if self:addGrid(math.round(minx + x), 
+								math.round(miny + y),
+								place) then
+								 
+					 -- the default grid name is the numerical sequence
+					place = place + 1
+					
+				end			 
+				i = i + 1
 			end	
 					
 		end
 		
-		i = i + 1
+		j = j + 1
 		
 	end
 end
 
 
-function Zone:squareGrid(a, b, dx, dy)
+function Zone:squareGrid(dx, dy)
+
 	self.gridType = 'square'
-	self.a = a
-	self.b = b
 	self.dx = dx
 	self.dy = dy
-	self:makeSquareGrid(self.border.x1-self.border.x0, self.border.y1-self.border.y0)
+	
+	-- find width/height of zone
+	local minx = self.border[1].x
+    local maxx = self.border[1].x
+    local miny = self.border[1].y
+    local maxy = self.border[1].y
+    
+    for i = 1 , #self.border do         
+        minx = math.min( self.border[i].x, minx )
+        maxx = math.max( self.border[i].x, maxx )
+        miny = math.min( self.border[i].y, miny )
+        maxy = math.max( self.border[i].y, maxy )
+    end
+    
+    
+	self:makeSquareGrid(minx, miny, maxx - minx, maxy - miny)
+	
+	return maxx - minx, maxy - miny
+
 end
 
 
@@ -205,11 +300,11 @@ function Zone:makeHexagonalGrid(width, height)
 				if j + 1 < 10 then
 					cy = '0'
 				end
-				self:addGrid(self.border.x0 + math.round(x), 
-							 self.border.y0 + math.round(y), 
-							 cx .. i + 1 .. cy .. j + 1, 
-							 math.round(x), 
-							 math.round(y - (0.45*self.b)))
+				--self:addGrid(self.border.x0 + math.round(x), 
+				--			 self.border.y0 + math.round(y), 
+				--			 cx .. i + 1 .. cy .. j + 1, 
+				--			 math.round(x), 
+				--			 math.round(y - (0.45*self.b)))
 				j = j + 1
 			end	
 					
@@ -225,7 +320,7 @@ function Zone:hexGrid(a, b)
 	self.gridType = 'hex'
 	self.a = a
 	self.b = b	
-	self:makeHexagonalGrid(self.border.x1-self.border.x0, self.border.y1-self.border.y0)
+	--self:makeHexagonalGrid(self.border.x1-self.border.x0, self.border.y1-self.border.y0)
 end
 
 
@@ -362,32 +457,37 @@ function Zone:makeAreaOfEffect(x, y, radius)
 end
 
 
-function Zone:getPlace(x, y)
+function Zone:assignPlace(x, y, width, height)
 
-	if self.gridType == 'square' then
 	
-		--local rows = math.floor((self.border.x1 - self.border.x0) / self.a)
-	
-		--local ax = math.floor((x - self.border.x0 + self.dx) / self.a)
-		--local ay = math.floor((y - self.border.y0 + self.dy) / self.b)
-		--local n = ax + rows * ay
+
+	return 0
+
+end
+
+
+function Zone:getCoordinate(cx, cy)
+
+	if self.gridType == 'square' or self.gridType == 'hex' then
 			
-		--return tostring(n)
-		
 		for k, v in pairs(self.grid) do
-			if v.x == x and v.y == y then
-				return v.p
+			if v.x == cx and v.y == cy then
+				return v.name
 			end
 		end
+		
+		return self.name
 		
 	elseif self.gridType == 'custom' then
 	
 		for k, v in pairs(self.grid) do
-			if v.x == x and v.y == y then
-				return v.p
+			if v.x == cx and v.y == cy then
+				return v.name
 			end
 		end
-	
+			
+		return self.name
+		
 	else
 	
 		return self.window	
@@ -398,26 +498,41 @@ end
 
 
 
+function Zone:setCoordinate(n)
+
+	if self.gridType == 'square' then
+	
+		for k, v in pairs(self.grid) do
+			if v.name == n then
+				return v.x, v.y
+			end
+		end
+	
+	end
+	
+	return -1
+	
+end
+
+
+
 local function char(num)
 	return string.char(string.byte("A") + num - 1)
 end
 
 
-function Zone:printCoordinates(x, y)
+function Zone:printCoordinates(cx, cy)
 	
 	if self.gridType == 'square' then
 	
-		x = math.floor((x - self.border.x0 + self.dx) / self.a)
-		y = math.floor((y - self.border.y0 + self.dy) / self.b)
-
-		return  tostring(char(x + 1)) .. tostring(y + 1)
+		return 'test'
 	
 	elseif self.gridType == 'hex' then
 	
 		for k, v in pairs(self.grid) do
-			if v.x == x and v.y == y then
-				local letter1 = string.sub(v.p, 1, 2)	
-				local number = string.sub(v.p, 3, 4)
+			if v.x == cx and v.y == cy then
+				local letter1 = string.sub(v.name, 1, 2)	
+				local number = string.sub(v.name, 3, 4)
 				number = string.gsub(number, '^0+', '')
 				if tonumber(letter1) > 26 then
 					letter1 = tostring(tonumber(letter1) - 26)
@@ -455,9 +570,16 @@ function Zones:add(tag, o)
 end
 
 function Zones:get(tag)
-	return Zones.tags[tag]
+	if Zones.tags[tag] ~= nil then
+		return Zones.tags[tag]	
+	end
+	error(5, tag)
+	return nil
 end
 
+function Zones:is(tag)
+	return Zones.tags[tag] ~= nil
+end
 
 function Zones:findZone(window, x, y)
 
@@ -473,18 +595,18 @@ function Zones:findZone(window, x, y)
 end
 
 
-function Zones:getPlace(window, x, y)
+function Zones:getPlace(window, cx, cy)
 
-	local zone = Zones:findZone(window, x, y)
+	local zone = Zones:findZone(window, cx, cy)
 
 	if zone == nil then
 		return 'Offboard'
 	end
 
 	if zone.coordinatesUsed then
-		return zone:printCoordinates(x, y)
+		return zone:printCoordinates(cx, cy)
 	else
-		return zone:getPlace(x, y)
+		return zone:getCoordinate(cx, cy)
 	end
 
 end
@@ -528,9 +650,8 @@ function Zones:snaptoDefault(window, id, x, y, dx, dy)
 						return false, x , y , x + dx , y + dy
 					end
 					
-					x = v["x"]
-					y = v["y"]					
-					return true, x , y , x + dx , y + dy
+					
+					return true, v["x"] , v["y"] , v["cx"] , v["cy"]
 				   
 				end 
 				  	
@@ -560,7 +681,7 @@ function Zones:doSnap(zone, dx, dy, x, y)
 	
 		-- simplification of sqr(dx² + dy²)
 		
-		local sum = math.abs(x + dx - v["x"]) + math.abs(y + dy - v["y"])
+		local sum = math.abs(cx - v["x"]) + math.abs(cy - v["y"])
 		
 		if sum < minimum_distance then
 			minimum_distance = sum
@@ -578,7 +699,7 @@ function Zones:doSnap(zone, dx, dy, x, y)
 		cy = minimumY			
 	end
 	
-	
+
 	return true, x , y , cx, cy
 	
 end
@@ -594,17 +715,17 @@ function Zones:snapTo(window, id, dx, dy, x, y)
 	if zone == nil then
 		-- problem with retreats!!
 		--return false, x , y
-		return true, x , y , x + dx , y + dy
+		--return true, x , y , x + dx , y + dy
+		return Zones:snaptoDefault(window, id, x, y, dx, dy)
 	end
 	
 	local counter
- 		
+	
  	if Counter[id] ~= nil then
 		counter = Counter[id]
 	else
 		counter = Repository[id]
 	end
-
 	
 	if zone:isWithinBorder(x + dx, y + dy) then
 		

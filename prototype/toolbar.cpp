@@ -19,7 +19,8 @@ extern Scale *scaled;
 
 ToolBar::MapSizeComboBox *ToolBar::sizeBox = nullptr;
 std::map<std::string, ToolBar *> ToolBar::instances;
-
+std::map<std::string, ToolBar::ToolButton *> ToolBar::toolButtons;
+std::map<std::string, ToolBar::ButtonAction *> ToolBar::actionButtons;
 
 
 
@@ -32,15 +33,17 @@ ToolBar::ButtonAction::ButtonAction(const char *id, std::string resourceName, QS
 	QPixmap pixmap;
 	(void)pixmap.convertFromImage(io->getImage(resourceName));
 	const QIcon icon = QIcon(pixmap);
-
+	
 
 	this->setIcon(icon);
 	this->setIconText(buttonText);	
 	this->setToolTip(toolTip);
+	
 	this->setEnabled(false);
 	
 	 
 	this->id = id;
+	ToolBar::actionButtons[std::string(id)] = this;
 
 	
 	if (luaScript.empty())		
@@ -49,6 +52,7 @@ ToolBar::ButtonAction::ButtonAction(const char *id, std::string resourceName, QS
 		QObject::connect(this, &QAction::triggered, this, [=](){ Luau::callbackScript(luaScript); });
 	
 }
+
 
 
 
@@ -62,9 +66,10 @@ ToolBar::ToolButton::ToolButton(const char *id, std::string resourceName, const 
 
 	this->setIcon(icon);
 	this->setToolTip(toolTip);
-	
+	this->setFixedSize(io->getSize(resourceName) + QSize(10,6));
 	 
 	this->id = id;
+	ToolBar::toolButtons[std::string(id)] = this;
 
 	
 	if (luaScript.empty())		
@@ -73,6 +78,7 @@ ToolBar::ToolButton::ToolButton(const char *id, std::string resourceName, const 
 		QObject::connect(this, &QAbstractButton::clicked, this, [=](){ Luau::callbackScript(luaScript); });
 	
 }
+
 
 
 
@@ -283,15 +289,18 @@ ToolBar::MapSizeAction::MapSizeAction(QObject *parent) : QWidgetAction(parent) {
 
 
 
-ToolBar::ToolBar(std::string tag, const QString title, QScrollArea *scrollArea) : QToolBar(title, getInstance(tag.c_str()))
+ToolBar::ToolBar(std::string window, std::string tag, const QString title, int height, QScrollArea *scrollArea) : QToolBar(title, getInstance(tag.c_str()))
 {
 	this->scrollArea = scrollArea;
 	
 	if (tag != "main")
 		this->setToolButtonStyle(Qt::ToolButtonTextBesideIcon);
 	
-	this->setIconSize(QSize(24, 24));
-	this->toolbarPinned = false;	
+	// maximum icon size, may be smaller 
+	this->setIconSize(QSize(2*height,height));
+	
+	this->toolbarPinned = false;
+	this->window = window;	
 	this->tag = tag;	
 	instances[tag] = this;
 
@@ -303,6 +312,32 @@ ToolBar::~ToolBar()
 }
 
 
+
+
+ToolBar::ToolButton *ToolBar::getToolButton(std::string id)
+{
+	for ( auto obj = ToolBar::toolButtons.begin(); obj != ToolBar::toolButtons.end(); ++obj  )
+	
+		if (obj->first == id)
+		{
+			return obj->second;
+		}
+			
+	return nullptr;
+}
+
+
+ToolBar::ButtonAction *ToolBar::getActionButton(std::string id)
+{
+	for ( auto obj = ToolBar::actionButtons.begin(); obj != ToolBar::actionButtons.end(); ++obj  )
+	
+		if (obj->first == id)
+		{
+			return obj->second;
+		}
+			
+	return nullptr;
+}
 
 
 
@@ -347,7 +382,7 @@ void ToolBar::addImageButton(const char *id, std::string resourceName, QString b
 	}
 	else
 	{
-		ToolButton *button = new ToolButton(id, resourceName, toolTip, func, luaScript);
+		ToolButton *button = new ToolButton(id, resourceName, toolTip, func, luaScript);		
 		this->addWidget(button);
 	}
 }
@@ -355,16 +390,25 @@ void ToolBar::addImageButton(const char *id, std::string resourceName, QString b
 
 void ToolBar::setImageButton(std::string id, std::string resourceName, QString buttonText)
 {
-	foreach (QObject *child, this->children())
-		if (child->inherits("QToolButton"))
-			if (((ToolButton *)child)->id == id)
-			{
-				QImage image = io->getImage(resourceName);
-				QSize size = QSize(this->width(), this->height());	
-				QIcon icon(QPixmap::fromImage(image).scaled(size, Qt::KeepAspectRatio));
-				((ToolButton *)child)->setIcon(icon);
-				return;
-			}		
+		
+	QImage image = io->getImage(resourceName);
+	QSize size = io->getSize(resourceName);
+	
+	
+	ButtonAction *test1 = getActionButton(id);
+	ToolButton *test2 = getToolButton(id);
+	
+	if (test1 == nullptr)
+	{
+		QIcon icon(QPixmap::fromImage(image).scaled(size, Qt::KeepAspectRatio));
+		test2->setIcon(icon);
+	}
+	else
+	{
+		QIcon icon(QPixmap::fromImage(image));
+		test1->setIcon(icon);
+	}
+			
 }
 		
 		
@@ -455,15 +499,18 @@ void ToolBar::addSizeComboBox()
 void ToolBar::zoom(float fraction)
 {
 	
-	Window::getInstance("main")->frame->scaleFraction = fraction;
+	Window *window = Window::getInstance(this->window.c_str());
 	
-	scaled->resourceScaleRotate("main", Window::getInstance("main")->frame->backgroundID);
+	window->frame->scaleFraction = fraction;
+	
+	scaled->resourceScaleRotate(this->window, window->frame->backgroundID);
 	
 	
-	Counter::setGUI("main");
+	window->setWidgets();
+	Counter::setGUI(this->window.c_str());
 	
 	
-	Window::getInstance("main")->frame->repaint();
+	window->frame->repaint();
 	// force redraw of mask layer
 	Overlay::overlay->clearMask();
 	
@@ -582,7 +629,8 @@ void ToolBar::zoomMiddle(float newFraction)
 		
 	Counter::setGUI("main");
 	
-	
+	Window::getInstance("main")->setWidgets();
+
 	Window::getInstance("main")->frame->repaint();
 	// force redraw of mask layer
 	Overlay::overlay->clearMask();
@@ -605,7 +653,7 @@ void ToolBar::zoomIndex(int index)
 			float fraction = (float)percent / 100.0;
 			zoomMiddle(fraction);
 			
-			Window::getInstance("main")->setWidgets();
+			Window::getInstance(this->window.c_str())->setWidgets();
 
 		}
 	}
@@ -616,20 +664,26 @@ void ToolBar::zoomIndex(int index)
 
 void ToolBar::zoomFraction(QPoint point, float amount)
 {	
-	float scaleFraction = Window::getInstance("main")->frame->scaleFraction;
-		
-	if (scaleFraction + amount <= 0.005 || 
-		scaleFraction + amount > 2.0)
-		return;
 	
-	float newFraction = scaleFraction + amount;			
+	Window *window = Window::getInstance(this->window.c_str());
+	
+	float scaleFraction = window->frame->scaleFraction;
+	float newFraction = scaleFraction;
+	
+	if (scaleFraction + amount < window->minZoom)
+		newFraction = window->minZoom;
+	else if (scaleFraction + amount > window->maxZoom)
+		newFraction = window->maxZoom;	
+	else
+		newFraction = scaleFraction + amount;
+		
 	zoomCoordinates(point, newFraction);
 	
 	// set zoom value in combobox
 	int zoom = (int)std::floor(newFraction * 100);
 	ToolBar::sizeBox->setCurrentText(QString::number(zoom) + "%");
-	
-	Window::getInstance("main")->setWidgets();
+
+	window->setWidgets();
 			
 }
 
@@ -637,7 +691,7 @@ void ToolBar::zoomFraction(QPoint point, float amount)
 
 void ToolBar::zoomIn()
 {
-	if (ToolBar::sizeBox != nullptr)
+	if (ToolBar::sizeBox != nullptr)		
 		zoomIndex(ToolBar::sizeBox->currentIndex() - 1);
 }
 
@@ -661,20 +715,6 @@ void ToolBar::wheelOut(QPoint point)
 }
 
 
-
-ToolBar::ToolButton *ToolBar::getToolButton(const char *id)
-{
-	std::string name = std::string(id);
-	
-	for ( auto obj = ToolBar::buttons.begin(); obj != ToolBar::buttons.end(); ++obj  )
-	
-		if (obj->first == name)
-		{
-			return obj->second;
-		}
-			
-	return nullptr;
-}
 
 
 
@@ -748,15 +788,13 @@ void ToolBar::do_activate (QAction *action)
 	
 	const char *window = "main";
 	
-	
-	
-		
-	for (auto obj = Counter::counters.begin(); obj != Counter::counters.end(); ++obj)		
-		Luau::doAction(window, obj->second->name.c_str(), entrytrait, entryaction);
 
-	
-	Luau::doAction("", "", "", "actionEnd");
 		
-					
+	for (auto obj = Counter::counters.begin(); obj != Counter::counters.end(); ++obj)
+	{		
+		Luau::doAction(window, obj->second->name.c_str(), entrytrait, entryaction);
+	}
+	
+				
 }
 

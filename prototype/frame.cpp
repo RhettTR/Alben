@@ -28,11 +28,9 @@ QScrollArea *CentralFrame::buttonParent;
 		
 bool CentralFrame::openStackoffset = true;	// true = open stack with offset method
 bool CentralFrame::facingMatters = false;	// true = rotate counters when map rotates
-CentralFrame::Area *CentralFrame::area = nullptr;
 bool CentralFrame::showGrid = false;
 QColor CentralFrame::gridColor = QColor(255, 0, 0, 255);
 int CentralFrame::gridRadius = 3;
-CentralFrame::Moved CentralFrame::countersDeleted;
 bool CentralFrame::allowPainting = true;	// to turn of painting while undoing
 
 		
@@ -42,148 +40,6 @@ bool CentralFrame::allowPainting = true;	// to turn of painting while undoing
 
 
 CentralFrame::Button::Button(const QString &text, QWidget *parent) : QPushButton(text, parent) {}
-	
-	
-	
-CentralFrame::Area::Area(CentralFrame *parent) : QLabel(parent)
-{	
-	this->parent = parent;		
-	this->setContextMenuPolicy(Qt::CustomContextMenu);
-}
-
-
-CentralFrame::Area::~Area()
-{
-}
-
-
-static Luau::PopupEntries popupentries;
-
-
-void CentralFrame::Area::showRightClickMenu(Counter *counter)
-{
-	
-	QMenu myMenu(this);
-	
-	
-	while (this->actions().count() > 0)
-		this->removeAction(this->actions().first());
-	
-	this->counter = counter;
-	
-	
-	popupentries.clear();
-		
-	popupentries = Luau::getTraits("Global", "Area");
-	
-
-	for (auto e : popupentries)
-	{
-		
-		// hook	
-		if (!Luau::menu(this->counter->name.c_str(), e.entryname.c_str(), e.entryid.c_str()))
-			continue;
-		 
-		const QString name = QString::fromStdString(e.entryname);
-		
-		QAction* action = new QAction(name, this);
-				
-		QVariant v;
-		v.setValue(e);
-		
-		action->setData(v);
-			
-	   
-		this->addAction(action);
-		
-		
-		QObject::connect( action, &QAction::triggered, this, [=]()->void{ execute(action); } );
-		
-	}
-
-	
-	myMenu.addActions(this->actions());
-	
-	myMenu.exec(QCursor::pos());
-	
-}
-
-
-void CentralFrame::Area::execute(QAction *action)
-{
-	QVariant v = action->data();
-	Luau::Popupentry e = (Luau::Popupentry) v.value<Luau::Popupentry>();
-	
-	
-	if (!e.entryid.empty())
-	{
-		const char *fromId = e.entryid.c_str();
-		const char *toId = std::to_string(Counter::nextId()).c_str();		
-		int zorder = Counter::bottomZorder();	
-		
-				
-		Luau::copyCounter(fromId, toId, zorder, "", this->counter->state.x, this->counter->state.y,
-													this->counter->state.cx, this->counter->state.cy);
-		
-		Luau::doCreate(toId, "Create");
-		Luau::doEvent("end", "", "", "", 0);
-		
-		
-		Counter::counters[atoi(toId)]->counter->lower();
-		// force redraw of mask layer
-		Overlay::overlay->clearMask(); 
-	}
-	
-	if (!e.entryaction.empty())
-	{
-		const char *entryaction = e.entryaction.c_str();
-		QByteArray bb = QString::fromStdString(this->counter->parentWindow->tag).toLocal8Bit();
-		const char *window = bb.data();
-		
-		
-		Luau::doAction(window, this->counter->name.c_str(), "Area", entryaction);
-		
-		Luau::doAction("", "", "", "actionEnd");
-	}
-	
-}
-
-
-bool CentralFrame::Area::findCounter(QPoint point, Counter *&foundCounter)
-{
-	
-	float scaleFraction = Window::getInstance(this->counter->state.tag.c_str())->frame->scaleFraction;
-	
-	int extra = (int)(15 * scaleFraction);
-	
-	for ( auto obj = Counter::counters.begin(); obj != Counter::counters.end(); ++obj  )
-		if (obj->second->state.tag == this->parent->window->tag)	
-		{
-			// hook - is this a counter with a menu
-			if (!Luau::menucounter(obj->second->id))
-				continue;
-			
-			int hx = obj->second->scaledMargin + std::round(obj->second->scaledWidth/2);
-			int hy = obj->second->scaledMargin + std::round(obj->second->scaledHeight/2);
-						
-			
-			int x = std::round(obj->second->state.x * scaleFraction) + hx;
-			int y = std::round(obj->second->state.y * scaleFraction) + hy;
-
-			
-			if (abs(x - point.x()) < (hx + extra) && 
-				abs(y - point.y()) < (hy + extra))	
-			{		
-				foundCounter = obj->second;
-				return true;	
-			}
-		}
-	
-	
-	foundCounter = nullptr;
-	return false;
-	
-}
 	
 	
 
@@ -227,18 +83,6 @@ void CentralFrame::mousePressEvent(QMouseEvent *event)
 		
 		
 		
-	if (event->button() == Qt::RightButton)	
-	{
-		if (CentralFrame::area != nullptr)
-		{
-			Counter *counter;
-			
-			if (CentralFrame::area->findCounter(event->position().toPoint(), counter))
-				CentralFrame::area->showRightClickMenu(counter);
-		}
-		
-	}
-	
 	
 	
 	if (event->button() == Qt::LeftButton)
@@ -433,6 +277,8 @@ void CentralFrame::mousePressEvent(QMouseEvent *event)
 					QString tag = QString::fromStdString(this->window->tag);
 					int x = counter->state.x;
 					int y = counter->state.y;
+					int cx = counter->state.cx;
+					int cy = counter->state.cy;
 					int dx = counter->state.x - child->owner->state.x; 	
 					int dy = counter->state.y - child->owner->state.y;
 					dataStream << id;
@@ -440,6 +286,8 @@ void CentralFrame::mousePressEvent(QMouseEvent *event)
 					dataStream << tag;
 					dataStream << x;
 					dataStream << y;
+					dataStream << cx;
+					dataStream << cy;
 					dataStream << dx;
 					dataStream << dy;
 				}
@@ -462,18 +310,6 @@ void CentralFrame::mousePressEvent(QMouseEvent *event)
 		auto result = drag->exec(Qt::CopyAction | Qt::MoveAction);
 		
 	
-		if (result == Qt::CopyAction)
-		{
-			if (this->window->tag != "Repository")	
-				for (auto d: countersDeleted)
-				{	
-					Luau::doDelete(d.name.c_str());	
-					delete Counter::counters[d.id];
-				}
-					
-			if (countersDeleted.size() > 0)
-				Luau::doEvent("end", "", "", "", 0);		
-		}
 	
 		if (result == Qt::IgnoreAction) 
 		{
@@ -492,16 +328,11 @@ void CentralFrame::mousePressEvent(QMouseEvent *event)
 				// add to selection if SHIFT button (right or left) is pressed
 				if (QApplication::keyboardModifiers() == Qt::ShiftModifier)
 				{		
-					//if (stackOpen.count(point))
-					//{
-						if (Luau::selectable(child->owner->name.c_str()))
-						{
-							child->owner->selected = !child->owner->selected;
-							child->owner->setImage();
-						}
-					//}
-					//else
-					//	selectStack(child->owner);
+					if (Luau::selectable(child->owner->name.c_str()))
+					{
+						child->owner->selected = !child->owner->selected;
+						child->owner->setImage();
+					}
 				}
 				else
 				// CTRL button toggle open stack
@@ -682,11 +513,10 @@ void CentralFrame::dropEvent(QDropEvent *event)
 
 		QPoint counterOffset, ghostOrigo, compensation;
 		
-		int n, id, sx, sy, dx, dy;
+		int n, id, sx, sy, cx, cy, dx, dy;
 		QString name, tag;		
 		Moved countersMoved;
 		
-		countersDeleted.clear();
 		
 		
 		
@@ -704,9 +534,11 @@ void CentralFrame::dropEvent(QDropEvent *event)
 			dataStream >> tag;
 			dataStream >> sx;
 			dataStream >> sy;
+			dataStream >> cx;
+			dataStream >> cy;
 			dataStream >> dx;
 			dataStream >> dy;
-			countersMoved.push_back({id, name.toStdString(), tag.toStdString(), sx, sy, dx, dy});
+			countersMoved.push_back({id, name.toStdString(), tag.toStdString(), sx, sy, cx, cy, dx, dy});
 		}
 		
 		
@@ -728,14 +560,14 @@ void CentralFrame::dropEvent(QDropEvent *event)
 	
 		QPoint target(droppedX, droppedY);
 		
-		
+		/*
 		if (abs(target.x() == source.x()) &&
 			abs(target.y() == source.y()))
 		{
 			event->ignore();
 			return;
 		}
-		
+		*/
 		
 		if (abs(target.x() - source.x()) < minimumMovement &&
 			abs(target.y() - source.y()) < minimumMovement)
@@ -811,7 +643,7 @@ void CentralFrame::dropEvent(QDropEvent *event)
 					source.setX(source.x() + compensation.x());
 					source.setY(source.y() + compensation.y());
 				}
-			
+		
 			}
 			
 			
@@ -823,7 +655,7 @@ void CentralFrame::dropEvent(QDropEvent *event)
 			
 			QPoint delta = target - source;
 			
-			QSize map = scaled->getScaledSize(CentralFrame::backgroundID);
+			QSize map = this->window->frame->size();
 			
 			float scaleFraction = this->window->frame->scaleFraction;
 			
@@ -839,7 +671,7 @@ void CentralFrame::dropEvent(QDropEvent *event)
 				
 				for ( auto obj = stack.begin(); obj != stack.end(); ++obj )		
 				{															
-					
+				
 					int x, y, cx, cy;	
 
 					
@@ -888,7 +720,7 @@ void CentralFrame::dropEvent(QDropEvent *event)
 		
 					if (Scale::rotation != 0)
 						scaled->rotate(obj->second, Scale::rotation, rx, ry);		
-							 
+
 					if (rx < -obj->second->scaledWidth || ry < -obj->second->scaledHeight || 
 						rx > map.width() || ry > map.height())
 						continue;	
@@ -899,13 +731,14 @@ void CentralFrame::dropEvent(QDropEvent *event)
 							
 					Luau::reportMove(obj->second->id, obj->second->image.c_str(), 
 									 obj->second->state.tag.c_str(), obj->second->state.tag.c_str(),
-									 obj->second->state.x, obj->second->state.y,
-									 x, y);
-									 			 
+									 obj->second->state.cx, obj->second->state.cy,
+									 cx, cy);
+					
+								 			 
 							
 					if (!(obj->second->state.x == x && obj->second->state.y == y))
 					{
-						Luau::updatePos(this->window->tag.c_str(), obj->second->name.c_str(), x, y, cx, cy);
+						Luau::updatePos(this->window->tag.c_str(), obj->second->name.c_str(), obj->second->state.zorder, x, y, cx, cy);
 						Luau::doEvent("movetrigger", obj->second->name.c_str(), "", "", 0);
 					}					
 					
@@ -916,29 +749,10 @@ void CentralFrame::dropEvent(QDropEvent *event)
 					obj->second->state.cy = cy;
 					obj->second->state.tag = this->window->tag;					
 					
-					/*
-					Luau::updatePos(this->window->tag.c_str(), obj->second->name.c_str(), 
-									obj->second->state.x, obj->second->state.y,
-									obj->second->state.cx, obj->second->state.cy);
-								
-					
-					
-					Luau::doEvent("move", obj->second->name.c_str(), "Counter", "x", obj->second->state.x);
-					Luau::doEvent("move", obj->second->name.c_str(), "Counter", "y", obj->second->state.y);
-					Luau::doEvent("move", obj->second->name.c_str(), "Counter", "cx", obj->second->state.cx);
-					Luau::doEvent("move", obj->second->name.c_str(), "Counter", "cy", obj->second->state.cy);
-					*/
-					Luau::moveCounter(this->window->tag.c_str(), obj->second->name.c_str(), x, y, cx, cy);						  
-					
-				    
-					
-					
+
 					// increment number of moved
 					n++;
 		
-					// hook
-					Luau::moved(this->window->tag.c_str(), obj->second->name.c_str(), obj->second->state.x, obj->second->state.y);
-						
 					
 					
 				}	// for
@@ -971,7 +785,19 @@ void CentralFrame::dropEvent(QDropEvent *event)
 						Luau::doEvent("move", obj->second->name.c_str(), "Counter", "zorder", obj->second->state.zorder);						
 						obj->second->counter->raise();
 					}
-			
+					
+				for (auto const& [point, stack] : stacks)	
+					for (auto obj = stack.begin(); obj != stack.end(); ++obj)
+						{
+							Luau::moveCounter(this->window->tag.c_str(), obj->second->name.c_str(), 
+											obj->second->state.zorder, obj->second->state.x, obj->second->state.y,
+											obj->second->state.cx, obj->second->state.cy);
+							// hook
+							Luau::moved(this->window->tag.c_str(), obj->second->name.c_str(), 
+										obj->second->state.x, obj->second->state.y);
+						}						  
+					
+				
 			
 				Luau::doEvent("end", "", "", "", 0);
 			}
@@ -987,6 +813,8 @@ void CentralFrame::dropEvent(QDropEvent *event)
 			
 			// drag from another window
 			
+			int n = 0;
+			
 			
 			for (auto m : countersMoved)
 				// only drag a single stack (for the time being)
@@ -998,14 +826,13 @@ void CentralFrame::dropEvent(QDropEvent *event)
 			
 	
 					Counter *counter;
-					
+				
 					if (m.tag == "Repository")
 						counter = Counter::repository[m.name];		
 					else
 						counter = Counter::counters[m.id];
-						
-						
-						
+											
+					
 					
 					
 					float scaleFraction = this->window->frame->scaleFraction;
@@ -1034,10 +861,24 @@ void CentralFrame::dropEvent(QDropEvent *event)
 					dropX = std::round((float)dropX / scaleFraction);
 					dropY = std::round((float)dropY / scaleFraction);
 					
+					
+					// find if dropped on a counter
+												
+					Counter::QtCounter *drop = 
+						dynamic_cast<Counter::QtCounter*>(childAt(event->position().toPoint()));
+						
+							
+					if (drop != nullptr)
+					{							
+						dropX = drop->owner->state.x;
+						dropY = drop->owner->state.y;					
+					}
+					
+					
+					
+					
 					int cx, cy;
 					
-					
-				
 				
 					// hook
 					if (!Luau::afterDrag(this->window->tag.c_str(),
@@ -1052,39 +893,34 @@ void CentralFrame::dropEvent(QDropEvent *event)
 						return;
 					}
 					
-			
+								
 					
-					const char *fromId = counter->image.c_str();
-					//int id = Counter::nextId();
-					//const char *toId = std::to_string(id).c_str();			
-					int zorder = Counter::topZorder();
+					
+					const char *fromId = counter->name.c_str();		// name, not image	
 					const char *tag = this->window->tag.c_str();
+					int zorder = Counter::topZorder();
 					
 					
-					// create Luau representation and C++ representation of counter
-					//Luau::copyCounter(fromId, toId, zorder, tag, dropX, dropY, cx, cy);
-					
-					// add counter to undo stack
-					//Luau::doCreate(toId, "Create");
+					Luau::reportMove(m.id, fromId, m.tag.c_str(), tag, m.cx, m.cy, cx, cy);
+										
 
-					Luau::moveCounter(tag, fromId, dropX, dropY, cx, cy);
+					Luau::moveCounter(tag, fromId, zorder, dropX, dropY, cx, cy);
 				
-					// save what counter to delete in window moved from (huge bug - use m)
-					countersDeleted.push_back(m);
-						
-					// log 					
-					Luau::reportMove(m.id, fromId, m.tag.c_str(), tag, m.x, m.y, dropX, dropY);
 					
+					
+					// 
+					n++;
 					
 					// hook	
 					Luau::dropped(this->window->tag.c_str(), fromId, dropX, dropY);
 					
 				
 				}
+				
 			
+			if (n > 0)	
+				Luau::doEvent("end", "", "", "", 0);
 		
-			//if (countersMoved.size() > 0)
-			//	Luau::doEvent("end", "", "", "", 0);
 			
 			
 			event->setDropAction(Qt::CopyAction);
@@ -1217,7 +1053,7 @@ void CentralFrame::setBackground(std::string background)
 			if (this->scrollArea != nullptr)
 				this->scrollArea->resize(size); 
 			else
-			 { 
+			{ 
 				this->window->resize(size);
 				this->resize(size);
 			}
@@ -1436,10 +1272,10 @@ void CentralFrame::deleteButton(const char *id)
 
 
 
-void CentralFrame::setGrid(Counter::Table *grid)
+void CentralFrame::setGrid(string zone, Counter::Table *grid)
 {
 	
-	this->gridCoordinates.clear();
+	std::vector<GridPoint> points;
 	
 	
 	for (auto obj = grid->begin(); obj != grid->end(); ++obj)
@@ -1464,13 +1300,42 @@ void CentralFrame::setGrid(Counter::Table *grid)
 			hy = (int)std::get<double>((table)["hy"]);			
 		 
 		
-		this->gridCoordinates.push_back({x, y, text, hx, hy});
+		points.push_back({x, y, text, hx, hy});
 		
 	}
+	
+	this->gridCoordinates[zone].clear();
+	this->gridCoordinates[zone] = std::vector<GridPoint>(); 
+	this->gridCoordinates[zone].swap(points);
 	
 	
 }
 
+
+
+void CentralFrame::setBorders(string zone, Counter::Table *borders)
+{
+	
+	std::vector<Point> points;
+	
+	
+	for (auto obj = borders->begin(); obj != borders->end(); ++obj)
+	{
+				
+		Counter::Table table = std::get<Counter::Table>(obj->second);
+		
+		int x = (int)std::get<double>((table)["x"]);
+		int y = (int)std::get<double>((table)["y"]);	
+		 
+		
+		points.push_back({x, y});
+		
+	}
+	
+	this->borders[zone].clear();
+	this->borders[zone] = points;
+	
+}
 
 
 
@@ -1498,31 +1363,59 @@ void CentralFrame::closeAllOpenStacks()
 }
 
 
-
-void CentralFrame::resizeEvent(QResizeEvent* event)
+void CentralFrame::zoomFraction(float amount, bool set)
 {
 	
-	QFrame::resizeEvent(event);
+	if (set)
+		this->scaleFraction = amount;
 	
-	window->setWidgets();
-
+	if (this->scaleFraction > 1.0)
+		this->scaleFraction = 1.0;
+	if (this->scaleFraction < 0.2)
+		this->scaleFraction = 0.2;
+			
+	
+	QSize size = QSize(this->startWidth, this->startHeight);
+	this->resize(size * this->scaleFraction);
+	
+	if (io->isResource(backgroundID))
+		scaled->resourceScaleRotate(this->window->tag, backgroundID);
+	
+	
+	this->window->setWidgets();
+	
+	
+	
+	Counter::setGUI(this->window->tag.c_str());
+	
 }
-
 
 
 void CentralFrame::wheelEvent(QWheelEvent *event)
 {
-	if (this->window->tag == "main")	
+	int amount = event->angleDelta().y();
+	
+	if (this->window->tag == "main")
+	{	
 		if (ToolBar::sizeBox != nullptr)
 		{
-			int amount = event->angleDelta().y();
-			
 			if (amount > 0)		
 				ToolBar::sizeBox->parent->wheelIn(event->position().toPoint());		
 			else		
 				ToolBar::sizeBox->parent->wheelOut(event->position().toPoint());
 				
 		}
+	}
+	else 
+	if (this->window->tag != "LogChat")
+	{
+		if (amount > 0)	
+			this->scaleFraction = this->scaleFraction + 0.05;
+		else
+			this->scaleFraction = this->scaleFraction - 0.05;
+				
+		zoomFraction(this->scaleFraction, false);	
+	}	
 		
 	event->accept();	
 }
@@ -1538,7 +1431,8 @@ void CentralFrame::paintEvent(QPaintEvent *event)
 		return;		// layout does rendering
 		
 	if (this->window->tag == "LogChat")
-		return;		// chat does not need painting	
+		return;		// chat does not need frame painting	
+	
 		
 	if (!CentralFrame::allowPainting)
 	{
@@ -1631,24 +1525,50 @@ void CentralFrame::paintEvent(QPaintEvent *event)
 	// draw any grid
 	if (CentralFrame::showGrid)
 	
-		// don't show dot for small scales
+		// don't show zone for small scales
 		if (scaleFraction > Scale::minScaleGrid)
-			if (!this->gridCoordinates.empty())
-			{
-				QPen pen;
+		{
+			QPen pen;
 				
-				pen.setWidth(1);
-				pen.setColor(CentralFrame::gridColor);
-				painter.setPen(pen);
-				painter.setBrush(CentralFrame::gridColor);
-				painter.setRenderHint(QPainter::Antialiasing);
-				painter.setRenderHint(QPainter::SmoothPixmapTransform);
+			pen.setWidth(1);
+			pen.setColor(CentralFrame::gridColor);
+			painter.setPen(pen);
+			painter.setBrush(CentralFrame::gridColor);
+			painter.setRenderHint(QPainter::Antialiasing);
+			painter.setRenderHint(QPainter::SmoothPixmapTransform);
 			
-				int size = CentralFrame::gridRadius  * scaleFraction;						
-						
-				for (auto c :this->gridCoordinates)
-					painter.drawEllipse(c.x * scaleFraction, c.y * scaleFraction, size, size);
-			}	
+			
+			// for all zones in window
+			for (auto const& [zone, grid] : this->gridCoordinates)
+				if (!grid.empty())
+				{	
+					int size = CentralFrame::gridRadius  * scaleFraction;						
+							
+					for (auto c : grid)
+						painter.drawEllipse(c.x * scaleFraction, c.y * scaleFraction, size, size);
+				}
+				
+			pen.setWidth(3);
+			painter.setPen(pen);
+			
+			for (auto const& [zone, border] : this->borders)
+				if (!border.empty())
+				{	
+					// show grid (zone) border
+					for (int i = 0; i < border.size(); i++ )	
+					{
+						int j = i + 1;
+						if (j == border.size())
+							j = 0;
+							
+						QLine line(border[i].x * scaleFraction, border[i].y * scaleFraction, 
+								   border[j].x * scaleFraction, border[j].y * scaleFraction);
+								   
+						painter.drawLine(line);
+					}
+				}
+			
+		}		
 		
 	// draw any Area of Effect	
 	for (auto const& [point, stack] : stacks)
@@ -1874,5 +1794,7 @@ void CentralFrame::paintEvent(QPaintEvent *event)
 			
 	}
 	
+	
+	event->accept();
 	
 }

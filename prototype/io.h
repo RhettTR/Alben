@@ -5,8 +5,8 @@
 #include <fstream>
 #include <string>
 #include <map>
-
 #include <QtWidgets>
+#include <QtNetwork>
 
 #include "counter.h"
 
@@ -17,14 +17,64 @@ class IO
 	
 	public:	
 	
-		static constexpr int intType = 1;
-        static constexpr int stringType = 2;
-        static constexpr int boolType = 3;
-        static constexpr int doubleType = 4;
-        static constexpr int tableType = 5;
+	
+		// net
+		class ConnectDialog : public QDialog
+		{
+			
+			public:				
+				ConnectDialog(QWidget *parent);
+				~ConnectDialog();
+				
+				QLineEdit *port;
+				QLineEdit *ip;
+				QLineEdit *portc;
+				QPlainTextEdit *messages;
+				
+			protected:	
+				virtual void paintEvent (QPaintEvent *event);	
+		};
+		
+		
+		
+		class Net : public QObject
+		{
+			public:
+				Net(QObject *parent = nullptr);
+				~Net();
+				void listen();
+				void confirm();
+				void sync();
+				void connect();
+				void disconnect();
+				void writeData(Counter::Table table, qint32 tableSize, qint32 type);
+				bool connected();
+				void outTable(Counter::Table t);
+				
+			private:
+				QTcpServer *server;
+				QTcpSocket *socket;
+				qint32 buffsize;
+				QDataStream *pstream;
+				bool checkPort(QString port);
+				void writeTable(Counter::Table table);
+				Counter::Table readTable(qint32 keys);
+				void onConnection();
+				void onStateChanged();
+				void onReadyRead();
+				void onConnected();
+				void onError();
+				static void onWritten(qint64 bytes);
+							
+		};
+		
+	
+
         
         static bool stepping;
         static bool recording;
+        static ConnectDialog *netDialog;
+        static Net *server;
         
         
         typedef std::variant<int, std::string, bool, double, Counter::Table> Variant;
@@ -49,6 +99,7 @@ class IO
 		static void addPadding(std::string resourceId, QColor color, int left, int top, int right, int bottom);
 		static void addMask(std::string resourceId, QColor color, int left, int top, int width, int height);
 		static void changeImage(std::string fromImage, std::string toImage);
+		static bool connected();
 		void reset();
 		void transfer_resource_keys();
 
@@ -59,7 +110,7 @@ class IO
 			QSize  size;	
 		}; 
 		
-		void close();
+		void closeGame();
 		
 		// getters for resources
 		QImage& getImage(std::string str);
@@ -77,6 +128,11 @@ class IO
 		QString loadHtml(std::string filename);
 		
 		static std::string findSide();
+		static int intType;
+		static int stringType;
+		static int boolType;
+		static int doubleType;
+		static int tableType;	
 		
 		
 		
@@ -87,6 +143,7 @@ class IO
 		class Stage : public std::map<Leftside, Rightside> {};
 		class Stack : public std::map<int, Stage> {};
 		
+
 		
 		
 	protected:
