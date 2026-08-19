@@ -423,6 +423,8 @@ void Overlay::StackOpen::mousePressEvent(QMouseEvent *event)
 		if (!child)
 			return;
 			
+		if (!Luau::selectable(child->source->name.c_str()))	
+			return;
 
 		child->setVisible(false);
 

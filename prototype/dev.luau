@@ -27,7 +27,7 @@ setDefaultOffset(3.0, 10, 2, 3, 0)
 
 -- card central power hand window
 
-create_window('cphand', 'Central Powers Card Hand', '#999999', true, '', 1000, 272)
+create_window('cphand', 'Central Powers Card Hand', '#999999', true, '', 1000, 292)
 
 
 local cpzone = Zone:new('cphand', 'cph')
@@ -40,7 +40,7 @@ cpzone:addBorder({x = 5, y = 536})
 
 local w, h = cpzone:squareGrid(382.0, 531.0)
 
-set_frame('cphand', 200, 400, w + 10, h + 10)
+set_frame('cphand', 220, 400, w + 10, h + 10)
 scale_frame('cphand', 0.5)
 
 
@@ -97,7 +97,7 @@ cpzone:addMember('cardback_cp')
 
 -- card allied power hand window
 
-create_window('aphand', 'Allied Powers Card Hand', '#e26363', true, '', 1000, 272)
+create_window('aphand', 'Allied Powers Card Hand', '#e26363', true, '', 1000, 292)
 
 
 local apzone = Zone:new('aphand', 'aph')
@@ -110,7 +110,7 @@ apzone:addBorder({x = 5, y = 536})
 
 local w, h = apzone:squareGrid(382.0, 531.0)
 
-set_frame('aphand', 200, 400, w + 10, h + 10)
+set_frame('aphand', 220, 400, w + 10, h + 10)
 scale_frame('aphand', 0.5)
 
 
@@ -445,7 +445,7 @@ set_frame('ctabwin', 200, 400, 1131, 827)
 
 
 
-create_window('aids', 'Player Aids', '#ffffff', false, 'Layout', 1100, 800)
+create_window('aids', 'Player Aids', '#ffffff', true, 'Layout', 1100, 800)
 
 set_frame('aids', 70, 70, 1100, 800)
 
@@ -488,12 +488,13 @@ create_toolbar('main', 'ct', 'Custom toolbar', 42)
 
 
 local callback = "toggle_window('cphand')"
-add_toolbar_button('ct', 'tbcphand', 'toolbar_cphand', '', 'Show/Hide window', callback)
+add_toolbar_button('Central', 'ct', 'tbcphand', 'toolbar_cphand', '', 'Show/Hide window', callback)
 toolbar_enable('ct', 'tbcphand')
 
 
+
 local callback = "toggle_window('aphand')"
-add_toolbar_button('ct', 'tbahand', 'toolbar_aphand', '', 'Show/Hide window', callback)
+add_toolbar_button('Allied', 'ct', 'tbahand', 'toolbar_aphand', '', 'Show/Hide window', callback)
 toolbar_enable('ct', 'tbaphand')
 
 
@@ -519,6 +520,10 @@ toolbar_enable('ct', 'ctables')
 local callback = "toggle_window('aids')"
 add_toolbar_button('ct', 'caid', 'ChartsIcon1', '', 'Show/Hide window', callback)
 toolbar_enable('ct', 'caid')
+
+
+add_toolbar_separator('ct')
+
 
 local callback = "toggle_window('pelim')"
 add_toolbar_button('ct', 'elim', 'toolbar_oos4', '', 'Show/Hide window', callback)
@@ -926,7 +931,7 @@ zonene:addGrid(4616, 2954, 'Samawah')
 zonene:addGrid(4908, 3067, 'Basra')
 zonene:addGrid(4739, 3114, 'Al Nasiriya')
 zonene:addGrid(4379, 3070, 'Arabia')
-zonene:addGrid(4223, 3239, 'Median')
+zonene:addGrid(4223, 3239, 'Medina')
 zonene:addGrid(4076, 3148, 'Aqaba')
 zonene:addGrid(4131, 3044, 'Beersheba')
 zonene:addGrid(4159, 2925, 'Jerusalem')
@@ -966,6 +971,30 @@ zonene:addMember('control_ap')
 zonene:addMember('control_cp')
 
 zonene:addMember('neutral')
+
+
+
+
+-- near east marker zone
+
+local zonenem = Zone:new('main', 'nem', 'Near East Marker Zone')
+
+zonenem:setAllowed(false)
+
+zonenem:addBorder({x = 4610, y = 1762})
+zonenem:addBorder({x = 5072, y = 1762})
+zonenem:addBorder({x = 5072, y = 1855})
+zonenem:addBorder({x = 4610, y = 1855})
+
+zonenem:squareGrid(115.0, 90.0)
+
+set_grid({zonenem.grid}, 1, 'main', 'nem')
+set_borders({zonenem.border}, 1, 'main', 'nem')
+
+zonenem:addMember('ru_ne_move3')
+zonenem:addMember('ru_ne_sr2')
+zonenem:addMember('cp_ne_sr2')
+zonenem:addMember('br_ne_sr2')
 
 
 
@@ -1086,8 +1115,11 @@ set_borders({grt.border}, 1, 'main', 'grt')
 grt:addMember('warstatus_ap')
 grt:addMember('warstatus_cp')
 grt:addMember('warstatus_combined')
+grt:addMember('bid_cp')
 grt:addMember('bid_ap')
 grt:addMember('vp')
+grt:addMember('russianvp_current')
+grt:addMember('russianvp_tsarfell')
 
 
 
@@ -1392,7 +1424,9 @@ ustrack:addMember('us_entry')
 local russian = Zone:new('main', 'russian') 
 
 russian:addBorder({x = 63, y = 2518})
-russian:addBorder({x = 982, y = 2518})
+russian:addBorder({x = 749, y = 2518})
+russian:addBorder({x = 749, y = 2437})
+russian:addBorder({x = 982, y = 2437})
 russian:addBorder({x = 982, y = 2652})
 russian:addBorder({x = 63, y = 2652})
 
@@ -1407,6 +1441,8 @@ russian:addGrid(575, 2605, 'Fall of the Tsar')
 russian:addGrid(690, 2605, 'Bolshevik Revolution Allowed')
 russian:addGrid(805, 2605, 'Bolshevik Revolution')
 russian:addGrid(920, 2605, 'Treaty of Brest Litovsk')
+russian:addGrid(805, 2470, 'Current CP')
+russian:addGrid(920, 2470, 'Tsar Fall CP')
 
 
 
@@ -1415,6 +1451,8 @@ set_borders({russian.border}, 1, 'main', 'russian')
 
 
 russian:addMember('russian_capit')
+russian:addMember('russianvp_current')
+russian:addMember('russianvp_tsarfell')
 
 
 
@@ -1449,31 +1487,127 @@ set_borders({areserve.border}, 1, 'main', 'arb')
 
 
 
+-- central powers elim/replace box
+
+
+local celim = Zone:new('main', 'cel', 'Central Powers Eliminated/Replacement Box') 
+
+celim:addBorder({x = 1008, y = 53})
+celim:addBorder({x = 1479, y = 53})
+celim:addBorder({x = 1479, y = 330})
+celim:addBorder({x = 1008, y = 330})
+
+celim:squareGrid(115.0, 140.0)
+
+-- grid indices start at 1
+celim:setGridName(1, 'a slot')
+celim:setGridName(7, 'a slot')
+
+
+celim:setAllowed(false)
+
+set_grid({celim.grid}, 1, 'main', 'cel')
+set_borders({celim.border}, 1, 'main', 'cel')
+
+celim:addMembers('^ge_army%w+')
+celim:addMembers('^ge_corps%w*')
+celim:addMembers('^ah_army%w+')
+celim:addMembers('^ah_corps%w*')
+celim:addMembers('^tu_corps')
+	
+celim:addMembers('^ro_corps')
+celim:addMembers('^bu_corps')
+celim:addMembers('^mn_corps')
+celim:addMembers('^it_army%w+')
+celim:addMembers('^it_corps')
+
+
+
+
+
+
+-- allied powers elim/replace box
+
+
+local aelim = Zone:new('main', 'ael', 'Allied Powers Eliminated/Replacement Box') 
+
+aelim:addBorder({x = 1853, y = 2973})
+aelim:addBorder({x = 2321, y = 2973})
+aelim:addBorder({x = 2321, y = 3250})
+aelim:addBorder({x = 1853, y = 3250})
+
+aelim:squareGrid(115.0, 140.0)
+
+aelim:setGridName(1, 'a slot')
+aelim:setGridName(7, 'a slot')
+
+aelim:setAllowed(false)
+
+set_grid({aelim.grid}, 1, 'main', 'ael')
+set_borders({aelim.border}, 1, 'main', 'ael')
+
+
+aelim:addMembers('^fr_army%w+')
+aelim:addMembers('^fr_corps%w*')
+aelim:addMember('bef_army')
+aelim:addMembers('^br_army%w+')
+aelim:addMembers('^br_corps%w*')
+aelim:addMembers('^bef_corps%w*')
+aelim:addMembers('^be_army')
+aelim:addMembers('^be_corps*')
+
+aelim:addMembers('^ru_army%w+')
+aelim:addMembers('^ru_corps')
+aelim:addMembers('^ru_cav')
+aelim:addMembers('^sb_army%w+')
+aelim:addMembers('^sb_corps')	
+aelim:addMembers('^ro_corps')
+aelim:addMembers('^mn_corps')
+aelim:addMembers('^it_army%w+')
+aelim:addMembers('^it_corps')
+aelim:addMembers('^gr_corps')
+
+
+
 
 -- create all decks
 
 
--- show functions
-local fdown = function(window, id) return Counter[id].Image.imageIndex == 2 end
-local fup = function(window, id) return Counter[id].Image.imageIndex == 1 end
-
+-- show / disable menu functions
+										  
+local fup = function(window, id) 
+				return (is_owner(Counter[id].Image.images[1])) and (Counter[id].Image.imageIndex == 1) 
+			end
+local rcup = function(window, id) 
+				local deck = Decks:get('cpdraws')
+				return (deck:cards(window) == 0) and is_owner(Counter[id].Image.images[1]) 
+			 end
+local raup = function(window, id)
+				 local deck = Decks:get('apdraws')
+				 return (deck:cards(window) == 0) and is_owner(Counter[id].Image.images[1]) 
+			 end
+local up = function(window, id) 
+				return is_owner(Counter[id].Image.images[1]) 
+			 end
+			 
+			 
 createDeck('cpdraws', 
 		  {Move = Move:new('Move', 'main', 'cpdecks', 'CP Discard Pile', 'Discard', fup)},	
-		  {Draw = Draw:new(fdown)},			  
+		  {},			  
 		  cpdecks:getGrid('CP Draw'))
 
 createDeck('cpdiscard',		 
-		  {MoveStack = MoveStack:new('cpdiscard', cpdecks:getGrid('CP Draw'), 'Reshuffle')},
+		  {MoveStack = MoveStack:new('cpdiscard', cpdecks:getGrid('CP Draw'), 'Reshuffle', rcup)},
 		  {}, 
 		  cpdecks:getGrid('CP Discard Pile'))
 		 	 
 createDeck('cplimited',		 
-		  {MoveStack = MoveStack:new('cplimited', cpdecks:getGrid('CP Draw'), 'Move to draw pile')},
+		  {MoveStack = MoveStack:new('cplimited', cpdecks:getGrid('CP Draw'), 'Move to draw pile', up)},
 		  {}, 
 		  cpdecks:getGrid('CP Limited War Deck'))
 		 
 createDeck('cptotal',		 
-		  {MoveStack = MoveStack:new('cptotal', cpdecks:getGrid('CP Draw'), 'Move to draw pile')},
+		  {MoveStack = MoveStack:new('cptotal', cpdecks:getGrid('CP Draw'), 'Move to draw pile', up)},
 		  {}, 
 		  cpdecks:getGrid('CP Total War Deck'))		 		 
 
@@ -1482,23 +1616,22 @@ createDeck('cptotal',
 
 createDeck('apdraws', 
 		  {Move = Move:new('Move', 'main', 'apdecks', 'AP Discard Pile', 'Discard', fup)},	
-		  {Draw = Draw:new(fdown)}, 
-		  --{},		  
+		  {},	  
 		  apdecks:getGrid('AP Draw'))
 
 
 createDeck('apdiscard',		 
-		  {MoveStack = MoveStack:new('apdiscard', apdecks:getGrid('AP Draw'), 'Reshuffle')},
+		  {MoveStack = MoveStack:new('apdiscard', apdecks:getGrid('AP Draw'), 'Reshuffle', raup)},
 		  {}, 
 		  apdecks:getGrid('AP Discard Pile'))
 		 
 createDeck('aplimited',		 
-		  {MoveStack = MoveStack:new('aplimited', apdecks:getGrid('AP Draw'), 'Move to draw pile')},
+		  {MoveStack = MoveStack:new('aplimited', apdecks:getGrid('AP Draw'), 'Move to draw pile', up)},
 		  {}, 
 		  apdecks:getGrid('AP Limited War Deck'))
 		 
 createDeck('aptotal',		 
-		  {MoveStack = MoveStack:new('aptotal', apdecks:getGrid('AP Draw'), 'Move to draw pile')},
+		  {MoveStack = MoveStack:new('aptotal', apdecks:getGrid('AP Draw'), 'Move to draw pile', up)},
 		  {}, 
 		  apdecks:getGrid('AP Total War Deck'))		
 
@@ -1506,14 +1639,45 @@ createDeck('aptotal',
 
 
 
+--- configuration
+
+
+local config = Zone:new('config', 'zone') 
+
+--[[
+config:addBorder({x = 5, y = 5})
+config:addBorder({x = 300, y = 5})
+config:addBorder({x = 300, y = 650})
+config:addBorder({x = 5, y = 650})
+
+config:setAllowed(false)
+
+local w, h = config:squareGrid(150.0, 50.0)
+
+set_grid({config.grid}, 1, 'config', 'config')
+set_borders({config.border}, 1, 'config', 'config')
+--]]
+
+set_font_options('config', 'Sans Serif', 12, 'Normal', '#000000')
+
+create_choicepage('Choices')
+
+
+add_window_label('config', 'Choices', 'label1', 100, 100, 100, 20)
+set_text('config', 'label1', 'Show grid: ')
+create_combobox('config', 'Choices', 'box1', 'No', 200, 104)
+add_combobox('config', 'box1', 'show_grid(false)', 'No')
+add_combobox('config', 'box1', 'show_grid(true)', 'Yes')
+
 
 
 
 -- loads the start position (only called after all windows and zones defined)
 
-load_setup('setup.gsav')
+--load_setup('start.gsav')
 
 
+ 
 
 
 

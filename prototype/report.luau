@@ -42,7 +42,16 @@ errors[32] = 'Coordinates _1_, _2_ not found in zone _3_.'
 errors[33] = 'Id _1_ not found.'
 errors[34] = 'Could not get grid name for _1_,_2_.'
 errors[35] = 'Connection timed out after _1_ milliseconds.'
-
+errors[36] = 'Zone _1_ already exists.'
+errors[37] = 'Vertical alignment _1_ not found.'
+errors[38] = 'Horizontal alignment _1_ not found.'
+errors[39] = 'Id _1_ not found in window _2_.'
+errors[40] = 'Choice page _1_ not found.'
+errors[41] = 'Choice page _1_ defined more than once.'
+errors[42] = 'Failed to open file _1_.'
+errors[43] = 'Key not safe.'
+errors[44] = 'Prime key generation failed.'
+errors[45] = 'No user key exists.'
 
 
 
@@ -89,7 +98,7 @@ function error(no, ...)
 		
 	end
 	
-	print('Error ' .. no .. ' (script) ' .. message)
+	print('Error ' .. no .. '  ' .. message)
 	
 end
 

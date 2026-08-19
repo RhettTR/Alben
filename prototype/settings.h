@@ -10,7 +10,36 @@ class Settings : public QDialog
 	
 		Settings(QWidget *parent);
 		
-		static std::string playerSide;
+		void init();
+		
+		QLineEdit *uridbox;
+		QLineEdit *userkeybox;
+		QLineEdit *nickbox;
+		
+				
+		static constexpr int USERKEYBITS = 512;
+		static constexpr int USERKEYHEXS = USERKEYBITS / 4;
+		
+		
+		typedef std::string Player;
+		typedef char Urid[2*Settings::USERKEYHEXS];
+		
+		static std::map<Player, Urid> players; 
+		
+		
+		
+		static Urid *myUrid();
+		static Urid *sideUrid(std::string side);
+		static std::string mySide();
+		static bool isMySide(std::string side);
+		static std::string myNick();
+		static bool isOwner(std::string id);
+		static bool isSide(std::string side);
+		
+		void updateRightsBox();
+		std::string streamRightsBox();
+		void setRightsBox(std::string str);
+		
 		
 		
 		struct OwnershipRights 
@@ -26,7 +55,10 @@ class Settings : public QDialog
 			unsigned int NoHoover : 1;
 		};
 		
+		
 		static OwnershipRights myOwnershipRights;
+
+
 
 		
 	private:
@@ -35,8 +67,25 @@ class Settings : public QDialog
 		void activated(QComboBox *rotation);
 		void facingOption(bool checked);
 		void colorSelection(QLabel *box);
-
-
+		void loadKey();
+		void setKeyFile();
+		void setUridFile();
+		void createUserKey();
+		void addUrid();
+		void createUrid();
+		void readUrids();
+		void writeUrids();
+		void removeUrid();
+		
+		static char userKey[USERKEYHEXS];
+		static bool userKeyExists;
+		QListWidget *uridlist;
+		static constexpr int RIGHTS = 9;
+		QCheckBox *rights[RIGHTS];
+		void createRightsBox(int n, QString text, bool enabled);
+		
+		
+		
 };
 
 

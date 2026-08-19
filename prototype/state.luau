@@ -39,26 +39,82 @@ end
 
 
 
+
 function State:sendStage ()
 
-	--for j = 1, State.stagePointer do
-	--	print(State.stageStack[j].id, State.stageStack[j].trait)
-	--end
 
 	local currentStage = State.stagePointer
 		
 	local i = State:findLastStage()
 	
-	for j = i + 1, currentStage do
+	
+	stagesync(i + 1, currentStage)
+	 
+end
+
+
+
+local next
+local currentStage
+
+function stagesync(start, current)
+
+	if net_connected() then
+	
+		next = start + 1
+		currentStage = current	
 		
-		send_table(State.stageStack, j, 1)
+		if start > current then
+			State.stagePointer = currentStage
+			local table = { trait = "stagesyncend" }	
+			send_table({table}, 1, 1)			
+			return
+		end
 		
+		-- 3 is stage sync
+		
+		send_table(State.stageStack, start, 3)
+									
+	end
+
+end
+
+
+function nextstagesync()
+
+	if net_connected() then
+		
+		if next > currentStage then
+			State.stagePointer = currentStage
+			local table = { trait = "stagesyncend" }	
+			send_table({table}, 1, 1)			
+			return
+		end
+		
+		
+		send_table(State.stageStack, next, 3)
+			
+		next = next + 1
+	
+	end
+
+end
+
+
+
+function stagedone()
+
+	if net_connected() then
+	
+		local table = { trait = "stagedone" }	
+		send_table({table}, 1, 1)
+
 	end
 	
-	State.stagePointer = currentStage
-	 
-	
 end
+
+
+
 
 
 function State:recieveTable (table)
@@ -96,10 +152,8 @@ function State:recieveTable (table)
 		
 	elseif table.trait == 'Counter' then
 		State:addMove (table.id, table.trait, table.key, table.value)
+	
 
-	
-	
-	
 	
 	elseif table.trait == 'Rotate' then		
 		State:addMove (table.id, table.trait, table.key, table.value)
@@ -168,17 +222,29 @@ function State:recieveTable (table)
 	elseif table.trait == 'sync' then
 		State:resetState()
 		sync()
-		
+	
+	
+	elseif table.trait == 'stagesync' then
+		stagesync()	
 
 	
 	elseif table.trait == 'done' then
 		nextsync()
+		
+	
+	elseif table.trait == 'stagedone' then
+		nextstagesync()	
 
 	
 	elseif table.trait == 'syncend' then
 		reset_idz()
 		toggle_painting()
 		Counter:generateGUI()
+		
+	
+	elseif table.trait == 'stagesyncend' then
+		Counter:generateGUI()
+			
 
 	end
 	
@@ -264,22 +330,18 @@ end
 function State:reset()	
 	
 	-- reset map to state before stack was made 
-		
-	for key, value in pairs(Counter) do
-			
+	
+	for key, value in pairs(Counter) do		
 		if type(key) == "string" and type(value) ~= 'function' and key ~= '__index' and value.deleted == false then
-		
 			delete_class(key)
-			
-			if State.baseState[key] ~= nil then
-				setCounter(key, State.baseState[key])				
-			end	
-			
 		end	
 	end
 	
-	for key, value in pairs(Globals) do
+	for key, value in pairs(State.baseState) do
+		setCounter(key, State.baseState[key])
+	end
 	
+	for key, value in pairs(Globals) do
 		if type(key) == "string" and type(value) ~= 'function' and key ~= '__index' then
 			if State.baseState[key] ~= nil then
 				Globals[key] = Counter:duplicate(State.baseState[key])
@@ -361,13 +423,16 @@ end
 
 
 function State:undo()
-
+	
 	
 	local currentStage = State.stagePointer
 			
 	local i = State:findLastStage ()
 	
-	-- check whether a die roll is undone
+
+	
+	
+	-- check whether a die roll/reveal is undone
 	for j = i + 1, currentStage do
 		if State.stageStack[j].key == 'roll' then
 			log_print('ERROR: Can not undo a dieroll')
@@ -379,13 +444,15 @@ function State:undo()
 			State.stagePointer = currentStage
 			return
 		end
+		if State.stageStack[j].key == 'draw' then
+			log_print('ERROR: Can not undo a drawn card')
+			State.stagePointer = currentStage
+			return
+		end
 	end
 	
 	
 	if #State.stageStack > 0 then
-		--for j = 1, State.stagePointer do
-		--	print(State.stageStack[j].id, State.stageStack[j].trait)
-		--end	
 		toolbar_enable('main', '__redo')
 	end
 	
@@ -403,7 +470,6 @@ function State:undo()
 	
 	
 	toggle_painting()
-	
 
 	
 	-- print log of redone move
@@ -420,7 +486,7 @@ function State:undo()
 	if i == 0 then
 		toolbar_disable('main', '__undo')
 	end
-	
+
 	
 end
 
@@ -428,6 +494,7 @@ end
 
 
 function State:redo()
+
 	
 	if #State.stageStack > 0 then
 		toolbar_enable('main', '__undo')
@@ -465,6 +532,7 @@ function State:redo()
 	if i == #State.stageStack then
 		toolbar_disable('main', '__redo')
 	end	
+
 	
 end
 

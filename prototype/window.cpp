@@ -3,7 +3,6 @@
 #include "luau.h"
 #include "scale.h"
 #include "overlay.h"
-#include "toolbar.h"
 
 
 extern IO *io;
@@ -16,16 +15,22 @@ std::string Window::rootTag;
 
 Window::PlainTextEdit *Window::textbox;
 Window::LineEdit *Window::edit;
+ToolBar *Window::bar;
 		
 
 Window *getInstance(const char *instance);
 std::map<std::string, Window *> Window::instances;
+	
+
+// a bit dirty .. holds the instance of this window for class Pane .. set in root
+Window *instance;
 
 
 
 
 Window::PlainTextEdit::PlainTextEdit(QString css, QWidget *parent) : QPlainTextEdit(parent)
 {
+	this->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Minimum);
 	this->setReadOnly(true);
 	this->setStyleSheet(css);
 }
@@ -46,6 +51,7 @@ Window::LineEdit::LineEdit(QPlainTextEdit *logbox, QString css, QWidget *parent)
 {
 	this->setStyleSheet(css);
 	this->logbox = logbox;
+	this->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Minimum);
 }
 
 
@@ -72,14 +78,14 @@ Window::Window(QWidget *parent, QString title, std::string tag, std::string type
 	
 	this->setWindowTitle(title);
 	
-    
+ 
     instances[tag] = this;
     
     this->tag = tag;
     this->font = "Sans Serif";
     this->fontSize = 12;
     this->weight = QFont::Normal;
-    this->color = "#000000";
+    this->color = "#ffffff";
     this->minZoom = 0.2;
     this->maxZoom = 2.0;
     this->title = title.toStdString();
@@ -141,19 +147,17 @@ Window::Window(QWidget *parent, QString title, std::string tag, std::string type
 		setCentralWidget(this->frame);
 		
 		
-		
-		
-		ToolBar *bar = new ToolBar(this->tag, "logbar", "Toolbar", 37, nullptr);
+		bar = new ToolBar(this->tag, "logbar", "Toolbar", 37, nullptr);
 		bar->setIconSize(QSize(32, 37));
 		this->addToolBar(Qt::TopToolBarArea, bar);
 		
 		
-		
 		QString fontStyle = "font: normal normal normal 15px/1.4 Arial; color: grey;";
-		
 		textbox = new PlainTextEdit(fontStyle, this);
+		
 		this->frame->layout()->addWidget(textbox);
 		
+		((QVBoxLayout *)this->frame->layout())->addStretch();
 		 
 		fontStyle = "font: normal normal normal 15px/1.4 Arial; color: black;";  
 		edit = new LineEdit(textbox, fontStyle, this);
@@ -163,9 +167,10 @@ Window::Window(QWidget *parent, QString title, std::string tag, std::string type
 		
 		
 		this->move(300, 750);   
-		this->resize(w, h);   
+		this->resize(w, h);
+		textbox->resize(w, h - bar->height() - edit->height());   
 		this->frame->backgroundColor = "white";
-
+		
 
 	}
 	else
@@ -174,24 +179,30 @@ Window::Window(QWidget *parent, QString title, std::string tag, std::string type
 		if (anyScroll)
 		{
 			this->scrollArea = new QScrollArea;
+			this->setCentralWidget(this->scrollArea);
+			
 			this->scrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
 			this->scrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
 				
-			this->setCentralWidget(this->scrollArea);
-			
-			QScrollBar *horizontalScrollBar = this->scrollArea->horizontalScrollBar();
 			
 			this->frame = new CentralFrame(parent, this, type, this->scrollArea);
 			this->scrollArea->setWidget(this->frame);
-			//this->resize(w, h + horizontalScrollBar->height());
+			this->frame->backgroundColor = "#F0F0F0";
+			this->frame->startWidth = w;
+			this->frame->startHeight = h;
+			this->frame->resize(w, h);
 			this->resize(w, h);
 		}	
 		else	
 		{	
 			this->scrollArea = nullptr;	
 			this->frame = new CentralFrame(parent, this, type);
+			this->frame->backgroundColor = "#F0F0F0";
 			setCentralWidget(this->frame);
+			this->frame->startWidth = w;
+			this->frame->startHeight = h;
 			this->resize(w, h);
+			
 		}
 		
 		
@@ -213,7 +224,7 @@ Window::~Window()
 
 
 
-Window *Window::instance = nullptr;
+
 
 
 Window *Window::getInstance(const char *instance)
@@ -225,7 +236,7 @@ Window *Window::getInstance(const char *instance)
 	
 		if (obj->first == name)
 		{
-			Window::instance = obj->second;
+			//Window::instance = obj->second;
 			return obj->second;
 		}
 
@@ -253,8 +264,6 @@ void Window::setOptions(QString font, int fontSize, std::string weight, std::str
 	
 	QStringList families = database.families();
 	
-	//for (auto f : families)
-	//	printf("%s\n", f.toStdString().c_str());
 	
 	if (!families.contains(font))
 	{
@@ -333,8 +342,6 @@ void Window::addAWidget(std::string key,  QWidget *value)
 
 
 
-
-
 void Window::setWidgets()
 {
 	
@@ -401,13 +408,39 @@ void Window::setWidgets()
 			}
 			else
 			{
-				label->resize((int)(label->w * fraction), (int)(label->h * fraction));
+				label->resize((int)std::round(label->w * fraction), (int)std::round(label->h * fraction));
 			}
 			
 			
-			label->move((int)(label->x * fraction), (int)(label->y * fraction));		
+			label->move((int)std::round(label->x * fraction), (int)std::round(label->y * fraction));		
 			
-		}	
+		}
+		
+		
+		ChoiceBox *box = dynamic_cast<ChoiceBox *>(it->second);	
+		
+		if (box != nullptr)
+		{
+			
+			int x = box->x - (int)std::round(box->width() / 2);
+			int y = box->y - (int)std::round(box->height() / 2);
+			
+			box->move((int)std::round(x * fraction), (int)std::round(y * fraction));
+			
+		}
+		
+		
+		Text *text = dynamic_cast<Text *>(it->second);	
+		
+		if (text != nullptr)
+		{
+			
+			int x = text->x - (int)std::round(text->width() / 2);
+			int y = text->y - (int)std::round(text->height() / 2);
+			
+			text->move((int)std::round(x * fraction), (int)std::round(y * fraction));
+			
+		}
 	
 	}
 		
@@ -442,6 +475,8 @@ void Window::resizeEvent(QResizeEvent* event)
 		}
 	}		
 	
+	if (this->tag == "LogChat")
+		textbox->resize(this->width(), this->height() - this->bar->height() - edit->height());
 	
 	event->accept();
 	
@@ -468,10 +503,6 @@ Window::Label::Label(Window *parent, std::string tag, int x, int y, int w, int h
 		
 
 	this->setVisible(true);
-	
-		
-		
-	//this->setStyleSheet(styleSheet);
 	
 	
 	this->parent = parent;
@@ -581,6 +612,133 @@ void Window::PushButton::mousePressEvent (QMouseEvent * event)
 
 
 
+Window::ChoiceBox::ChoiceBox(QWidget *parent, Window *window, std::string tag, int x, int y) : 
+			QComboBox(parent), window(window), tag(tag), x(x), y(y)
+{
+	
+	window->addAWidget(tag, this);
+	
+	
+	this->setSizeAdjustPolicy(QComboBox::AdjustToContents);
+	
+	QObject::connect(this, &QComboBox::activated, 
+					 this, [=]()->void{ active(this->currentIndex()); });
+}
+
+
+void Window::ChoiceBox::add(QString text, QString data)
+{
+	
+	const QString &t = text; 
+	
+	this->addItem(t, QVariant(data));
+	
+	this->window->setWidgets();
+}
+
+
+void Window::ChoiceBox::active(int index)
+{	
+	
+	QVariant variant = this->itemData(index);
+	
+	QString str = QVariant(variant).toString();
+	
+	//printf("%s\n",str.toStdString().c_str());
+	
+	// data is a script chunck
+	
+	Luau::callbackScript(str.toStdString());
+	
+	Window::getInstance("main")->frame->update();
+}
+
+
+
+
+
+
+
+
+Window::Text::Text(QWidget *parent, Window *window, std::string tag, int x, int y, int w, int h) : 
+					 QLabel(parent), x(x), y(y), w(w), h(h)
+{
+	
+	this->resize(w, h);			
+	this->setVisible(true);
+	
+	
+	this->parent = parent;
+	this->window = window;
+	this->tag = tag;
+	
+	
+	this->window->addAWidget(tag, this);
+	
+
+}
+
+void Window::Text::setOptions(QString alingment, QString border)
+{
+	
+	QString str = alingment.simplified();
+		
+	QStringList entries = str.split(':');
+	
+	
+	
+	entries[0] = entries[0].trimmed();
+	entries[1] = entries[1].trimmed();
+	
+	std::unordered_map<QString, enum Qt::AlignmentFlag> 
+		verticalAlignment{{"Left", Qt::AlignLeft}, {"Right", Qt::AlignRight}, 
+						  {"Center", Qt::AlignHCenter}, {"Justify", Qt::AlignJustify}};
+		  
+	std::unordered_map<QString, enum Qt::AlignmentFlag> 
+		horisontalAlignment{{"Top", Qt::AlignTop}, {"Bottom", Qt::AlignBottom}, 
+						    {"Center", Qt::AlignVCenter}, {"Base", Qt::AlignBaseline}};
+		 
+	
+	enum Qt::AlignmentFlag vertical;
+	enum Qt::AlignmentFlag horizontal;
+		  
+	auto it = verticalAlignment.find(entries[0]);
+	
+	if (it != verticalAlignment.end()) 
+		vertical = it->second;
+	else 
+		Luau::error(37, 1, entries[0].toStdString().c_str());
+	
+	it = horisontalAlignment.find(entries[1]);
+	
+	if (it != horisontalAlignment.end()) 
+		horizontal = it->second;
+	else 
+		Luau::error(38, 1, entries[1].toStdString().c_str());
+	
+	
+	this->setAlignment(vertical | horizontal);
+	this->window->setWidgets();
+
+}
+
+
+void Window::Text::set(QString text)
+{
+	
+	this->setFont(QFont(this->window->font, this->window->fontSize, this->window->weight));
+	this->setText(text);
+	this->window->setWidgets();
+	
+}
+
+
+
+
+
+
+
+
 
 
 
@@ -666,6 +824,11 @@ void Window::Pane::zoomFraction(float amount, bool set)
 						QImage imageScaled = image.scaled(size, Qt::KeepAspectRatio, Qt::SmoothTransformation);
 						label->resize(size);
 						label->setPixmap( QPixmap::fromImage(imageScaled) );
+						
+						if (instance->frame->scrollArea != nullptr)
+							// 32 height of tab ??
+							instance->frame->resize(QSize(0,32) + size);
+							
 					}
 					
 				}
@@ -706,6 +869,25 @@ void Window::Pane::wheelEvent(QWheelEvent *event)
 }
 
 
+void Window::Pane::showEvent(QShowEvent *event)
+{
+	// resize frame based on current shown Pane content
+	
+	if (instance->frame->scrollArea != nullptr)
+	{
+		QLayoutItem* item = this->layout()->itemAt(0);		
+		QWidget *widget = item->widget();
+		
+		if (widget != nullptr)
+		{
+			QLabel *label = dynamic_cast<QLabel*>(widget);
+			if (label != nullptr)
+				// 32 height of tab ??
+				instance->frame->resize(QSize(0,32) +  label->size());
+		}
+	}
+	
+}
 
 
 
@@ -855,6 +1037,8 @@ void Window::root(int level)
 	
 	
 	panes.push(pane);
+	
+	instance = this;
 	
 }
 
@@ -1242,14 +1426,14 @@ void Window::reset()
 }
 
 
-QString Window::textInput(QString title, QString start)
+QString Window::textInput(QString title, QString caption, QString start)
 {
 	
 	bool ok{};
 	Window *parent = Window::getInstance("main");
 	
     QString text = QInputDialog::getText(parent, title,
-                                         "Text value:", QLineEdit::Normal,
+                                         caption, QLineEdit::Normal,
                                          start, &ok);
     if (ok)
         return text;

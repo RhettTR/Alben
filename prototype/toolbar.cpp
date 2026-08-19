@@ -51,12 +51,11 @@ ToolBar::ButtonAction::ButtonAction(const char *id, std::string resourceName, QS
 	else
 		QObject::connect(this, &QAction::triggered, this, [=](){ Luau::callbackScript(luaScript); });
 	
+		
 }
 
 
-
-
-ToolBar::ToolButton::ToolButton(const char *id, std::string resourceName, const QString toolTip, 
+ToolBar::ToolButton::ToolButton(std::string side, const char *id, std::string resourceName, const QString toolTip, 
 								std::function<void(void)> f, std::string luaScript) 
 {
 	QPixmap pixmap;
@@ -77,10 +76,13 @@ ToolBar::ToolButton::ToolButton(const char *id, std::string resourceName, const 
 	else
 		QObject::connect(this, &QAbstractButton::clicked, this, [=](){ Luau::callbackScript(luaScript); });
 	
+	
+	this->side = side;
+	
+	//this->setEnabled(Settings::isSide(side));
+		
 }
-
-
-
+	
 
 ToolBar::Label::Label(std::string str, const QString toolTip, int w, int h, const QString css)
 {
@@ -340,8 +342,6 @@ ToolBar::ButtonAction *ToolBar::getActionButton(std::string id)
 }
 
 
-
-
 ToolBar *ToolBar::getInstance(const char *instance)
 {
 	
@@ -359,21 +359,28 @@ ToolBar *ToolBar::getInstance(const char *instance)
 }
 
 
+void ToolBar::setSidesEnabled()
+{
+	for (auto obj = ToolBar::toolButtons.begin(); obj != ToolBar::toolButtons.end(); ++obj)
+	{	
+		obj->second->setEnabled(Settings::isMySide(obj->second->side));	
+	}	
+
+}
+
 
 void ToolBar::reset()
 {
-	
 	for ( auto obj = ToolBar::instances.begin(); obj != ToolBar::instances.end(); ++obj  )
 	{
 		if (obj->second->windowTitle() != "System toolbar")
 			((Window *)this->parent())->removeToolBar(obj->second);
 	}
-	
 }
 
 
 
-void ToolBar::addImageButton(const char *id, std::string resourceName, QString buttonText, const QString toolTip, std::function<void(void)> func, std::string luaScript)
+void ToolBar::addImageButton(std::string side, const char *id, std::string resourceName, QString buttonText, const QString toolTip, std::function<void(void)> func, std::string luaScript)
 {
 	if (this->tag == "main" || !buttonText.isEmpty())
 	{
@@ -382,7 +389,7 @@ void ToolBar::addImageButton(const char *id, std::string resourceName, QString b
 	}
 	else
 	{
-		ToolButton *button = new ToolButton(id, resourceName, toolTip, func, luaScript);		
+		ToolButton *button = new ToolButton(side, id, resourceName, toolTip, func, luaScript);		
 		this->addWidget(button);
 	}
 }
@@ -785,6 +792,7 @@ void ToolBar::do_activate (QAction *action)
 	
 	const char *entryaction = retrieved.entryaction.toStdString().c_str();
 	const char *entrytrait = retrieved.entrytrait.toStdString().c_str();
+	const char *entryfield = retrieved.entryfield.toStdString().c_str();
 	
 	const char *window = "main";
 	
@@ -792,9 +800,17 @@ void ToolBar::do_activate (QAction *action)
 		
 	for (auto obj = Counter::counters.begin(); obj != Counter::counters.end(); ++obj)
 	{		
-		Luau::doAction(window, obj->second->name.c_str(), entrytrait, entryaction);
+		Luau::doAction(window, obj->second->name.c_str(), entrytrait, entryfield, entryaction);
 	}
 	
 				
+}
+
+
+void ToolBar::init()
+{	
+	// disable buttons not this side
+	for (auto obj = ToolBar::instances.begin(); obj != ToolBar::instances.end(); ++obj)
+		obj->second->setSidesEnabled();
 }
 

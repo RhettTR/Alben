@@ -17,17 +17,18 @@ class ToolBar : public QToolBar
 		class ButtonAction : public QAction
 		{
 			public:
-				std::string id;
+				std::string id;				
 				ButtonAction(const char *id, std::string resourceName, QString buttonText, const QString toolTip,
-							 std::function<void(void)>, const std::string);	
+							 std::function<void(void)>, const std::string);
 		};
 		
 		class ToolButton : public QToolButton
 		{
 			public:
 				std::string id;
-				ToolButton(const char *id, std::string resourceName, const QString toolTip,
-						   std::function<void(void)>, const std::string);
+				std::string side;
+				ToolButton(std::string side, const char *id, std::string resourceName, const QString toolTip,
+						   std::function<void(void)>, const std::string);	   
 		};
 		
 		class Label : public QLabel
@@ -63,13 +64,14 @@ class ToolBar : public QToolBar
 		ToolBar(std::string window, std::string tag, const QString title, int height, QScrollArea *scrollArea = nullptr);
 		~ToolBar();
 		static ToolBar *getInstance(const char *instance);
+		void setSidesEnabled();
 		
 		
 		void reset();
 		std::string tag;
 		bool toolbarPinned;
 		std::string window;
-		void addImageButton(const char *id, std::string resourceName, QString buttonText, const QString toolTip, std::function<void(void)>, std::string = "");
+		void addImageButton(std::string side, const char *id, std::string resourceName, QString buttonText, const QString toolTip, std::function<void(void)>, std::string = "");
 		void setImageButton(std::string id, std::string resourceName, QString buttonText);
 		void setLabelImage(std::string id, std::string resourceName, QString buttonText);
 		void addLabel(std::string id, std::string str, const QString toolTip, int w, int h, const QString css);
@@ -92,6 +94,9 @@ class ToolBar : public QToolBar
 		
 		void showMenu(const char *menuid);
 		void do_activate (QAction *action);
+		static void init();
+		
+		ToolBar::ToolButton *getToolButton(std::string id);
 		
 		
 	private:
@@ -106,7 +111,7 @@ class ToolBar : public QToolBar
 		static std::map<std::string, ToolBar *> instances;
 		static std::map<std::string, ToolButton *> toolButtons;
 		static std::map<std::string, ButtonAction *> actionButtons;
-		ToolBar::ToolButton *getToolButton(std::string id);
+		
 		ToolBar::ButtonAction *getActionButton(std::string id);
 		
 		

@@ -42,6 +42,30 @@ end
 
 
 
+Side = {}
+
+function Side:new(side)
+	local o = {}
+	if side == nil then
+		o.side = 'none'
+	else
+		o.side = side
+	end
+	return o
+end
+
+function Side:findAllSides()
+	local sides = {}
+	for k, v in pairs(Repository) do
+		if type(k) == "string" and k ~= '__index' and type(v) ~= 'function' then				
+			sides[Repository[k].Side.side] = true
+		end
+	end
+	return sides
+end
+
+
+
 Flip = {}
 
 function Flip:new(id)
@@ -297,13 +321,21 @@ RotateCCW = {
 	menuclick = "actionRotateCcw"
 }
 
+
+Facing = {
+	menuname = "Adjust Facing",
+	menuclick = "actionFacing"
+}
+
+
 			
 	
 Delete = {
 	menuname = "Delete",
 	menutrait = "Delete",
+	menufield =  "Delete",
 	menuclick = "actionDelete",
-	menushow = function(window, id) return window ~= 'Repository' end
+	menushow = function(window, id) return not (window == 'Repository') end
 } 
 
 
@@ -328,12 +360,11 @@ OnlyOneInStack = {
 
 Rotate = {}
 
-function Rotate:new ()
+function Rotate:new (menu)
 	local o = {}
-	setmetatable(o, self)
-	self.__index = self
-	o.rotatecw = RotateCW
-	o.rotateccw = RotateCCW
+	for k,v in pairs(menu) do
+		o[k] = v
+	end
 	o.degrees = 0
 	return o
 end
@@ -367,17 +398,23 @@ end
 
 Move = {}
 
-function Move:new(trait, window, zone, point, name, action)
+function Move:new(field, window, zone, point, name, action)
 	local o = {}
 	setmetatable(self, self)
-	self.__index = self 
+	self.__index = self
+	o.trait = "Move"
 	o.zone = zone
 	o.point = point
 	o.window = window
 	o.menuname = name
 	o.menuclick = "actionMove"
-	o.menutrait = trait
-	o.menushow = action
+	o.menutrait = o.trait
+	o.menufield = field
+	if action == nil then
+		o.menushow = function(window, id) return window == 'main' end
+	else
+		o.menushow = action
+	end	
 	return o
 end
 
@@ -396,7 +433,7 @@ end
 
 MoveStack = {}
 
-function MoveStack:new(from, to, name)
+function MoveStack:new(from, to, name, action)
 	local o = {}
 	-- from is grid or deck id moved from
 	-- to is the position moved to
@@ -405,6 +442,9 @@ function MoveStack:new(from, to, name)
 	o.cy = to.y
 	o.menuname = name
 	o.menuclick = "actionMoveStack"
+	o.menutrait = "MoveStack"
+	o.menufield = "MoveStack"
+	o.menushow = action
 	return o
 end
 
@@ -497,6 +537,7 @@ function SubMenu:new(title, actions)
 	o.menuname = title
 	o.menuactions = actions
 	o.menutrait = "SubMenu"
+	o.menufield = "SubMenu"
 	o.menushow = function(window, id) return window == 'main' end
 	return o 
 end
@@ -504,14 +545,15 @@ end
 
 PlaceMarker = {}
 
-function PlaceMarker:new(name, trait, marker)
+function PlaceMarker:new(name, field, marker)
 	local o = {}
 	setmetatable(self, self)
 	self.__index = self
-	o.marker = marker
 	o.menuname = name
 	o.menuclick = "actionPlace"
-	o.menutrait = trait
+	o.menutrait = "PlaceMarker"
+	o.menufield = field
+	o.menuid = marker
 	o.menushow = function(window, id) return window == 'main' end
 	return o
 end
@@ -528,16 +570,16 @@ end
 
 
 
-areaActions = [[Central Control, control_cp, actionPlace:
-				Allied Control, control_ap, actionPlace:
-				Place Central Trench, cp_trench1, actionPlace:
-				Place Allied Trench, ap_trench1, actionPlace:
+areaActions = [[Central Control, control_cp, actionPlace, Central:
+				Allied Control, control_ap, actionPlace, Allied:
+				Place Central Trench, cp_trench1, actionPlace, Central:
+				Place Allied Trench, ap_trench1, actionPlace, Allied:
 				Trench Modification, trench_mod, actionPlace:
 				Fort Besieged, fort_besieged, actionPlace:
 				Fort Destroyed, fort_destroyed, actionPlace:
 				Fort Destroyed (mini), fort_destroyed_mini, actionPlace:
-				Out of Supply (Allied), oos_ap, actionPlace:
-				Out of Supply (Central), oos_cp, actionPlace:
+				Out of Supply (Allied), oos_ap, actionPlace, Allied:
+				Out of Supply (Central), oos_cp, actionPlace, Central:
 				Delete all markers, , actionRemoveMarkers]]
 
 
@@ -549,6 +591,8 @@ function Piece:new (id)
 	self.__index = self
 	o.Flip = Flip:new(id)
 	o.SubMenu = SubMenu:new('Area', areaActions)
+	o.MoveMarker = PlaceMarker:new('Move', 'MoveMarker', 'activate_move')
+	o.AttackeMarker = PlaceMarker:new('Attack', 'AttackeMarker', 'activate_attack')	
 	return o
 end
 
@@ -571,6 +615,55 @@ function Corps:new (id)
 	setmetatable(self, {__index = Piece})
 	self.__index = self
 	o.Shadow = Shadow:new('shadow_blurred')
+	return o
+end
+
+
+CentralArmy = {}
+
+function CentralArmy:new (id)
+	local o = Army:new(id)
+	setmetatable(self, {__index = Army})
+	self.__index = self
+	-- need to send to more places than just 1
+	o.Elim = Move:new('Elim', 'main', 'cel', 1, 'Eliminated', nil)
+	o.Perm = Move:new('Perm', 'pelim', '', {x=1032,y=253}, 'Permanently Eliminated')
+	return o
+end
+
+
+CentralCorps = {}
+
+function CentralCorps:new (id)
+	local o = Corps:new(id)
+	setmetatable(self, {__index = Corps})
+	self.__index = self
+	o.Elim = Move:new('Elim', 'main', 'cel', 7, 'Eliminated', nil)
+	o.Perm = Move:new('Perm', 'pelim', '', {x=1215,y=285}, 'Permanently Eliminated')
+	return o
+end
+
+
+AlliedArmy = {}
+
+function AlliedArmy:new (id)
+	local o = Army:new(id)
+	setmetatable(self, {__index = Army})
+	self.__index = self
+	o.Elim = Move:new('Elim', 'main', 'ael', 1, 'Eliminated', nil)
+	o.Perm = Move:new('Perm', 'pelim', '', {x=306,y=253}, 'Permanently Eliminated')
+	return o
+end
+
+
+AlliedCorps = {}
+
+function AlliedCorps:new (id)
+	local o = Corps:new(id)
+	setmetatable(self, {__index = Corps})
+	self.__index = self
+	o.Elim = Move:new('Elim', 'main', 'ael', 7, 'Eliminated', nil)
+	o.Perm = Move:new('Perm', 'pelim', '', {x=483,y=285}, 'Permanently Eliminated')
 	return o
 end
 

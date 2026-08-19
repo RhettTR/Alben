@@ -31,7 +31,7 @@ bool CentralFrame::facingMatters = false;	// true = rotate counters when map rot
 bool CentralFrame::showGrid = false;
 QColor CentralFrame::gridColor = QColor(255, 0, 0, 255);
 int CentralFrame::gridRadius = 3;
-bool CentralFrame::allowPainting = true;	// to turn of painting while undoing
+bool CentralFrame::allowPainting = true;	// to turn off painting while undoing
 
 		
 
@@ -58,10 +58,11 @@ CentralFrame::CentralFrame(QWidget *parent, Window *window, string type, QScroll
 		this->setLayout(new QVBoxLayout());
 		this->layout()->setContentsMargins(0, 0, 0, 0);
 		this->layout()->setSpacing(0);
-		this->scrollArea = nullptr;
+		this->scrollArea = scrollArea;
 	}
 	else
 	{
+		this->setLayout(new QVBoxLayout());
 		this->scrollArea = scrollArea;
 		buttonParent = this->scrollArea;
 		setAcceptDrops(true);
@@ -87,13 +88,14 @@ void CentralFrame::mousePressEvent(QMouseEvent *event)
 	
 	if (event->button() == Qt::LeftButton)
 	{
-
+		
+		
 		QDrag *drag = new QDrag(this);
 		drag->deleteLater();		
 		
 		
 		QPoint frameCoordinates;
-		//Moved countersMoved;
+		
 			
 		if (this->window->tag == "Repository")
 			frameCoordinates = mapTo((QWidget *)this, event->position().toPoint());
@@ -105,7 +107,7 @@ void CentralFrame::mousePressEvent(QMouseEvent *event)
 		Counter::QtCounter *child = 
 			dynamic_cast<Counter::QtCounter*>(childAt(frameCoordinates));
 		
-	
+
 		
 		
 		if (child == nullptr)
@@ -159,7 +161,7 @@ void CentralFrame::mousePressEvent(QMouseEvent *event)
 			//update image so that ghost is scaled
 			child->owner->setImage();	
 				
-				
+		
 			
 			
 			if (anySelected(child->owner, dummy , position))			
@@ -192,6 +194,7 @@ void CentralFrame::mousePressEvent(QMouseEvent *event)
 			QPoint o2 = ((QWidget *)child->parent())->mapToGlobal(QPoint(0,0));
 			
 			QPoint origo = o2 - o1;
+
 		
 		
 			
@@ -235,10 +238,8 @@ void CentralFrame::mousePressEvent(QMouseEvent *event)
 			
 			// hook
 			Luau::pointoffset(child->owner->state.tag.c_str(), 
-							  child->owner->state.x,
-							  child->owner->state.y,
-							  std::round(child->owner->width/2) + child->owner->margin, 
-							  std::round(child->owner->height/2) + child->owner->margin, 
+							  child->owner->state.cx,
+							  child->owner->state.cy,
 							  xoffset, 
 							  yoffset,   
 							  xopen,
@@ -265,7 +266,7 @@ void CentralFrame::mousePressEvent(QMouseEvent *event)
 			
 			dataStream << compensation;
 			
-			
+				
 			
 			
 			
@@ -305,7 +306,7 @@ void CentralFrame::mousePressEvent(QMouseEvent *event)
 			
 			
 		}
-		
+	
 		
 		auto result = drag->exec(Qt::CopyAction | Qt::MoveAction);
 		
@@ -313,7 +314,11 @@ void CentralFrame::mousePressEvent(QMouseEvent *event)
 	
 		if (result == Qt::IgnoreAction) 
 		{
+			
+			if (Luau::isFeeding())
+				Luau::stopFeed();
 		
+			
 			if (!child)
 			{
 				if (!Overlay::openView->isVisible())
@@ -377,6 +382,7 @@ void CentralFrame::mousePressEvent(QMouseEvent *event)
 
 
 
+
 void CentralFrame::dragEnterEvent(QDragEnterEvent *event)
 {		
 	this->activateWindow();
@@ -392,13 +398,14 @@ void CentralFrame::dragEnterEvent(QDragEnterEvent *event)
 
 
 void CentralFrame::dragMoveEvent(QDragMoveEvent *event)
-{		
+{
 	
-	if (event->source() == this && scrollArea != nullptr)
-	{	
+	if (this->window->tag == "main")
+	{
+		
 		int horizontalPos = scrollArea->horizontalScrollBar()->value();
 		int verticalPos = scrollArea->verticalScrollBar()->value();
-		
+			
 			
 		if (event->mimeData()->hasFormat("application/x-alben-counter"))
 		{	
@@ -477,8 +484,12 @@ void CentralFrame::dragMoveEvent(QDragMoveEvent *event)
 			
 			dataStream >> lastPoint;
 			
+		
+		
 			int dx = horizontalPos + (lastPoint.x() - event->position().toPoint().x());
 			int dy = verticalPos + (lastPoint.y() - event->position().toPoint().y()); 
+			
+			
 	
 			scrollArea->horizontalScrollBar()->setValue(dx);
 			scrollArea->verticalScrollBar()->setValue(dy);
@@ -486,8 +497,10 @@ void CentralFrame::dragMoveEvent(QDragMoveEvent *event)
 					
 		}
 		
+		
+		
 	}
-	
+
 		
 	if (event->mimeData()->hasFormat("application/x-alben-counter") ||
 		event->mimeData()->hasFormat("application/x-alben-drag")) 		
@@ -964,7 +977,7 @@ void CentralFrame::dropEvent(QDropEvent *event)
 		
 	} 
 
-	
+		
 	else 
 	
 		event->ignore();
@@ -1377,7 +1390,7 @@ void CentralFrame::zoomFraction(float amount, bool set)
 	
 	QSize size = QSize(this->startWidth, this->startHeight);
 	this->resize(size * this->scaleFraction);
-	
+
 	if (io->isResource(backgroundID))
 		scaled->resourceScaleRotate(this->window->tag, backgroundID);
 	
@@ -1394,7 +1407,7 @@ void CentralFrame::zoomFraction(float amount, bool set)
 void CentralFrame::wheelEvent(QWheelEvent *event)
 {
 	int amount = event->angleDelta().y();
-	
+
 	if (this->window->tag == "main")
 	{	
 		if (ToolBar::sizeBox != nullptr)
@@ -1407,7 +1420,7 @@ void CentralFrame::wheelEvent(QWheelEvent *event)
 		}
 	}
 	else 
-	if (this->window->tag != "LogChat")
+	if (this->window->tag != "LogChat" && this->window->tag != "config")
 	{
 		if (amount > 0)	
 			this->scaleFraction = this->scaleFraction + 0.05;
@@ -1416,7 +1429,7 @@ void CentralFrame::wheelEvent(QWheelEvent *event)
 				
 		zoomFraction(this->scaleFraction, false);	
 	}	
-		
+	
 	event->accept();	
 }
 
@@ -1543,9 +1556,10 @@ void CentralFrame::paintEvent(QPaintEvent *event)
 				if (!grid.empty())
 				{	
 					int size = CentralFrame::gridRadius  * scaleFraction;						
-							
+						
 					for (auto c : grid)
 						painter.drawEllipse(c.x * scaleFraction, c.y * scaleFraction, size, size);
+					
 				}
 				
 			pen.setWidth(3);
@@ -1567,7 +1581,7 @@ void CentralFrame::paintEvent(QPaintEvent *event)
 						painter.drawLine(line);
 					}
 				}
-			
+				
 		}		
 		
 	// draw any Area of Effect	
@@ -1668,9 +1682,9 @@ void CentralFrame::paintEvent(QPaintEvent *event)
 		
 		Counter *first = stack.begin()->second; 
 		
-		int fx = first->state.x;
-		int fy = first->state.y;
-	
+		
+		int fcx = first->state.cx;
+		int fcy = first->state.cy;
 
 		
 			
@@ -1688,10 +1702,8 @@ void CentralFrame::paintEvent(QPaintEvent *event)
 		
 		// get non-default values from module
 		Luau::pointoffset(first->state.tag.c_str(), 
-						  fx, 
-						  fy,
-						  std::round(first->width/2) + first->margin, 
-						  std::round(first->height/2) + first->margin, 
+						  fcx, 
+						  fcy,
 						  xoffset, 
 						  yoffset,   
 						  xopen,

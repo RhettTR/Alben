@@ -7,11 +7,12 @@ Repository = {}
 
 
 
-function Repository:new (images)
+function Repository:new (images, side)
 	local o = {}	
 	setmetatable(o, self)
 	Repository.__index = self
 	o.Image = Image:new(images, 1)
+	o.Side = Side:new(side)
 	o.x = 0
 	o.y = 0
 	o.scale = 1.0
@@ -85,7 +86,9 @@ Counter = {}
 
 
 function Counter:new (id, images, imageIndex, zorder, window, x, y, cx, cy)	
-	local o = Counter:duplicate(Repository[images[1]])	
+	local o = Counter:duplicate(Repository[images[1]])
+	-- side set to nil, repository has it
+	o.Side = nil	
 	setmetatable(o, Counter)
 	Counter.__index = Counter
 	o.Image.imageIndex = imageIndex
@@ -102,7 +105,8 @@ end
 
 function Counter:load (table)
 	local o = Counter:duplicate(Repository[table.Image.images[1]])
-	o = Counter:merge(o, table)	
+	o = Counter:merge(o, table)
+	o.Side = nil	
 	setmetatable(o, Counter)
 	Counter.__index = Counter
 	return o
@@ -271,14 +275,14 @@ function Counter:findId(stringId)
 	return nil
 end
 
-function Counter:findTrait(table, trait)
+function Counter:findTrait(table, field, trait)
 	for k, v in pairs(table) do	
-		if type(k) == "string" and k ~= '__index' and type(v) ~= 'function' then			
-			if k == trait then
+		if type(k) == "string" and k ~= '__index' and type(v) ~= 'function' then
+			if k == field and v.trait == trait then
 				return v
 			end
 			if type(v) == 'table' and (v.deleted == nil or v.deleted == false) then
-				local table = Counter:findTrait(v, trait)
+				local table = Counter:findTrait(v, field, trait)
 				if table ~= nil then
 					return table
 				end
@@ -427,8 +431,7 @@ function Counter:refresh()
 		-- reset counter
 		
 		Counter[k] = nil
-		Counter[k] = Counter:duplicate(Repository[name])
-		
+		Counter[k] = Counter:duplicate(Repository[name])		
 		
 		-- reinstall state
 
@@ -442,14 +445,12 @@ function Counter:refresh()
 		Counter[k].window = window
 		Counter[k].zorder = zorder
 		
-			
-			
-		
-			
-		
 		
 		
 	end
+	
+	
+	--Counter:generateGUI()
 	
 	
 end
@@ -624,7 +625,7 @@ function Deck:draw(window, zone, pos)
 	
 		
 	
-	reporttext('move', Repository[Counter[card].Image.images[2]].name .. ' is drawn in the <span style="color:DarkSlateGray;">'
+	reporttext('draw', Repository[Counter[card].Image.images[2]].name .. ' is drawn in the <span style="color:DarkSlateGray;">'
 				   .. get_title(window) .. '</span> window')
 				   
 		
@@ -634,6 +635,30 @@ function Deck:draw(window, zone, pos)
 	
 	
 end		
+
+
+function Deck:cards(window)
+	
+	local cards = {}
+
+	for k,v in pairs(Counter) do
+		if type(k) == "string" and k ~= '__index' and type(v) ~= 'function' and v.deleted == false then
+			
+			local trait = Counter[v.id].Card
+			
+			if trait ~= nil then
+			
+				if trait.deckId == self.id and Counter[v.id].window == window then
+					table.insert(cards, v.id)
+				end
+			end
+			
+		end
+	end
+
+	return #cards
+	
+end
 
 
 

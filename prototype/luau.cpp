@@ -9,13 +9,14 @@
 #include "lualib.h"
 #include "luacode.h"
 
-
+#include "configure.h"
 #include "luau.h"
 #include "overlay.h"
 #include "toolbar.h"
 #include "io.h"
 #include "window.h"
 #include "scale.h"
+
 
  
 
@@ -36,6 +37,7 @@ typedef struct std::vector<aScript> Scripts;
 extern IO *io;
 extern Window *repositoryWindow;
 extern Window *logWindow;
+extern Configure *config;
 
 
 
@@ -182,7 +184,10 @@ void Luau::error(int no, int count, ...)
     va_start(args, count);
     
     for (int i = 0; i < count; i++) 
+    {
+		
         lua_pushstring(L, va_arg(args, const char *));
+	}
     
     va_end(args);
 	
@@ -395,9 +400,13 @@ extern "C" {
 					
 				found->doesNotStack = ((state).find("DoesNotStack") != (state).end());
 				
+				if ((state).find("Side") != (state).end())					
+					found->side = std::get<std::string>(std::get<Counter::Table>((state)["Side"])["side"]);
+				else
+					found->side = "none";
 				
 				
-				//found->parentWindow->frame->repaint();				
+								
 				found->setImage();
 				
 				found->parentWindow->frame->update();
@@ -431,7 +440,7 @@ extern "C" {
 		{	
 			const char *id = lua_tostring(L, -1); 
 			lua_pop(L, 1);
-		
+//printf("find %s\n", id);		
 			Counter *found = Counter::findObj(id);
 			if (found)	
 			{			
@@ -453,7 +462,7 @@ extern "C" {
 			const char *image = lua_tostring(L, -1);
 			const char *id = lua_tostring(L, -2);
 			lua_pop(L, 2);
-			Counter *found = Counter::findObj(id);
+			Counter *found = Counter::findObj(id);			
 			if (found)
 			{
 				found->state.image = image;
@@ -510,6 +519,32 @@ extern "C" {
 		
 		return 0;
 	}
+	
+	static int get_size(lua_State *L)
+	{		
+		
+		std::string resourceName(lua_tostring(L, -1));
+		
+		lua_pop(L, 1);
+		
+		
+		int w = 0;
+		int h = 0;
+		
+		if (!resourceName.empty())
+		{
+			QSize size = io->getSize(resourceName);
+			w = size.width();
+			h = size.height();
+		}
+		
+	
+		lua_pushnumber(L, w);
+		lua_pushnumber(L, h);	
+				
+		return 2;
+	}
+	
 	
 	static int set_root(lua_State *L)
 	{	
@@ -668,6 +703,31 @@ extern "C" {
 		
 		return 0;
 	}
+		
+	static int is_owner(lua_State *L)
+	{
+		std::string id(lua_tostring(L, -1));
+		lua_pop(L, 1); 
+		
+		bool owner = Settings::isOwner(id);
+		
+		lua_pushboolean(L, (int)owner);	
+		
+		return 1;
+	}
+	
+	static int is_side(lua_State *L)
+	{
+		std::string side(lua_tostring(L, -1));
+		lua_pop(L, 1); 
+		
+		bool owner = Settings::isSide(side);
+		
+		lua_pushboolean(L, (int)owner);	
+		
+		return 1;
+	}
+	
 	
 	
 	
@@ -801,20 +861,24 @@ extern "C" {
 	
 	static int add_toolbar_button(lua_State *L)
 	{	
+		int size = lua_gettop(L);
+		std::string side = "";
+		
 		std::string luaScript(lua_tostring(L, -1));		
 		const QString toolTip = QString(lua_tostring(L, -2));
 		QString buttonText(lua_tostring(L, -3));
 		std::string resourceName(lua_tostring(L, -4));
 		const char *id = lua_tostring(L, -5);
 		const char *tag = lua_tostring(L, -6);
+		if (size == 7)
+			side = std::string(lua_tostring(L, -7));
 		
-		lua_pop(L, 6);
+		lua_pop(L, size);
 		
 		ToolBar *toolbar = ToolBar::getInstance(tag);		
 
 
-		toolbar->addImageButton(id, resourceName, buttonText, toolTip, nullptr, luaScript);		
-		toolbar->enabled(resourceName, true);
+		toolbar->addImageButton(side, id, resourceName, buttonText, toolTip, nullptr, luaScript);		
 		
 		return 0;
 	}
@@ -831,6 +895,21 @@ extern "C" {
 		ToolBar *toolbar = ToolBar::getInstance(tag);
 		
 		toolbar->setLabelImage(id, resourceName, buttonText);
+		
+		return 0;
+	}
+	
+	static int enable_toolbar_button(lua_State *L)
+	{
+		bool value = lua_toboolean(L, -1);
+		std::string id(lua_tostring(L, -2));
+		const char *tag = lua_tostring(L, -3);
+		
+		lua_pop(L, 3);
+		
+		ToolBar *toolbar = ToolBar::getInstance(tag);
+		ToolBar::ToolButton *button = toolbar->getToolButton(id);
+		button->setEnabled(value);
 		
 		return 0;
 	}
@@ -990,6 +1069,8 @@ extern "C" {
 			
 		window->frame->setBackground(background);
 		
+		//window->setStyleSheet("background-color:" + QString::fromStdString(background) + ";");
+		
 		
 		return 0;
 	}
@@ -1106,22 +1187,50 @@ extern "C" {
 	
 	static int add_window_label(lua_State *L)
 	{	
-		const char *css = lua_tostring(L, -1);
-		const char *resourceName = lua_tostring(L, -2);
-		int h = lua_tonumber(L, -3);
-		int w = lua_tonumber(L, -4);
-		int y = lua_tonumber(L, -5);
-		int x = lua_tonumber(L, -6);				
-		std::string widgetTag(lua_tostring(L, -7));		
-		const char *windowTag = lua_tostring(L, -8); 
+		int h = lua_tonumber(L, -1);
+		int w = lua_tonumber(L, -2);
+		int y = lua_tonumber(L, -3);
+		int x = lua_tonumber(L, -4);				
+		std::string widgetTag(lua_tostring(L, -5));	
+		const char *pageTag = lua_tostring(L, -6);	
+		const char *windowTag = lua_tostring(L, -7);
+			
+		lua_pop(L, 7);
 		
-		lua_pop(L, 8);
 		
 		Window *window = Window::getInstance(windowTag);
+		Configure::ChoicePage *page = Configure::getPage(pageTag);
+
+		new Window::Text(page, window, widgetTag, x, y, w, h);
+		
+		return 0;
+	}
+	
+	static int set_text(lua_State *L)
+	{	
+		QString text(lua_tostring(L, -1));
+		std::string id(lua_tostring(L, -2));
+		const char *tag = lua_tostring(L, -3);
+		   
+		lua_pop(L, 3);
+		
+		
+		Window *window = Window::getInstance(tag);
+		 
+		
+		try
+		{
+			window->widgets.at(id);
+		}
+		catch (const std::out_of_range &e)
+		{
+			Luau::error(39, 2, id, window); 
+			return 0;
+		}
 		
 	
-		new Window::Label(window, widgetTag, x, y, w, h, std::string(resourceName));
-		
+		((Window::Text *)window->widgets[id])->set(text);
+				
 		return 0;
 	}
 	
@@ -1132,7 +1241,20 @@ extern "C" {
 		const char *tag = lua_tostring(L, -3); 
 		lua_pop(L, 3);
 		
+		
+		
 		Window *window = Window::getInstance(tag);
+		
+		try
+		{
+			window->widgets.at(id);
+		}
+		catch (const std::out_of_range &e)
+		{
+			Luau::error(39, 2, id, window); 
+			return 0;
+		}
+		
 	
 		((Window::Label *)window->widgets[id])->setText(text);
 				
@@ -1144,11 +1266,35 @@ extern "C" {
 		std::string id(lua_tostring(L, -1)); 
 		lua_pop(L, 1);
 		
-		//const char *text = ((Window::Frame *)Window::getInstance("artillery-window")->frame)->labels[id]->get().c_str();			
 		const char *text = "";
 		lua_pushstring(L, text);	
 				
 		return 1;
+	}
+	
+	static int set_label_options(lua_State *L)
+	{
+		QString alingment(lua_tostring(L, -1));
+		QString border(lua_tostring(L, -2));
+		std::string id(lua_tostring(L, -3));
+		const char *tag = lua_tostring(L, -4);
+		
+		lua_pop(L, 4);
+		
+		Window *window = Window::getInstance(tag);
+		((Window::Text *)window->widgets[id])->setOptions(alingment, border);
+		
+		return 0;		
+	}
+	
+	static int create_choicepage(lua_State *L)
+	{
+		std::string tag(lua_tostring(L, -1));	
+		lua_pop(L, 1);
+		
+		new Configure::ChoicePage(config, tag);
+		
+		return 0;		
 	}
 	
 	static int create_checkbox(lua_State *L)
@@ -1160,11 +1306,12 @@ extern "C" {
 		int w = lua_tonumber(L, -5);
 		int y = lua_tonumber(L, -6);
 		int x = lua_tonumber(L, -7);
-		const char *id = lua_tostring(L, -8); 
+		const char *id = lua_tostring(L, -8);
+		const char *tag = lua_tostring(L, -9); 
 		
-		lua_pop(L, 8);
+		lua_pop(L, 9);
 		
-		(void)new Window::CheckBox(id, (Window *)Window::getInstance("artillery-window"), x, y, w, h, text, script, css);
+		(void)new Window::CheckBox(id, (Window *)Window::getInstance(tag), x, y, w, h, text, script, css);
 		
 		return 0;
 	}
@@ -1188,10 +1335,54 @@ extern "C" {
 		QString title(lua_tostring(L, -2));
 		lua_pop(L, 2);
 		
-		QString text = Window::textInput(title, start);
+		QString text = Window::textInput(title, "Text value:", start);
 		lua_pushstring(L, text.toStdString().c_str());	
 				
 		return 1;
+	}
+	
+	static int create_combobox(lua_State *L)
+	{	
+		
+		int y = lua_tonumber(L, -1);
+		int x = lua_tonumber(L, -2);
+		QString placeholderText(lua_tostring(L, -3));				
+		std::string widgetTag(lua_tostring(L, -4));
+		const char *parentTag = lua_tostring(L, -5); 		
+		const char *windowTag = lua_tostring(L, -6);
+		
+		
+		lua_pop(L, 6);
+		
+		Window *window = Window::getInstance(windowTag);
+		QWidget *page = (QWidget *)Configure::getPage(parentTag);
+		
+		if (page == nullptr)
+			page = (QWidget *)window;
+	
+		Window::ChoiceBox *box = new Window::ChoiceBox(page, window, widgetTag, x, y);
+		
+		box->setPlaceholderText(placeholderText);
+		
+		return 0;
+	}
+	
+	
+	static int add_combobox(lua_State *L)
+	{
+		QString text(lua_tostring(L, -1));
+		QString data(lua_tostring(L, -2));
+		std::string id(lua_tostring(L, -3));		
+		const char *windowTag = lua_tostring(L, -4);
+		 
+		lua_pop(L, 4);
+		
+		Window *window = Window::getInstance(windowTag);
+		
+		((Window::ChoiceBox *)window->widgets[id])->add(text, data);
+		
+		
+		return 0;
 	}
 	
 	static int get_title(lua_State *L)
@@ -1463,13 +1654,21 @@ extern "C" {
 		return 0;
 	}
 	
+	static int get_nick(lua_State *L)
+	{
+		std::string text = "[" + Settings::myNick() + "] ";
+		
+		lua_pushstring(L, text.c_str());
+
+		return 1;
+	}
+	
 	static int log_print(lua_State *L)
 	{	
+		std::string text(lua_tostring(L, -1));
+		lua_pop(L, 1);	
 		
-		QString text(lua_tostring(L, -1));
-		lua_pop(L, 1);
-			
-		logWindow->textbox->appendHtml(text);
+		logWindow->textbox->appendHtml(QString::fromStdString(text));
 
 		return 0;
 	}
@@ -1521,7 +1720,7 @@ extern "C" {
 		{	
 			qint32 tableSize = 0;		
 			Counter::Table table = getTable(tableSize);
-			IO::server->writeData(table, tableSize, type);	
+			IO::server->writeData(table, tableSize, type);				
 		}
 		else
 			Luau::error(31, 1, id);
@@ -1555,6 +1754,8 @@ extern "C" {
 			
 		return 1;
 	}
+	
+	
 	
 	
 	
@@ -1652,7 +1853,7 @@ Counter::Table getTable(qint32 &size)
 
 
 
-
+/*
 void outTable(Counter::Table t)
 {
 	for (auto obj = t.begin(); obj != t.end(); ++obj)
@@ -1675,7 +1876,7 @@ void outTable(Counter::Table t)
 		);	
 	}
 }
-
+*/
 
 
 
@@ -1689,7 +1890,7 @@ void getEntries()
 
 	lua_pushnil(L);
 	
-	Luau::Popupentry e = {"", "", "", "", "", false};
+	Luau::Popupentry e = {"", "", "", "", "", "", false};
 	
 	while(lua_next(L, -2) != 0) 
 	{
@@ -1718,7 +1919,7 @@ void getEntries()
 						if (!e.entryname.empty())
 						{
 							entries.push_back(e);
-							e = {"", "", "", "", "", false};	
+							e = {"", "", "", "", "", "", false};	
 						}							
 						e.entryname = std::string(lua_tostring(L, -1));
 					}
@@ -1730,6 +1931,8 @@ void getEntries()
 						e.entryid = std::string(lua_tostring(L, -1));
 						
 				}
+				if (s == "menufield")
+					e.entryfield = std::string(lua_tostring(L, -1));
 				if (s == "menuactions")
 					e.entryactions = std::string(lua_tostring(L, -1));
 			}
@@ -1956,21 +2159,35 @@ void Luau::updateBottomZorder()
 }
 
 
-void Luau::doAction(const char *window, const char *id, const char *trait, const char *name, const char *actionId)
+Counter::Table Luau::findAllSides()
+{
+	lua_getglobal(L, "findallsides");
+	lua_pcall(L, 0, 1, 0);
+	
+	qint32 dummy;
+	Counter::Table table = getTable(dummy);
+	lua_pop(L, 1);
+	
+	return table;
+}
+
+
+void Luau::doAction(const char *window, const char *id, const char *trait, const char *field, const char *name, const char *actionId)
 {
 	
 	lua_getglobal(L, "action");
 	lua_pushstring(L, window);
 	lua_pushstring(L, id);
 	lua_pushstring(L, trait);
+	lua_pushstring(L, field);
 	lua_pushstring(L, name);
 	
 	if (actionId == nullptr)
-		lua_pcall(L, 4, 0, 0);
+		lua_pcall(L, 5, 0, 0);
 	else
 	{
 		lua_pushstring(L, actionId);
-		lua_pcall(L, 5, 0, 0);
+		lua_pcall(L, 6, 0, 0);
 	}
 	
 }
@@ -2183,6 +2400,35 @@ bool Luau::selectable(const char *id)
 }
 
 
+void Luau::feed(int x, int y)
+{
+	lua_getglobal(L, "feed");
+	lua_pushnumber(L, x);
+	lua_pushnumber(L, y);
+	lua_pcall(L, 2, 0, 0);	
+}
+
+
+bool Luau::isFeeding()
+{
+	lua_getglobal(L, "isFeeding");
+	lua_pcall(L, 0, 1, 0);
+	
+	int result = lua_toboolean (L, -1);
+	
+	lua_pop(L, 1);
+	
+	return (result != 0);
+}
+
+
+void Luau::stopFeed()
+{
+	lua_getglobal(L, "stopFeed");
+	lua_pcall(L, 0, 0, 0);
+}
+
+
 bool Luau::menu(const char *id, const char *name, const char *marker)
 {
 	lua_getglobal(L, "menu");
@@ -2213,15 +2459,13 @@ bool Luau::menucounter(int id)
 }
 
 
-void Luau::pointoffset(const char *tag, int x, int y, int dx, int dy, float &xoff, float &yoff, int &xopen, int &yopen, int &shown)
+void Luau::pointoffset(const char *tag, int cx, int cy, float &xoff, float &yoff, int &xopen, int &yopen, int &shown)
 {
 	lua_getglobal(L, "pointoffset");
 	lua_pushstring(L, tag);
-	lua_pushnumber(L, x);
-	lua_pushnumber(L, dx);
-	lua_pushnumber(L, y);
-	lua_pushnumber(L, dy);
-	lua_pcall(L, 5, 5, 0);
+	lua_pushnumber(L, cx);
+	lua_pushnumber(L, cy);
+	lua_pcall(L, 3, 5, 0);
 	
 	shown = (int)lua_tonumber (L, -1);
 	yopen = (int)lua_tonumber (L, -2);
@@ -2407,6 +2651,13 @@ void Luau::done()
 
 
 
+void Luau::stagedone()
+{
+	lua_getglobal(L, "stagedone");
+	lua_pcall(L, 0, 0, 0);
+}
+
+
 
 void Luau::loadDeck(Counter::Table table)
 {
@@ -2462,14 +2713,6 @@ void Luau::updateMoved(const char *id, bool moved)
 	lua_pushstring(L, id);
 	lua_pushboolean(L, (moved == true ? 1 : 0));
 	lua_pcall(L, 2, 0, 0);
-}
-
-
-void Luau::updateSide(const char *side)
-{
-	lua_getglobal(L, "updateSide");
-	lua_pushstring(L, side);
-	lua_pcall(L, 1, 0, 0);
 }
 
 
@@ -2608,6 +2851,9 @@ void Luau::startVM()
 	lua_pushcfunction(L, setGUI, "setGUI");
 	lua_setglobal(L, "setGUI");
 	
+	lua_pushcfunction(L, get_size, "get_size");
+	lua_setglobal(L, "get_size");
+	
 	// repository
 	
 	lua_pushcfunction(L, set_root, "set_root");
@@ -2654,6 +2900,12 @@ void Luau::startVM()
 	
 	lua_pushcfunction(L, set_row_length, "set_row_length");
 	lua_setglobal(L, "set_row_length");
+	
+	lua_pushcfunction(L, is_owner, "is_owner");
+	lua_setglobal(L, "is_owner");
+	
+	lua_pushcfunction(L, is_side, "is_side");
+	lua_setglobal(L, "is_side");
 	
 	// gui
 	
@@ -2713,6 +2965,9 @@ void Luau::startVM()
 	lua_pushcfunction(L, set_toolbar_button, "set_toolbar_button");
 	lua_setglobal(L, "set_toolbar_button");
 	
+	lua_pushcfunction(L, enable_toolbar_button, "enable_toolbar_button");
+	lua_setglobal(L, "enable_toolbar_button");
+	
 	lua_pushcfunction(L, add_toolbar_label, "add_toolbar_label");
 	lua_setglobal(L, "add_toolbar_label");
 	
@@ -2751,6 +3006,9 @@ void Luau::startVM()
 	lua_pushcfunction(L, add_window_image, "add_window_image");
 	lua_setglobal(L, "add_window_image");
 	
+	lua_pushcfunction(L, set_text, "set_text");
+	lua_setglobal(L, "set_text");
+	
 	lua_pushcfunction(L, add_window_label, "add_window_label");
 	lua_setglobal(L, "add_window_label");
 
@@ -2760,11 +3018,23 @@ void Luau::startVM()
 	lua_pushcfunction(L, get_label_text, "get_label_text");
 	lua_setglobal(L, "get_label_text");
 	
+	lua_pushcfunction(L, set_label_options, "set_label_options");
+	lua_setglobal(L, "set_label_options");
+	
+	lua_pushcfunction(L, create_choicepage, "create_choicepage");
+	lua_setglobal(L, "create_choicepage");
+	
 	lua_pushcfunction(L, create_checkbox, "create_checkbox");
 	lua_setglobal(L, "create_checkbox");
 	
 	lua_pushcfunction(L, get_checkbox_checked, "get_checkbox_checked");
 	lua_setglobal(L, "get_checkbox_checked");
+	
+	lua_pushcfunction(L, create_combobox, "create_combobox");
+	lua_setglobal(L, "create_combobox");
+	
+	lua_pushcfunction(L, add_combobox, "add_combobox");
+	lua_setglobal(L, "add_combobox");
 	
 	lua_pushcfunction(L, get_text_input, "get_text_input");
 	lua_setglobal(L, "get_text_input");
@@ -2829,6 +3099,9 @@ void Luau::startVM()
 	
 	// logging
 	
+	lua_pushcfunction(L, get_nick, "get_nick");
+	lua_setglobal(L, "get_nick");
+	
 	lua_pushcfunction(L, log_print, "log_print");
 	lua_setglobal(L, "log_print");
 	
@@ -2850,6 +3123,10 @@ void Luau::startVM()
 	
 	lua_pushcfunction(L, get_top_stack, "get_top_stack");
 	lua_setglobal(L, "get_top_stack");
+	
+	
+	
+	
 	
 
 	lua_getglobal(L, "module");

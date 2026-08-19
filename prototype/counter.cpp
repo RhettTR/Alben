@@ -24,6 +24,7 @@ int Counter::_bottomZorder = 0;
 
 
 map<int, Counter *> Counter::counters;
+//map<std::pair<int, int>, std::map<int, Counter *>> Counter::countersHash;
 map<string, Counter *> Counter::repository;
 map<string, Counter::SystemMask *> Counter::masks;
 
@@ -90,6 +91,7 @@ void Counter::QtCounter::showRightClickMenu(QtCounter *counter)
 	
 	
 	// check ownership and ability	
+	/*
 	if (counter->owner->getOwnershipField() != 0 && counter->owner->getOwnershipField() % IO::getKey() != 0)
 	{
 		Settings::OwnershipRights rights = counter->owner->getRights();
@@ -98,7 +100,7 @@ void Counter::QtCounter::showRightClickMenu(QtCounter *counter)
 			return;
 		
 	}
-
+	*/
 	
 	QMenu myMenu(counter);
 	QWidget widget;
@@ -122,6 +124,7 @@ void Counter::QtCounter::showRightClickMenu(QtCounter *counter)
 		ActionData data;
 		data.entryaction = QString(e.entryaction.c_str());
 		data.entrytrait = QString(e.entrytrait.c_str());
+		data.entryfield = QString(e.entryfield.c_str());
 		data.entryid = QString(e.entryid.c_str());
 		data.entryactions = QString(e.entryactions.c_str());
 		
@@ -145,20 +148,33 @@ void Counter::QtCounter::showRightClickMenu(QtCounter *counter)
 			{
 				
 				
-				// entries come as menuname, menuid, menuaction
+				// entries come as menuname, menuid, menuaction, side (optional)
 				
 				QStringList entry = item.split(',');
 				
 				entry[0] = entry[0].trimmed();
 				entry[1] = entry[1].trimmed();
 				entry[2] = entry[2].trimmed();
+				if (entry.size() == 4)
+					entry[3] = entry[3].trimmed();
 		
 				QAction* action = new QAction(entry[0], counter);
 			
 				ActionData actionData;
 				actionData.entryid = entry[1];
 				actionData.entryaction = entry[2];
+				actionData.entrytrait = data.entrytrait;
+				actionData.entryfield = data.entryfield;
 				
+				
+				// only show entries with side my side
+				// show no side entries for opposite side
+				if (entry.size() == 4)		
+					if (!Settings::isMySide(entry[3].toStdString()) || 
+					    !Settings::isMySide(repository[counter->owner->image]->side))
+						action->setVisible(false);
+						
+		
 			
 				QVariant v;
 				
@@ -185,7 +201,7 @@ void Counter::QtCounter::showRightClickMenu(QtCounter *counter)
 		
 
 			if (e.entrytest)
-				if (!Luau::doTest(counter->owner->state.tag.c_str(), e.entrytrait.c_str(), counter->owner->name.c_str())) 
+				if (!Luau::doTest(counter->owner->state.tag.c_str(), e.entryfield.c_str(), counter->owner->name.c_str())) 
 					action->setEnabled(false);
 	
 				
@@ -218,6 +234,7 @@ void Counter::QtCounter::do_activate (QAction *action)
 	
 	std::string entryaction = retrieved.entryaction.toStdString();
 	std::string entrytrait = retrieved.entrytrait.toStdString();
+	std::string entryfield = retrieved.entryfield.toStdString();
 	std::string entryid = retrieved.entryid.toStdString();
 	
 	const char *window = this->owner->state.tag.c_str();
@@ -277,7 +294,8 @@ void Counter::QtCounter::do_activate (QAction *action)
 				
 				Luau::doAction(obj->second->state.tag.c_str(), 
 							   obj->second->name.c_str(), 
-							   entrytrait.c_str(), 
+							   entrytrait.c_str(),
+							   entryfield.c_str(),  
 							   "actionPlace",
 							   entryid.c_str());				
 			else
@@ -285,6 +303,7 @@ void Counter::QtCounter::do_activate (QAction *action)
 				Luau::doAction(obj->second->state.tag.c_str(), 
 							   obj->second->name.c_str(), 
 							   entrytrait.c_str(), 
+							   entryfield.c_str(),
 							   entryaction.c_str());		
 		}
 		
@@ -305,7 +324,7 @@ void Counter::QtCounter::mousePressEvent (QMouseEvent * e)
 		return;
 	}
 	
-
+	
 		
 	if (e->button() == Qt::RightButton)
 	{
@@ -335,10 +354,47 @@ void Counter::QtCounter::mousePressEvent (QMouseEvent * e)
 		}
 		e->accept();
 	}
+	
 	else 	
 		e->ignore();
 		
 }
+
+
+
+void Counter::QtCounter::mouseReleaseEvent(QMouseEvent *e)
+{
+	if (Luau::isFeeding())
+	{
+		Luau::stopFeed();
+		return;
+	}
+}
+
+
+
+void Counter::QtCounter::mouseMoveEvent(QMouseEvent *e)
+{
+	Window *window = Window::getInstance(this->owner->state.tag.c_str());
+
+	if (window->tag == "main")
+	{	
+		popupPoint = e->position().toPoint();		
+		timer->start(1500);
+	}
+	
+	if (e->buttons() == Qt::LeftButton)
+	{
+		if (Luau::isFeeding())
+		{
+			QPoint pos = e->position().toPoint();
+			Luau::feed(pos.x(), pos.y());
+		}
+	}
+	
+	//e->ignore();	
+}
+
 
 
 void Counter::QtCounter::mouseDoubleClickEvent(QMouseEvent *e)
@@ -376,6 +432,9 @@ void Counter::QtCounter::hooverAction()
 		return;
 		
 	if (QApplication::keyboardModifiers() == Qt::ShiftModifier)
+		return;
+		
+	if (Luau::isFeeding())	
 		return;
 		
 
@@ -492,19 +551,6 @@ void Counter::QtCounter::hooverAction()
 
 
 
-void Counter::QtCounter::mouseMoveEvent (QMouseEvent * e)
-{
-	Window *window = Window::getInstance(this->owner->state.tag.c_str());
-
-	if (window->tag == "main")
-	{	
-		popupPoint = e->position().toPoint();		
-		timer->start(1500);
-	}
-}
-
-
-
 void Counter::QtCounter::leaveEvent (QEvent *e)
 {	
 	Window *window = Window::getInstance(this->owner->state.tag.c_str());
@@ -594,8 +640,7 @@ Counter::Counter(Table *state)
 	this->name = std::get<std::string>(std::get<Table>(std::get<Table>((*state)["Image"])["images"])[1]);
 	this->image = this->name;	
 	
-	Counter::repository[this->name] = this;
-	
+	Counter::repository[this->name] = this;	
 	this->state.x = 0;
 	this->state.y = 0;
 	this->state.cx = 0;
@@ -626,8 +671,9 @@ Counter::Counter(Table *state)
 	
 	
 	this->parentWindow = repositoryWindow;
+	this->side = std::get<std::string>(std::get<Table>((*state)["Side"])["side"]);
 	
-	
+
 	
 	Window::Pane *pane = repositoryWindow->getParent();
 	
@@ -655,7 +701,7 @@ Counter::Counter(Table *state)
 	this->doesNotStack = ((*state).find("DoesNotStack") != (*state).end());
 	this->disabled = false;
 	
-	this->_ownershipField = 0;	
+	//this->_ownershipField = 0;	
 	
 	
 	this->counter->show();
@@ -730,10 +776,15 @@ Counter::Counter(int id, Table *state)
 	else
 		this->state.opacity = 1.0;
 		
+	if ((*state).find("Side") != (*state).end())
+		this->side = std::get<std::string>(std::get<Table>((*state)["Side"])["side"]);
+	else
+		this->side = "none";
+		
 			
 
 	
-	
+	//Counter::countersHash[std::make_pair(this->state.cx, this->state.cy)][this->state.zorder] = this;
 	
 	this->table = *state;
 	
@@ -756,26 +807,6 @@ Counter::Counter(int id, Table *state)
 		this->hasShadow = true;
 		this->shadow = value;
 	}	
-	
-	
-	
-	this->_ownershipField = 0;
-	
-	if ((*state).find("Side") != (*state).end())
-	{
-		if (std::get<std::string>((*state)["Side"]) == Settings::playerSide)
-		{
-			// NOTE!! the factor 0xef06eea1 should not be a constant but generated and then discarded
-			this->_ownershipField = IO::getKey() * 0xef06eea1;
-			this->_ownershipRights = Settings::myOwnershipRights;
-		}
-		else
-		{
-			// default rights same as own
-			this->_ownershipRights = Settings::myOwnershipRights;
-		}
-	}
-	
 	
 	
 
@@ -947,13 +978,22 @@ Counter* Counter::findObj(const char *id)
 {
 	
 	string str(id);
-	int iid = std::stoi(str);
 	
 	
-	auto it = counters.find(iid); 
+	try 
+	{
+		int iid = std::stoi(str);
+		
+		auto it = counters.find(iid); 
+		
+		if (it != counters.end()) 
+			return it->second;
+			
+	} 
+	catch (std::invalid_argument const &e) {}
+	catch (std::out_of_range const &e) {}
 	
-	if (it != counters.end()) 
-		return it->second;
+	
 		
 		
 	auto st = repository.find(str); 
@@ -964,8 +1004,9 @@ Counter* Counter::findObj(const char *id)
 	
 		
 	// id not found; exit
-	Luau::error(33, 1, id);		
-	std::exit(1);
+	//Luau::error(33, 1, id);		
+	//std::exit(1);
+	return nullptr;
 	
 }
 
@@ -1408,7 +1449,7 @@ void Counter::setPos(int x, int y)
 		this->counter->move(x, y);
 }
 
-
+/*
 unsigned long long Counter::getOwnershipField()
 {
 	return this->_ownershipField;
@@ -1424,11 +1465,12 @@ Settings::OwnershipRights Counter::getRights()
 	return this->_ownershipRights;
 }
 
+
 void Counter::setRights(Settings::OwnershipRights rights)
 {
 	this->_ownershipRights = rights;
 }
-
+*/
 
 
 void Counter::setGUI(const char *tag)
@@ -1483,5 +1525,21 @@ void Counter::setGUI(const char *tag)
 }
 
 
-
-
+/*
+std::map<int, Counter *> Counter::childAt(int x, int y)
+{
+	
+	try
+    {
+        std::map<int, Counter *> pair = countersHash.at(std::make_pair(x, y));
+        return pair;
+    }
+    catch (const std::out_of_range &e)
+    {
+		std::map<int, Counter *> m;
+		m.clear();
+        return m;
+    }
+    
+}
+*/

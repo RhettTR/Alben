@@ -117,8 +117,6 @@ class IO
 		QSize getSize(std::string str);
 		bool isResource(std::string str);
 		
-		// getter for ownership key
-		static unsigned long long getKey();
 		
 		void saveTable(Counter::Table table);
 		QString saveGame(QString saveAs, QString saveTo, QString suffix);
@@ -127,7 +125,9 @@ class IO
 		void loadSetUp(std::string filename);
 		QString loadHtml(std::string filename);
 		
-		static std::string findSide();
+		void loadConfig();
+		static void saveConfig();
+		
 		static int intType;
 		static int stringType;
 		static int boolType;
@@ -154,7 +154,7 @@ class IO
 		
 		std::map<std::string, Resource> _resources;
 		
-		static unsigned long long _ownershipKey;	// holds a 32-bit prime number
+		
 		
 };
 

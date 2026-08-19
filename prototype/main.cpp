@@ -14,6 +14,7 @@
 #include "toolbar.h"
 #include "settings.h"
 #include "window.h"
+#include "configure.h"
 
 
 
@@ -31,6 +32,10 @@ class MainWindow;
 MainWindow *window;
 Window *repositoryWindow;
 Window *logWindow;
+Window *configWindow;
+Configure *config;
+Settings *settings;
+
 
 
 
@@ -72,10 +77,9 @@ void net ()
 	IO::netDialog->setVisible(!IO::netDialog->isVisible());
 }
 
-void settings () 
+void dosettings () 
 {
-	Settings *dialog = new Settings((QWidget *)window);
-	dialog->show();
+	settings->setVisible(!settings->isVisible());
 }
 
 void help ()
@@ -93,6 +97,18 @@ void cancel ()
 void close ()
 {
 	io->closeGame();
+}
+
+void configure(bool newgame)
+{
+	config->setNewGame(newgame);
+	configWindow->setVisible(!configWindow->isVisible());
+}
+
+void newgame()
+{
+	io->closeGame();
+	configure(true);
 }
 
 void load ()
@@ -242,6 +258,10 @@ int main(int argc, char *argv[])
     QMenu *fileMenu = menuBar->addMenu("&File");
          
     
+    QAction *newAction = new QAction("&New Game");
+    QObject::connect(newAction, &QAction::triggered, &newgame);
+    fileMenu->addAction(newAction);
+    
     QAction *loadAction = new QAction("&Load Game or Log...");
     QObject::connect(loadAction, &QAction::triggered, &load);
     fileMenu->addAction(loadAction);
@@ -250,9 +270,13 @@ int main(int argc, char *argv[])
     QObject::connect(saveAction, &QAction::triggered, &save);
     fileMenu->addAction(saveAction);
     
-    QAction *closeAction = new QAction("&Close Game");
+    QAction *closeAction = new QAction("Cl&ose Game");
     QObject::connect(closeAction, &QAction::triggered, &close);
     fileMenu->addAction(closeAction);
+    
+    QAction *configureAction = new QAction("&Configure...");
+    QObject::connect(configureAction, &QAction::triggered, []() { configure(false); });
+    fileMenu->addAction(configureAction);
     
     fileMenu->addSeparator();
     
@@ -291,8 +315,8 @@ int main(int argc, char *argv[])
     // Edit
     
     QMenu *editMenu = menuBar->addMenu("&Edit");
-    QAction *settingsAction = new QAction("Setti&ngs");
-    QObject::connect(settingsAction, &QAction::triggered, &settings);
+    QAction *settingsAction = new QAction("&Settings");
+    QObject::connect(settingsAction, &QAction::triggered, &dosettings);
     editMenu->addAction(settingsAction);
     
     // Windows
@@ -321,14 +345,17 @@ int main(int argc, char *argv[])
    
     
     
-    
     window->move(250, 150);
-	window->resize(1120, 500 + menuBar->height());
+	window->resize(1120, 650 + menuBar->height());
 	
 	
-	
+
 	// load resources
 	io = new IO();
+	
+	QIcon icon(QPixmap::fromImage(io->getImage("__icon")));
+	window->setWindowIcon(icon);
+	
 	
 	// scale resources
 	scaled = new Scale();
@@ -353,63 +380,82 @@ int main(int argc, char *argv[])
 	window->addToolBar(Qt::TopToolBarArea, mainToolBar);
 	
 	
-	mainToolBar->addImageButton("__undo", "__undo", "", "Undo last move", &undo);
-	mainToolBar->addImageButton("__redo", "__redo", "", "Redo next move", &redo);
+	mainToolBar->addImageButton("", "__undo", "__undo", "", "Undo last move", &undo);
+	mainToolBar->addImageButton("", "__redo", "__redo", "", "Redo next move", &redo);
 	mainToolBar->addSeparator();
-	mainToolBar->addImageButton("__forward", "__forward", "", "Logfile step forward", &step);
-	mainToolBar->addImageButton("__end", "__end", "", "Logfile go to end", &gotoEnd);
-	mainToolBar->addImageButton("__abort", "__abort", "", "Abort logfile", &abortLog);
+	mainToolBar->addImageButton("", "__forward", "__forward", "", "Logfile step forward", &step);
+	mainToolBar->addImageButton("", "__end", "__end", "", "Logfile go to end", &gotoEnd);
+	mainToolBar->addImageButton("", "__abort", "__abort", "", "Abort logfile", &abortLog);
 	mainToolBar->addLabel("__record", "__record", "Logfile recording", 24, 24, "");
 	mainToolBar->addSeparator();
-	mainToolBar->addImageButton("__pluss", "__pluss", "", "Zoom in", [=]()->void{ mainToolBar->zoomIn(); });	
+	mainToolBar->addImageButton("", "__pluss", "__pluss", "", "Zoom in", [=]()->void{ mainToolBar->zoomIn(); });	
 	mainToolBar->addSizeComboBox();	
-	mainToolBar->addImageButton("__minus", "__minus", "", "Zoom out", [=]()->void{ mainToolBar->zoomOut(); });	
+	mainToolBar->addImageButton("", "__minus", "__minus", "", "Zoom out", [=]()->void{ mainToolBar->zoomOut(); });	
 	mainToolBar->enabled("__pluss", true);
 	mainToolBar->enabled("__minus", true);
 	mainToolBar->addSeparator();
-	mainToolBar->addImageButton("__movedicon", "__movedicon", "", "Delete all moved-makers", &clearMoved);
+	mainToolBar->addImageButton("", "__movedicon", "__movedicon", "", "Delete all moved-makers", &clearMoved);
 	mainToolBar->enabled("__movedicon", true);
 	QWidget* spacer = new QWidget();
 	spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
 	mainToolBar->addWidget(spacer);
-	mainToolBar->addImageButton("connection", "__disconnected", "", "Connect to net", &net);
+	mainToolBar->addImageButton("", "connection", "__disconnected", "", "Connect to net", &net);
 	mainToolBar->enabled("connection", true);
 
-	
-	
-	// default rights table
-	
-	Settings::myOwnershipRights = {0b1, 0b1, 0b1, 0b1, 0b1, 0b1, 0b1, 0b0, 0b0};
 
-	
 	
 	
    
 	// create repository window
 	
-    repositoryWindow = new Window(window, "GT Repository", "Repository", "Layout", false, 550, 400);
+    repositoryWindow = new Window(window, "Repository", "Repository", "Layout", false, 550, 400);
     
     
     // create log / chat window
 	
-    logWindow = new Window(window, "GT Log / Chat", "LogChat", "Layout", false, 800, 250);
+    logWindow = new Window(window, "Log / Chat", "LogChat", "Layout", false, 800, 250);
     
-
-
+    // create configuration window
+   
+    config = new Configure(window); 
+	configWindow = config->window;
+	
+	// settings preferences
+	settings = new Settings((QWidget *)window);
     
+	io->loadConfig();	
+	settings->init();
+	
+	
     
     l.startVM();
+  
     
+    // luau is now running
     
     
     scaled->resourceScaleRotate("main", window->frame->backgroundID);
 	
     window->show();
+    
     if (repositoryWindow->isVisible())
 		repositoryWindow->show();
+		
 	if (logWindow->isVisible())
 		logWindow->show();
-    
+		
+	
+	
+	
+	// called only once (creates side selection boxes and side data (urids))	 
+	config->init();
+		
+	// does nothing if no load_setup call
+	config->load(); 
+	
+	//ToolBar::init();
+	
+   
       
     int res = app.exec();   
     

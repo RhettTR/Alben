@@ -1,6 +1,3 @@
---- set side
-
-PlayerSide = "German"
 
 
 -- set alpha transparency for counters
@@ -58,7 +55,8 @@ set_map_zoom('main', 0.1, 1.0)
 local function actionDelete (window, id)
 	if window ~= 'Repository' then
 		setNoAction(false)
-		reporttext('move', Counter[id].name  .. ' in <span style="color:DarkSlateGray;">' ..
+		reporttext('move', '<span style="color:DarkSlateGray;">' .. Counter[id].name  .. 
+						   '</span> in <span style="color:DarkSlateGray;">' ..
 						   Zones:getPlace(window, Counter[id].cx, Counter[id].cy) .. '</span> is deleted')
 		Counter:delete(id)
 		delete_class(id)
@@ -67,9 +65,10 @@ local function actionDelete (window, id)
 end
 
 local function actionFlip (window, id)
+
 	if window == 'Repository' then
-		local newname = Repository:flip(id)
-		set_counter_image(id, newname)
+		local newname = Repository:flip(id)	
+		set_counter_image(id, newname)	
 		return
 	else	
 		local name = Counter[id].Image.images[Counter[id].Image.imageIndex]
@@ -84,11 +83,14 @@ local function actionFlip (window, id)
 			if not aName then
 				reporttext('move', unit .. ' flipped')				
 			else			 						 
-				reporttext('move', unit .. ' flipped to <span style="color:DarkSlateGray;">' .. 
-					      aName .. '</span>')
+				reporttext('move', '<span style="color:DarkSlateGray;">' .. unit .. 
+						   '</span> flipped to <span style="color:DarkSlateGray;">' .. 
+					       aName .. '</span>' .. ' in <span style="color:DarkSlateGray;">' ..
+						   Zones:getPlace(window, Counter[id].cx, Counter[id].cy) .. '</span>')
 			end			
 		end	
 	end	
+	
 end
 
 local function actionToggle (window, id, trait)
@@ -164,10 +166,10 @@ local function actionSelect (window, id)
 end
 
 
-local function actionMove (window, id, cx, cy)
+local function actionMove (window, id, field, cx, cy)
 
-	
-	local move = Counter:findTrait(Counter[id], 'Move')
+
+	local move = Counter:findTrait(Counter[id], field, 'Move')
 	
 	if move == nil then
 		error(4, 'Move')
@@ -176,7 +178,15 @@ local function actionMove (window, id, cx, cy)
 		
 	
 	local zone = Zones:get(move.zone)
-	local point = zone:getGrid(move.point)		
+	local point
+	
+	if zone == nil then
+		point = move.point
+	else
+		point = zone:getGrid(move.point)
+	end
+		
+			
 	local dx, dy = get_corner(Counter[id].Image.images[1])
 	
 	if cx ~= nil and cy ~= nil then
@@ -198,17 +208,23 @@ local function actionMove (window, id, cx, cy)
 	
 	local zorder = top_zorder()
 	
-	
+		
 	
 	Counter:move(move.window, id, zorder, point.x - dx, point.y - dy, point.x,  point.y)				
 	
 	
 	update_class(Counter, id)
 	
-	
-	reporttext('move', Counter[id].name  .. ' moves to <span style="color:DarkSlateGray;">'
-						..  point.name .. '</span> in <span style="color:DarkSlateGray;">'
-						.. get_title(move.window) .. '</span>')
+	if zone == nil then
+		reporttext('move', '<span style="color:DarkSlateGray;">' .. Counter[id].name .. 
+						   '</span> moves to <span style="color:DarkSlateGray;">' ..
+						   get_title(move.window) .. '</span>')
+	else
+		reporttext('move', '<span style="color:DarkSlateGray;">' .. Counter[id].name .. 
+						   '</span> moves to <span style="color:DarkSlateGray;">' ..
+						   point.name .. '</span> in <span style="color:DarkSlateGray;">' ..
+						   zone.name .. '</span>')
+	end
 		 	 
 				
 end
@@ -232,7 +248,7 @@ local function actionMoveAll (window, id)
 		for k, v in pairs(Counter) do
 			if type(k) == "string" and k ~= '__index' and type(v) ~= 'function' and v.deleted == false then	
 				if zone:hasMember(Counter[k].Image.images[1]) then			
-					actionMove(window, k) 
+					actionMove(window, k, 'Move') 
 				end
 			end
 		end
@@ -258,10 +274,12 @@ local function actionRemoveMarkers (window, id)
 				if v.cx == cx and v.cy == cy then
 					local value = Counter:findTrait(v, 'marker')
 					if value ~= nil then
+						reporttext('move', 'A <span style="color:DarkSlateGray;">' .. Counter[k].name  .. 
+								   '</span> is deleted in <span style="color:DarkSlateGray;">' .. 
+								   Zones:getPlace(window, Counter[id].cx, Counter[id].cy) .. '</span>')
 						setNoAction(false)
 						Counter:delete(k)
-						delete_class(k)
-						
+						delete_class(k)						
 					end	
 				end
 			end
@@ -363,7 +381,6 @@ local function actionPlace (window, id, trait, actionid)
 	
 	local table = Repository[actionid]
 	
-
 	if table == nil then
 		return 
 	end
@@ -402,7 +419,12 @@ local function actionPlace (window, id, trait, actionid)
 				Counter[id].x, Counter[id].y, Counter[id].cx, Counter[id].cy)
 	
 	
-	State:addCreate(toId, 'Create')			
+	State:addCreate(toId, 'Create')
+	
+	
+	reporttext('move', '<span style="color:DarkSlateGray;">' .. Counter[toId].name  .. 
+			   '</span> is placed in <span style="color:DarkSlateGray;">' .. 
+			   Zones:getPlace(window, Counter[id].cx, Counter[id].cy) .. '</span>')			
 		
 		
 	-- has to be here for zorder			
@@ -412,6 +434,15 @@ local function actionPlace (window, id, trait, actionid)
 	
 end
 
+
+
+local function actionFacing (window, id)
+
+	-- set global, triggers feeding of points
+	
+	startFeed(id)
+
+end
 
 
 
@@ -438,7 +469,7 @@ end
 
 function ifAction()
 
-	if not NoAction then
+	if NoAction == false then
 		State:addStage()
 	end
 	
@@ -448,65 +479,49 @@ end
 
 
 
-function action(window, id, trait, action, actionid)
+function action(window, id, trait, field, action, actionid)
 
 	--print('doing '..action..' on '..id)
 	
 	
-	
 	if action == 'actionDelete' then
 		actionDelete(window, id)
-	end	
-	if action == 'actionFlip' then
-		actionFlip(window, id)
-	end	
-	if action == 'actionRotateCw' then
-		actionRotate(window, id, 1)
-	end	
-	if action == 'actionRotateCcw' then
-		actionRotate(window, id, -1)
-	end	
-	if action == 'actionMoved' then
-		actionMoved(window, id)
-	end
-	if action == 'actionToggle' then	
-		actionToggle(window, id, trait)
-	end
-	if action == 'actionClone' then
-		actionClone(window, id)
-	end 
-	if action == 'actionSelect' then
+	elseif action == 'actionSelect' then
 		actionSelect(window, id)
-	end
-	if action == 'actionMove' then
-		actionMove(window, id)
-	end
-	if action == 'actionMoveAll' then
+	elseif action == 'actionFlip' then
+		actionFlip(window, id)
+	elseif action == 'actionRotateCw' then
+		actionRotate(window, id, 1)
+	elseif action == 'actionRotateCcw' then
+		actionRotate(window, id, -1)
+	elseif action == 'actionMoved' then
+		actionMoved(window, id)
+	elseif action == 'actionToggle' then	
+		actionToggle(window, id, trait)
+	elseif action == 'actionClone' then
+		actionClone(window, id)
+	elseif action == 'actionMove' then
+		actionMove(window, id, field)
+	elseif action == 'actionMoveAll' then
 		actionMoveAll(window, id)
-	end
-	if action == 'actionRemoveMarkers' then
+	elseif action == 'actionRemoveMarkers' then
 		actionRemoveMarkers(window, id)
-	end
-	if action == 'actionReveal' then
+	elseif action == 'actionReveal' then
 		actionReveal(window, id)
-	end
-	if action == 'actionStepLoss' then
+	elseif action == 'actionStepLoss' then
 		actionStepLoss(window, id)
-	end
-	if action == 'actionInput' then
+	elseif action == 'actionInput' then
 		actionInput(window, id, trait)
-	end	
-	if action == 'actionInc' then
+	elseif action == 'actionInc' then
 		actionInc(window, id, trait)
-	end
-	if action == 'actionDraw' then
+	elseif action == 'actionDraw' then
 		actionDraw(window, id)
-	end		
-	if action == 'actionMoveStack' then
+	elseif action == 'actionMoveStack' then
 		actionMoveStack(window, id, trait)
-	end
-	if action == 'actionPlace' then
+	elseif action == 'actionPlace' then
 		actionPlace(window, id, trait, actionid)
+	elseif action == 'actionFacing' then
+		actionFacing (window, id) 
 	end
 	
   
@@ -634,31 +649,35 @@ end
 
 
 function logging(type, text)
-
-	State:addText(type, text)
-	log_print(text)
-
+	nick = get_nick()
+	log_print(nick .. text)
+	State:addText(type, nick .. text)
 end
 
 
 
-function doTest(window, trait, id, o)
-	
+function doTest(window, field, id, o)
+
 	for k, v in pairs(o) do
-		if type(k) == 'string' then	
-			if k == trait then			
-				if type(v) == 'table' then
+	
+		if type(v) == 'table' then
+			if v.menufield ~= nil then
+				if v.menufield == field then
 					if v.menushow ~= nil then
-						return v.menushow(window, id)
-					end
-				end
+						if type(v.menushow) == 'function' then
+							return v.menushow(window, id)
+						end	
+					end		
+				end			
 			end
 		end
+		
 		if type(v) == 'table' then
-			if doTest(window, trait, id, v) == true then
+			if doTest(window, field, id, v) == true then
 				return true
 			end 
 		end
+		
 	end	
 	
 	return false
@@ -666,10 +685,10 @@ function doTest(window, trait, id, o)
 end
 
 
-function tests(window, trait, id)
+function tests(window, field, id)
 	
 	local traits = getTraits(window, id)	
-	return doTest(window, trait, id, traits)	
+	return doTest(window, field, id, traits)	
 	
 end
 
@@ -697,10 +716,6 @@ local State = state()
 local Zone = zone()
 local Traits = traits()
 local Repository = repository()
-
-
-
-
 
 
 
@@ -896,35 +911,32 @@ end
 
 
 function updateid()
-
 	if net_connected() then
-	
 		local table = { trait = "updateid" }
 		send_table({table}, 1, 1)
-		
 	end
 end
 
 
 function updatetopzorder()
-
 	if net_connected() then
-	
 		local table = { trait = "updatetopzorder" }
 		send_table({table}, 1, 1)
-		
 	end
 end
 
 
 function updatebottomzorder()
-
-	if net_connected() then
-	
+	if net_connected() then	
 		local table = { trait = "updatebottomzorder" }
-		send_table({table}, 1, 1)
-		
+		send_table({table}, 1, 1)	
 	end
+end
+
+
+function findallsides()
+	sides = Side:findAllSides()
+	return sides
 end
 
 
@@ -976,9 +988,6 @@ end
 
 
 
-function updateSide(side)
-	PlayerSide = side
-end
 
 function saveStage()
 	State.savedPointer = State.stagePointer
@@ -1221,6 +1230,67 @@ function selectable(id)
 end
 
 
+function rotatable(id)
+	
+	return Counter:hasTrait(Counter[id], 'Rotate')
+	
+end
+
+
+
+-- cursor feed hook;  x,y are cursor mouse coordinates realative to widget
+
+function feed(x, y)
+
+	local id = _G['Rotated']
+	
+	if id == nil then
+		return
+	end		
+
+
+
+	local w, h = get_size(Counter[id].Image.images[1])
+
+	local degrees = math.deg( math.atan2( y - math.floor(h/2) , x - math.floor(w/2) ) )
+	
+	degrees = math.floor(degrees + 90)
+	
+	if degrees > 180 then
+		degrees = degrees - 360
+	elseif degrees < -180 then
+		degrees = degrees + 360
+	end
+	
+	
+	Counter[id].Rotate.degrees = degrees
+	rotate_counter(id, degrees)
+	
+end
+
+
+function startFeed(id)
+	_G['Rotated'] = id
+	reporttext('move', 'Started ajusting facing')
+end
+
+
+function isFeeding()
+	if _G['Rotated'] then
+		return true
+	end
+	return false
+end	
+
+
+function stopFeed()
+	_G['Rotated'] = nil
+	reporttext('move', 'Stopped ajusting facing')
+end
+
+
+
+
 function menu(id, name, marker)
 
 	-- returns whether menu entry shown or not .. false = not
@@ -1254,15 +1324,15 @@ function menucounter(id)
 end
 
 
-function pointoffset(window, x, dx, y, dy)
+function pointoffset(window, cx, cy)
 	
-	local zone = Zones:findZone(window, x + dx, y + dy)
-	
+	local zone = Zones:findZone(window, cx, cy)
+
 	if zone == nil then
 		return defaultOffset()
 	end
 	
-	local offset = zone:getOffset(x + dx, y + dy)
+	local offset = zone:getOffset(cx, cy)
 	local next = next
 	
 	if offset == nil or next(offset) == nil then

@@ -18,7 +18,6 @@
 
 
 
-class CentralFrame;
 class StackFrame;
 class StackOpen;
 class Window;
@@ -34,6 +33,7 @@ template <class... Fs> Overload(Fs...) -> Overload<Fs...>;
 struct ActionData {
 	QString entryaction;
 	QString entrytrait;
+	QString entryfield;
 	QString entryid;
 	QString entryactions;
 };
@@ -60,10 +60,12 @@ class Counter
 				
 			protected:
 				virtual void mousePressEvent (QMouseEvent *e);
+				virtual void mouseReleaseEvent (QMouseEvent *e);
 				virtual void mouseMoveEvent (QMouseEvent *e);
 				virtual void leaveEvent (QEvent *e);
 				virtual void mouseDoubleClickEvent (QMouseEvent *e);
 				virtual void paintEvent (QPaintEvent *e);
+				
 				
 			private:
 				void do_activate (QAction *action);
@@ -129,6 +131,7 @@ class Counter
 		
 		
 		Window *parentWindow;
+		std::string side;
 		
 		Counter::QtCounter *counter;
 		
@@ -170,12 +173,7 @@ class Counter
 		void setPos(int x, int y);
 		int findOffset(int size, std::string type);
 				
-		unsigned long long getOwnershipField();
-		void setOwnershipField(unsigned long long field);
-		
-		Settings::OwnershipRights getRights();	
-		void setRights(Settings::OwnershipRights rights);
-		
+
 		static void setGUI(const char *tag);
 		
 		int incrementDegrees(); 
@@ -205,6 +203,8 @@ class Counter
 				
 		static std::map<int, Counter *> counters;
 		
+		//static std::map<std::pair<int, int>, std::map<int, Counter *>> countersHash;
+		
 		static std::map<std::string, Counter *> repository;
 		
 		static std::map<std::string, Counter::SystemMask *> masks;
@@ -219,9 +219,7 @@ class Counter
 								// only its relative value to other counters in a stack
 								
 		static int _bottomZorder; // ensures counter always on bottom of stack
-								
-		unsigned long long _ownershipField;			// holds a 64-bit number
-		Settings::OwnershipRights _ownershipRights;	// bitfield of rights					
+													
 		
 		
 };

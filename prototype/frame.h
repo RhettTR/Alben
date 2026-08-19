@@ -149,6 +149,7 @@ class CentralFrame : public QFrame
 		
 		
 		
+		
 	private:
 		
 		std::map<Point, int> stackOpen;		// int is sign for offset

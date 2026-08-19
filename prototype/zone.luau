@@ -566,6 +566,10 @@ Zones.tags = {}
 
 
 function Zones:add(tag, o)
+	if Zones:is(tag) then
+		error(36, tag)
+		return
+	end
 	Zones.tags[tag] = o
 end
 
@@ -573,7 +577,7 @@ function Zones:get(tag)
 	if Zones.tags[tag] ~= nil then
 		return Zones.tags[tag]	
 	end
-	error(5, tag)
+	--error(5, tag)
 	return nil
 end
 

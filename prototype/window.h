@@ -9,6 +9,8 @@
 
 
 #include "counter.h"
+#include "toolbar.h"
+
 
 
 class CentralFrame;
@@ -58,6 +60,7 @@ class Window : public QMainWindow
 			protected:
 				virtual void resizeEvent(QResizeEvent* event);
 				virtual void wheelEvent(QWheelEvent *event);
+				virtual void showEvent(QShowEvent *event);
 			private:
 				void zoomFraction(float amount, bool set);
 				void wheelIn();
@@ -106,7 +109,7 @@ class Window : public QMainWindow
 				int w;
 				int h;
 							
-				void setText(QString text);	
+				void setText(QString text);
 				std::string get();
 				QImage backgroundImage;
 				std::string tag;
@@ -125,8 +128,7 @@ class Window : public QMainWindow
 					
 				int x;
 				int y;	
-				bool get();
-				CentralFrame *frame;	
+				bool get();	
 		};
 		
 		
@@ -148,6 +150,43 @@ class Window : public QMainWindow
 		};
 		
 		
+		class ChoiceBox : public QComboBox
+		{
+			public:
+				ChoiceBox(QWidget *parent, Window *window, std::string tag, int x, int y);
+				
+				int x;
+				int y;
+				std::string tag;
+				Window *window;
+				void active(int index);
+				void add(QString text, QString data);
+				
+		};
+		
+		
+		
+		
+		
+		class Text : public QLabel
+		{
+			public:
+				Text(QWidget *parent, Window *window, std::string tag, int x, int y, int w, int h);
+					
+				int x;
+				int y;
+				int w;
+				int h;
+							
+				void set(QString text);
+				void setOptions(QString alingment, QString border);	
+				std::string tag;
+				QWidget *parent;
+				Window *window;
+				
+		};
+		
+		
 		
 		
 		
@@ -163,7 +202,6 @@ class Window : public QMainWindow
 		
 		
 		void addAWidget(std::string key,  QWidget *value);
-		static Window *instance;
 		QWidget *container;
 		void setWidgets();
 		void setOptions(QString font, int fontSize, std::string weight, std::string color);
@@ -176,7 +214,7 @@ class Window : public QMainWindow
 		
 		static Window *getInstance(const char *instance);
 		static void rollDie();
-		static QString textInput(QString title, QString start);
+		static QString textInput(QString title, QString caption, QString start);
 		void deleteWidgets();
 		void showWindow();
 		void setSingleRowed(int x, int y, int w, int h);
@@ -223,20 +261,21 @@ class Window : public QMainWindow
 		
 		static PlainTextEdit *textbox;
 		static LineEdit *edit;
+		static ToolBar *bar;
 		
 		
 	protected:
 		
 		virtual void resizeEvent(QResizeEvent* event);	
 		
-			
+				
 		
 	
 	private:
 	
 		static std::map<std::string, Window *> instances;
 		std::stack<std::any> panes;
-	
+		
 		
 		
 };

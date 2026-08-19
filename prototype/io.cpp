@@ -8,6 +8,7 @@
 #include "io.h"
 #include "scale.h"
 #include "luau.h"
+#include "configure.h"
 #include "settings.h"
 #include "toolbar.h"
 #include "overlay.h"
@@ -16,6 +17,8 @@
 
 extern IO *io;
 extern ToolBar *mainToolBar;
+extern Configure *config;
+extern Settings *settings;
 
 
 using namespace std;
@@ -25,7 +28,6 @@ using namespace std::filesystem;
 std::fstream IO::fs;
 
  
-unsigned long long IO::_ownershipKey;
 bool IO::stepping;
 bool IO::recording;
 IO::ConnectDialog *IO::netDialog;
@@ -145,7 +147,6 @@ IO::Net::Net(QObject *parent) : QObject(parent)
 {
 	server = new QTcpServer(this);
 	socket = new QTcpSocket(this);
-	//socket->open(QIODeviceBase::ReadWrite);
 	
 	QObject::connect(socket, &QTcpSocket::connected, this, [=]() { onConnected(); });
 	QObject::connect(socket, &QTcpSocket::errorOccurred, this, [=]() { onError(); });
@@ -154,7 +155,7 @@ IO::Net::Net(QObject *parent) : QObject(parent)
 	
 	
 
-	buffsize = 4*1024;
+	buffsize = 8*1024;
     
 	// sets internal socket buffersize	
     socket->setReadBufferSize(buffsize);
@@ -523,76 +524,90 @@ void IO::Net::onReadyRead()
 	
 	
 	// table size is first 4 bytes (qint32)
-	// type (1=update 2=sync) is last 4 bytes (qint32)
+	// type (1=update 2=sync 3=stage sync) is last 4 bytes (qint32)
+	// table keys last 4 bytes
 	
-	QByteArray buffer = socket->peek(8);
 	
-	if (buffer.size() < 8)
+	
+	while (socket->bytesAvailable() > 0)	
 	{
-		printf("error\n");
-		return;
-	}
 	
 	
+		char data[3 * sizeof(qint32)];
 		
-	qint32 tableSize = qFromBigEndian<quint32>((uchar*)buffer.first(4).data());
-	qint32 type = qFromBigEndian<quint32>((uchar*)buffer.last(4).data());
-	
-	
-	
-	
-	// 12 extra bytes for tableSize, type and keys
-	
-	if (socket->bytesAvailable() < tableSize + 12)
-	{
-		bool res = this->socket->waitForReadyRead(5000);
-		if (res == false)
-		{
-			Luau::error(35, 1, 5000);
-			return; 
-		}
-	}	
-	
-	
-	
-	
+		qint64 result = socket->peek((char *)data, 3 * sizeof(qint32));
+		
+		
 
-	if (type == 1)
-	{
-		
-		while (socket->bytesAvailable() > 0)	
+		if (result < 12) 
 		{
+			bool res = this->socket->waitForReadyRead(5000);
+			if (res == false)
+			{
+				Luau::error(35, 1, 5000);
+				return; 
+			}
+		}
+		
+		
+		
+		qint32 tableSize = qFromBigEndian<quint32>(&data[0]);
+		qint32 type = qFromBigEndian<quint32>(&data[4]);
+		qint32 keys = qFromBigEndian<quint32>(&data[8]);;
+		
+		
+		
+		
+
+		if (type == 1)
+		{
+			
 			stream >> tableSize;	
 
 			stream >> type;
 				
-			qint32 keys;
 			stream >> keys;
 
 			Counter::Table table = readTable(keys);			
-			Luau::updateCounter(table);				
+			Luau::updateCounter(table);	
+			
 		}
+			
 		
+		if (type == 2)
+		{
+			stream >> tableSize;	
+			
+			stream >> type;
+			
+			stream >> keys;
+		
+			Counter::Table table = readTable(keys);
+			Luau::loadCounter(table);
+			
+			Luau::done();
+		}
+			
+			
+		if (type == 3)
+		{
+			stream >> tableSize;	
+			
+			stream >> type;
+			
+			stream >> keys;
+			
+	
+
+			Counter::Table table = readTable(keys);
+			Luau::updateCounter(table);
+		
+			Luau::stagedone();
+		}
+	
 	}
 		
-	
-	if (type == 2)
-	{
-		stream >> tableSize;	
 		
-		stream >> type;
-		
-		qint32 keys;
-		stream >> keys;
-
-		Counter::Table table = readTable(keys);
-		Luau::loadCounter(table);
-		Luau::done();
-	}
-		
-	
-
-   
 }
 
 
@@ -653,6 +668,7 @@ void IO::closeGame()
 	
 	ToolBar::getInstance("main")->enabled("__forward", false);
 	ToolBar::getInstance("main")->enabled("__end", false);
+	
 }
 	
 	
@@ -660,6 +676,8 @@ IO::LoadGame::LoadGame(std::string fileName)
 {	
 	
 	bool logfile = false;
+	
+	Configure::urids.clear();
 	
 	
 	try
@@ -693,7 +711,22 @@ IO::LoadGame::LoadGame(std::string fileName)
 					
 					Luau::setTurn(turn);
 				}
+				
+				
+				if (key == "side")
+				{
+		
+					Configure::Entry entry; 
 					
+					std::getline(fs, entry.side, '\0');
+			
+					fs.read(reinterpret_cast<char*>(&entry.urid), sizeof entry.urid);
+					
+					fs.read(reinterpret_cast<char*>(&entry.ownershipRights), sizeof entry.ownershipRights);
+							
+					Configure::urids.push_back(entry);
+					
+				}	
 				
 					
 				if (key == "counter")
@@ -702,31 +735,16 @@ IO::LoadGame::LoadGame(std::string fileName)
 					// read number of keys in this table
 					std::size_t size; 
 					
-					fs.read(reinterpret_cast<char*>(&size), sizeof size);
-				
-					// read ownershipField
-					unsigned long long f;
-					
-					fs.read(reinterpret_cast<char*>(&f), sizeof f);
-					
-					// read rights
-					Settings::OwnershipRights r;
-					
-					fs.read(reinterpret_cast<char*>(&r), sizeof r); 
-					
+					fs.read(reinterpret_cast<char*>(&size), sizeof size);					
 					
 					if (size > 0)
 					{	
 					
 						// read table
 						Counter::Table table = loadTable(size);
-					
-					
-						int id = Luau::loadCounter(table);
-					
-						Counter::counters[id]->setOwnershipField(f);				
-						Counter::counters[id]->setRights(r);
 						
+						(void)Luau::loadCounter(table);
+							
 					}
 						
 				}
@@ -762,12 +780,6 @@ IO::LoadGame::LoadGame(std::string fileName)
 			
 	
 			
-			if (Settings::playerSide == "")
-			{
-				Settings::playerSide = findSide();
-				Luau::updateSide(Settings::playerSide.c_str());
-			}
-			
 			
 			if (logfile)
 			{
@@ -792,6 +804,7 @@ IO::LoadGame::LoadGame(std::string fileName)
 	}
 
 }
+
 
 
 
@@ -897,9 +910,14 @@ void IO::loadGame()
 													"Load Files (*.gsav *.glog);;All Files(*.*)");
 	
 	
+	// test if fileName is a gametop saved file
+	
 	if (!fileName.isNull())
 	{
-		closeGame();		
+		closeGame();
+		
+		// horrible bug, must be here
+		Luau::resetBase();			
 	
 		LoadGame *load = new LoadGame(fileName.toStdString());	
 		delete load;
@@ -908,6 +926,12 @@ void IO::loadGame()
 		Counter::resetZorder();
 		
 		Counter::setGUI("all");
+		
+		
+		config->load(); 
+		
+		
+		ToolBar::init();
 		
 	}
 	
@@ -924,6 +948,11 @@ void IO::loadSetUp(string filename)
 
 	
 	string completeFileName = "./setups/" + base.toStdString() + ".gsav";
+
+
+	// horrible bug, must be here
+	Luau::resetBase();	
+	
 	
 	LoadGame *load = new LoadGame(completeFileName);	
 	delete load;
@@ -932,6 +961,8 @@ void IO::loadSetUp(string filename)
 	Counter::resetZorder();
 	
 	Counter::setGUI("all");
+	
+	ToolBar::init();
 	
 }
 
@@ -1005,13 +1036,7 @@ IO::IO()
 	IO::stepping = false;
 	IO::recording = false;
 	
-	
-	// NOTE!! _ownershipKey must be loaded from a user profile, not set like this
-	
-	_ownershipKey = 0xc2158b49;		// 32-bit prime
-									// openssl prime -generate -bits 32 -hex
-									
-	//_ownershipKey = 0xddb49da1;
+
 	
 	IO::intType = 1;
 	IO::stringType = 2;
@@ -1069,39 +1094,6 @@ bool IO::isResource(string str)
 }
 
 
-unsigned long long IO::getKey()
-{
-	return _ownershipKey;
-}
-
-
-std::string IO::findSide()
-{
-	
-	std::string side = "";
-	
-	for (auto obj = Counter::counters.begin(); obj != Counter::counters.end(); ++obj)
-	{
-		Counter *counter = obj->second;
-		Counter::Table table = obj->second->table;
-		
-		if (table.find("Side") != table.end())
-		{
-			unsigned long long field = counter->getOwnershipField();
-			
-			if (field != 0)
-				if (field % getKey() == 0)
-				{
-					side = std::get<std::string>(table["Side"]);
-					return side;
-				}
-		}
-		
-	}
-	
-	return side;
-	
-}
 
 //QSvgRenderer
 //QSvgWidget
@@ -1320,7 +1312,6 @@ QString IO::saveGame(QString saveAs, QString saveTo, QString suffix)
 										 
 	dialog.setDefaultSuffix(suffix);
 	dialog.setAcceptMode(QFileDialog::AcceptSave);
-	//dialog.setFileMode():
 										 
 	QStringList fileNames;
 	
@@ -1356,8 +1347,33 @@ QString IO::saveGame(QString saveAs, QString saveTo, QString suffix)
 		
 		fs.write(reinterpret_cast<const char*>(&turn.turn), sizeof turn.turn);
 		fs.write(reinterpret_cast<const char*>(&turn.phase), sizeof turn.phase);
-	      
+	     
 		
+		
+		// save sides
+		
+		
+		
+		// (these fields must later be encrypted)		
+		for (const Configure::Entry &entry : Configure::urids) 
+		{
+		
+			key = "side";
+			fs.write(key.c_str(), key.size() + 1);
+		
+			
+			fs.write(entry.side.c_str(), entry.side.size() + 1);
+			fs.write(reinterpret_cast<const char*>(&entry.urid), sizeof entry.urid);
+			
+			Settings::OwnershipRights r;
+			
+			if (entry.side == Settings::mySide())
+				r = Settings::myOwnershipRights;			
+			else
+				r = entry.ownershipRights;
+			
+			fs.write(reinterpret_cast<const char*>(&r), sizeof r);
+		}
 		
 		
 		
@@ -1383,26 +1399,7 @@ QString IO::saveGame(QString saveAs, QString saveTo, QString suffix)
 				// save top level table size
 				std::size_t s = table.size();
 				fs.write(reinterpret_cast<const char*>(&s), sizeof s);
-				
-				// save the ownershipField
-				unsigned long long f = counter->getOwnershipField();
-				Settings::OwnershipRights r = Settings::myOwnershipRights;
-				
-				// case where opponent has dragged your conter on board
-				// set your OwnershipField and rights
-				if (f == 0)
-					if (table.find("Side") != table.end())
-						if (std::get<std::string>(table["Side"]) == Settings::playerSide)
-						{
-							counter->setOwnershipField(IO::getKey() * 0xef06eea1);
-							f = counter->getOwnershipField();						
-						}
-				fs.write(reinterpret_cast<const char*>(&f), sizeof f);
-				
-				// save rights			
-				fs.write(reinterpret_cast<const char*>(&r), sizeof r); 
-				
-				
+			
 				saveTable(table);
 			}						
 				
@@ -1459,5 +1456,98 @@ void IO::saveLog(QString file)
 	}
 	
 	fs.close();
+	
+}
+
+
+
+void IO::loadConfig()
+{
+	
+	// make default config path and file name
+	
+	QDir home = QDir(QDir::home());
+	
+	QString name = home.absolutePath() + "/.gametop/config.txt";
+	QString normalizedName = QDir::cleanPath(name);
+	QString configFile = QDir::toNativeSeparators(normalizedName);
+	
+	
+	try
+	{
+		fs.exceptions(std::ios_base::badbit);
+				
+		fs.open(configFile.toStdString(), ios::in);
+	
+		if (!fs.is_open()) 
+		{
+			// no config file exists; make one
+			
+			std::filesystem::path path{configFile.toStdString()};
+			std::filesystem::create_directories(path.parent_path());
+			
+			saveConfig();
+			
+			return;
+		}
+		
+		
+		// a config file exists
+		
+		std::string input;
+			
+		while (fs)
+		{				
+			if (std::getline(fs, input, '\n'))
+			{
+				
+				if (input.rfind("NICK=", 0) == 0)
+					settings->nickbox->setText(QString::fromStdString(input.substr(strlen("NICK="))));
+					
+				if (input.rfind("USERKEYFILE=", 0) == 0)
+					settings->userkeybox->setText(QString::fromStdString(input.substr(strlen("USERKEYFILE="))));
+					
+				if (input.rfind("URIDFILE=", 0) == 0)
+					settings->uridbox->setText(QString::fromStdString(input.substr(strlen("URIDFILE="))));
+					
+				if (input.rfind("OWNERSHIPRIGHTS=", 0) == 0)
+					settings->setRightsBox(input.substr(strlen("OWNERSHIPRIGHTS=")));	
+				
+			}
+		}	
+		
+		fs.close();
+		
+		
+			
+	}
+	catch (const ifstream::failure& e)
+	{
+		std::cout << e.what() << std::endl;
+	}
+	
+}
+
+
+void IO::saveConfig()
+{
+	
+	QDir home = QDir(QDir::home());
+	
+	QString name = home.absolutePath() + "/.gametop/config.txt";
+	QString normalizedName = QDir::cleanPath(name);
+	QString configFile = QDir::toNativeSeparators(normalizedName);
+	
+	std::ofstream fileStream(configFile.toStdString());
+	
+	
+	if (fileStream.is_open())
+	{
+		fileStream << "NICK=" <<  settings->nickbox->text().toStdString() << "\n";
+		fileStream << "USERKEYFILE=" << settings->userkeybox->text().toStdString() << "\n";
+		fileStream << "URIDFILE=" << settings->uridbox->text().toStdString() << "\n";
+		fileStream << "OWNERSHIPRIGHTS=" << settings->streamRightsBox() << "\n";
+		fileStream.close();
+	}
 	
 }
