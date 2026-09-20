@@ -1420,7 +1420,7 @@ void CentralFrame::wheelEvent(QWheelEvent *event)
 		}
 	}
 	else 
-	if (this->window->tag != "LogChat" && this->window->tag != "config")
+	if (this->window->tag != "LogChat" && this->window->tag != "config" && this->window->tag != "Script")
 	{
 		if (amount > 0)	
 			this->scaleFraction = this->scaleFraction + 0.05;
@@ -1444,7 +1444,8 @@ void CentralFrame::paintEvent(QPaintEvent *event)
 		return;		// layout does rendering
 		
 	if (this->window->tag == "LogChat")
-		return;		// chat does not need frame painting	
+		return;		// chat does not need frame painting
+		
 	
 		
 	if (!CentralFrame::allowPainting)
