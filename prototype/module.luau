@@ -796,6 +796,10 @@ function refresh()
 	Counter:refresh()
 end
 
+function refreshGUI()
+	refresh_gui()
+end
+
 
 
 local k

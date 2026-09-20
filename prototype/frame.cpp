@@ -1569,9 +1569,9 @@ void CentralFrame::paintEvent(QPaintEvent *event)
 				if (!border.empty())
 				{	
 					// show grid (zone) border
-					for (int i = 0; i < border.size(); i++ )	
+					for (long long unsigned int i = 0; i < border.size(); i++ )	
 					{
-						int j = i + 1;
+						long long unsigned int j = i + 1;
 						if (j == border.size())
 							j = 0;
 							

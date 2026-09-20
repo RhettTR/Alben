@@ -33,6 +33,7 @@ MainWindow *window;
 Window *repositoryWindow;
 Window *logWindow;
 Window *configWindow;
+Window *scriptWindow;
 Configure *config;
 Settings *settings;
 
@@ -226,6 +227,12 @@ void reload ()
 }
 
 
+void script ()
+{
+	scriptWindow->setVisible(!scriptWindow->isVisible());
+}
+
+
 
 
 
@@ -289,7 +296,19 @@ int main(int argc, char *argv[])
     endLogAction->setEnabled(false);
     fileMenu->addAction(endLogAction);
     
-    fileMenu->addSeparator();         
+    fileMenu->addSeparator(); 
+    
+    QAction *undoAction = new QAction("Undo");
+    undoAction->setShortcut(QKeySequence("Ctrl+Z"));
+    QObject::connect(undoAction, &QAction::triggered, &undo);
+    fileMenu->addAction(undoAction);
+    
+    QAction *redoAction = new QAction("Redo");
+    redoAction->setShortcut(QKeySequence("Ctrl+Y"));
+    QObject::connect(redoAction, &QAction::triggered, &redo);
+    fileMenu->addAction(redoAction); 
+    
+    fileMenu->addSeparator();           
          
     QAction *reloadAction = new QAction("Reload");
     reloadAction->setShortcut(QKeySequence("Ctrl+R"));
@@ -301,15 +320,11 @@ int main(int argc, char *argv[])
     QObject::connect(refreshAction, &QAction::triggered, &refresh);
     fileMenu->addAction(refreshAction);
     
-    reloadAction = new QAction("Undo");
-    reloadAction->setShortcut(QKeySequence("Ctrl+Z"));
-    QObject::connect(reloadAction, &QAction::triggered, &undo);
-    fileMenu->addAction(reloadAction);
+    QAction *scriptAction = new QAction("Run script...");
+    QObject::connect(scriptAction, &QAction::triggered, &script);
+    fileMenu->addAction(scriptAction);
     
-    reloadAction = new QAction("Redo");
-    reloadAction->setShortcut(QKeySequence("Ctrl+Y"));
-    QObject::connect(reloadAction, &QAction::triggered, &redo);
-    fileMenu->addAction(reloadAction);
+
     
     
     // Edit
@@ -425,6 +440,9 @@ int main(int argc, char *argv[])
     
 	io->loadConfig();	
 	settings->init();
+	
+	// window for running script
+	scriptWindow = new Window(window, "Run Script", "Script", "Layout", true, 500, 700);
 	
 	
     

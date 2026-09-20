@@ -16,6 +16,8 @@ std::string Window::rootTag;
 Window::PlainTextEdit *Window::textbox;
 Window::LineEdit *Window::edit;
 ToolBar *Window::bar;
+QPlainTextEdit *Window::editarea;
+QPushButton *Window::runbutton;
 		
 
 Window *getInstance(const char *instance);
@@ -73,7 +75,8 @@ void Window::LineEdit::keyPressEvent(QKeyEvent *e)
 
 
 
-Window::Window(QWidget *parent, QString title, std::string tag, std::string type, bool anyScroll, int w, int h) : QMainWindow(parent)
+Window::Window(QWidget *parent, QString title, std::string tag, std::string type, bool anyScroll, int w, int h) : 
+					QMainWindow(parent), info(QFont("Sans Serif", 12, QFont::Normal))
 {
 	
 	this->setWindowTitle(title);
@@ -82,7 +85,6 @@ Window::Window(QWidget *parent, QString title, std::string tag, std::string type
     instances[tag] = this;
     
     this->tag = tag;
-    this->font = "Sans Serif";
     this->fontSize = 12;
     this->weight = QFont::Normal;
     this->color = "#ffffff";
@@ -174,6 +176,50 @@ Window::Window(QWidget *parent, QString title, std::string tag, std::string type
 
 	}
 	else
+	if (tag == "Script")
+	{
+		
+		this->scrollArea = nullptr;
+		this->container = nullptr;
+		
+		this->frame = new CentralFrame(parent, this, type);
+		setCentralWidget(this->frame);
+		
+		this->frame->layout()->setSpacing(5);
+		this->frame->layout()->setContentsMargins(7, 7, 7, 7);
+		
+		QString style = "font: normal normal normal 15px/1.4 Arial; color: black;";
+		editarea = new QPlainTextEdit(this);
+		editarea->setStyleSheet(style);
+		editarea->setPlainText("show_grid(true)\nrefreshGUI()");
+				
+		this->frame->layout()->addWidget(editarea);
+		
+		
+		QHBoxLayout *bottons = new QHBoxLayout();
+				
+		runbutton = new QPushButton("Clear");
+		runbutton->setMaximumWidth(100);
+		QObject::connect(runbutton, &QPushButton::released, [=]()->void{ editarea->clear(); });
+		bottons->addWidget(runbutton);
+		
+		bottons->addStretch();
+		
+		runbutton = new QPushButton("Run");
+		runbutton->setMaximumWidth(100);
+		QObject::connect(runbutton, &QPushButton::released,
+						 [=]()->void{ Luau::callbackScript(editarea->toPlainText().toStdString()); });
+		bottons->addWidget(runbutton);
+		
+		
+		((QVBoxLayout *)this->frame->layout())->addLayout(bottons);
+		
+		this->resize(w, h);
+		  
+		this->frame->backgroundColor = "white";
+		
+	}
+	else
 	{
 		
 		if (anyScroll)
@@ -260,18 +306,18 @@ void Window::showWindow()
 
 void Window::setOptions(QString font, int fontSize, std::string weight, std::string color)
 { 
-	QFontDatabase database; 
+
 	
-	QStringList families = database.families();
+	QFontDatabase database;
+	this->info = QFontInfo(QFont(font));
 	
-	
-	if (!families.contains(font))
+	if (!database.families().contains(this->info.family()))
 	{
 		Luau::error(9, 1, font.toStdString().c_str());
 		std::exit(1);
-	}
-	else
-		this->font = font;
+	}			
+		
+
 	
 	this->fontSize = fontSize;
 	
@@ -477,6 +523,11 @@ void Window::resizeEvent(QResizeEvent* event)
 	
 	if (this->tag == "LogChat")
 		textbox->resize(this->width(), this->height() - this->bar->height() - edit->height());
+		
+	if (this->tag == "Script")
+		editarea->resize(this->width() - 2*this->frame->layout()->contentsMargins().left(), 
+						 this->height() - 2*this->frame->layout()->contentsMargins().top() - 
+						 this->runbutton->height() - this->frame->layout()->spacing() );	
 	
 	event->accept();
 	
@@ -527,7 +578,7 @@ void Window::Label::setText(QString text)
 	
 	paint->setRenderHint(QPainter::TextAntialiasing);
 	
-	paint->setFont(QFont(this->parent->font, this->parent->fontSize, this->parent->weight));
+	paint->setFont(QFont(this->parent->info.family(), this->parent->fontSize, this->parent->weight));
 	paint->setPen(QPen(QColor(this->parent->color)));
 	
 	paint->drawText(0, 0, this->w, this->h, Qt::AlignCenter, text);
@@ -613,8 +664,10 @@ void Window::PushButton::mousePressEvent (QMouseEvent * event)
 
 
 Window::ChoiceBox::ChoiceBox(QWidget *parent, Window *window, std::string tag, int x, int y) : 
-			QComboBox(parent), window(window), tag(tag), x(x), y(y)
+			QComboBox(parent), x(x), y(y)
 {
+	this->window = window;
+	this->tag = tag;
 	
 	window->addAWidget(tag, this);
 	
@@ -726,7 +779,7 @@ void Window::Text::setOptions(QString alingment, QString border)
 void Window::Text::set(QString text)
 {
 	
-	this->setFont(QFont(this->window->font, this->window->fontSize, this->window->weight));
+	this->setFont(QFont(this->window->info.family(), this->window->fontSize, this->window->weight));
 	this->setText(text);
 	this->window->setWidgets();
 	
@@ -1437,8 +1490,8 @@ QString Window::textInput(QString title, QString caption, QString start)
                                          start, &ok);
     if (ok)
         return text;
-	
-	return start;
+	else
+		return start;
 	
 }
 

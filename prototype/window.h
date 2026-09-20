@@ -205,7 +205,7 @@ class Window : public QMainWindow
 		QWidget *container;
 		void setWidgets();
 		void setOptions(QString font, int fontSize, std::string weight, std::string color);
-		QString font;
+		QFontInfo info;
 		int fontSize;
 		enum QFont::Weight weight;
 		QColor color;
@@ -262,6 +262,8 @@ class Window : public QMainWindow
 		static PlainTextEdit *textbox;
 		static LineEdit *edit;
 		static ToolBar *bar;
+		static QPlainTextEdit *editarea;
+		static QPushButton *runbutton;
 		
 		
 	protected:

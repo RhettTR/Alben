@@ -447,8 +447,7 @@ void Configure::load()
 
 void Configure::updateComboBoxes()
 {
-	int n = 0;
-
+	
 	for (int n = 0; n < grid->rowCount(); n++)
 	{
 		QWidget* widget = grid->itemAtPosition(n, 1)->widget();

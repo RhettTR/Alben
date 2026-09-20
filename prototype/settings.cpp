@@ -286,6 +286,10 @@ Settings::Settings(QWidget *parent) : QDialog(parent)
 	button->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
     QObject::connect(button, &QPushButton::released, [=]()->void{ addUrid(); });
 	sizeLayout->addWidget(button);
+	button = new QPushButton("Show selected Urid");
+	button->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
+    QObject::connect(button, &QPushButton::released, [=]()->void{ showUrid(); });
+	sizeLayout->addWidget(button);
 	button = new QPushButton("Remove selected Urid");
 	button->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
     QObject::connect(button, &QPushButton::released, [=]()->void{ removeUrid(); });
@@ -543,6 +547,36 @@ void Settings::addUrid()
 }
 
 
+void Settings::showUrid()
+{
+	
+	QListWidgetItem *selected = uridlist->currentItem();
+
+	// nothing selected
+	if (selected == nullptr)
+		return;
+		
+	QString player = selected->text();
+		
+
+	QByteArray ba(players[player.toStdString()], 2*Settings::USERKEYHEXS);
+	 
+	QString urid(ba);
+	
+	
+	QInputDialog showbox(this);
+	
+	showbox.setWindowTitle("Urid for player " + player);
+	showbox.setLabelText("Copy this string:");
+	showbox.setTextValue(urid);
+	showbox.resize(600, showbox.height());
+	showbox.setOptions(QInputDialog::NoButtons);
+
+	showbox.exec();
+	
+}
+
+
 void Settings::removeUrid()
 {
 	
@@ -555,9 +589,18 @@ void Settings::removeUrid()
     
 	QString player = selected->text();
 	
-	delete selected;
 	
-		
+	QMessageBox::StandardButton test = QMessageBox::question(
+		this, 
+		"Removing player " + player, 
+		"Are you sure you want to remove this player?");
+    
+    if (test != QMessageBox::Yes)
+		return;  
+	else
+		delete selected;  
+       
+    	
 	
 	for (auto it = players.begin(); it != players.end(); )
     {

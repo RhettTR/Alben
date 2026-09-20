@@ -155,8 +155,13 @@ void Luau::callbackScript(std::string script)
 	size_t bytecodeSize = 0;
 	
 	char* bytecode = luau_compile(script.c_str(), script.length(), NULL, &bytecodeSize);
-	assert(luau_load(L, "script", bytecode, bytecodeSize, 0) == 0);
+	int res = luau_load(L, "script", bytecode, bytecodeSize, 0);
 	free(bytecode);	
+	
+	// error messages need to be shown somewhere !!
+	if (res != 0)
+		return;
+	
 		
 	lua_setglobal(L, "script");
 	
@@ -836,6 +841,15 @@ extern "C" {
 		return 0;
 	}
 	
+	static int refresh_gui(lua_State *L)
+	{
+		Window::getInstance("main")->frame->update();
+		
+		return 0;
+	}
+	
+	
+	
 	static int not_recording(lua_State *L)
 	{
 		lua_pushboolean(L, (int)!IO::recording);
@@ -1322,7 +1336,8 @@ extern "C" {
 		const char *window = lua_tostring(L, -2); 
 		lua_pop(L, 2);
 		
-		//bool value = ((Window::Frame *)((Window *)Window::getInstance(window))->frame)->checkboxes[box]->get();			
+		//bool value = ((Window::Frame *)((Window *)Window::getInstance(window))->frame)->checkboxes[box]->get();
+		//bool value = Window::getInstance(window)->frame->checkboxes[box]->get();				
 		bool value = true;
 		lua_pushboolean(L, (int)value);	
 				
@@ -1421,7 +1436,6 @@ extern "C" {
 	
 	static int get_corner(lua_State *L)
 	{	
-		Counter *counter;
 		QSize size;
 		
 		if (lua_isnumber(L, -1))
@@ -2944,6 +2958,9 @@ void Luau::startVM()
 	
 	lua_pushcfunction(L, stop_stepping, "stop_stepping");
 	lua_setglobal(L, "stop_stepping");
+	
+	lua_pushcfunction(L, refresh_gui, "refresh_gui");
+	lua_setglobal(L, "refresh_gui");
 	
 	// toolbar
 	

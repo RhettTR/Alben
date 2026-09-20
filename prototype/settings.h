@@ -75,6 +75,7 @@ class Settings : public QDialog
 		void createUrid();
 		void readUrids();
 		void writeUrids();
+		void showUrid();
 		void removeUrid();
 		
 		static char userKey[USERKEYHEXS];

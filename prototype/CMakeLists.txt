@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-project(Alben)
+project(GameTop)
 
 set(BUILD_SHARED_LIBS ON)
 

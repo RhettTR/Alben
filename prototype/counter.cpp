@@ -237,9 +237,6 @@ void Counter::QtCounter::do_activate (QAction *action)
 	std::string entryfield = retrieved.entryfield.toStdString();
 	std::string entryid = retrieved.entryid.toStdString();
 	
-	const char *window = this->owner->state.tag.c_str();
-	
-	
 	
 	CentralFrame::Stacks stacks;
 
