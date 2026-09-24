@@ -1137,21 +1137,8 @@ void IO::load_resources(string directory)
 					image.fill(Qt::transparent);
 							
 				   
-					QPainterPath path;
-					path.moveTo(23.0, 23.0);
-					path.arcTo(0.0, 0.0, 46.0, 46.0, 90.0, 90.0);
-					path.lineTo(0.0, 479.0);
-					path.arcTo(0.0, 479.0, 46.0, 46.0, 180.0, 90.0);
-					path.lineTo(329.0, 525.0);
-					path.arcTo(329.0, 479.0, 46.0, 46.0, -90.0, 90.0);
-					path.lineTo(375.0, 23.0);
-					path.arcTo(329.0, 0.0, 46.0, 46.0, 0.0, 90.0);
-					path.lineTo(23.0, 0.0);
-
-				
 					
 					QPainter painter(&image);
-					painter.setClipPath(path);
 					painter.setRenderHint(QPainter::Antialiasing);
 					painter.setRenderHint(QPainter::TextAntialiasing);
 					painter.setRenderHint(QPainter::SmoothPixmapTransform);
@@ -1518,6 +1505,27 @@ void IO::loadConfig()
 		
 		fs.close();
 		
+		
+		
+		// test if user key file and urid file exist
+		
+		if (!settings->userkeybox->text().isEmpty())
+		{	
+			std::fstream fs(settings->userkeybox->text().toStdString(), fs.binary | fs.in);
+			if (!fs.is_open())
+				settings->userkeybox->setText("");
+			else
+				fs.close();
+		}		
+		
+		if (!settings->uridbox->text().isEmpty())
+		{	
+			std::fstream fs(settings->uridbox->text().toStdString(), fs.binary | fs.in);
+			if (!fs.is_open())
+				settings->uridbox->setText("");
+			else
+				fs.close();
+		}	
 		
 			
 	}

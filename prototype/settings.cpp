@@ -204,7 +204,7 @@ Settings::Settings(QWidget *parent) : QDialog(parent)
     
     sizeLayout = new QHBoxLayout();
     button = new QPushButton("Create a Urid");
-    QObject::connect(button, &QPushButton::released, [=]()->void{ createUrid(); });
+    QObject::connect(button, &QPushButton::released, [=]()->void{ Settings::createUrid(); });
 	sizeLayout->addWidget(button);
 	label = new QLabel("    Make your own Unified Resource Identifier (Urid). It is\n"
 					   "    best to create only one Urid and never delete it.");
@@ -437,9 +437,8 @@ void Settings::loadKey()
 
 		if (!fs.is_open())
 		{ 
-			//Luau::error(42, 1, userkeybox->text().toStdString().c_str());
-			// bug; lua global "error" not yet defined
-			printf("Failed to open file %s\n", userkeybox->text().toStdString().c_str());
+			//printf("Failed to open file %s\n", userkeybox->text().toStdString().c_str());
+			userkeybox->setText("");	
 			return;
 		}
 
@@ -767,6 +766,7 @@ void Settings::createUserKey()
 		if (!fs.is_open())
 		{
 			Luau::error(42, 1, fileName.toStdString().c_str());
+			uridbox->text().clear();
 			return;
 		}
 		
@@ -856,8 +856,9 @@ void Settings::readUrids()
 	std::fstream fs(uridbox->text().toStdString(), fs.binary | fs.in);
 
 	if (!fs.is_open())
-	{
+	{	
 		Luau::error(42, 1, uridbox->text().toStdString().c_str());
+		uridbox->text().clear();
 		return;
 	}
 	
@@ -941,6 +942,7 @@ void Settings::writeUrids()
 		if (!fs.is_open())
 		{
 			Luau::error(42, 1, fileName.toStdString().c_str());
+			uridbox->setText("");
 			return;
 		}
 		
@@ -956,6 +958,9 @@ void Settings::writeUrids()
 		
 		// update comboboxes
 		config->updateComboBoxes();
+		
+		// update file name box	
+		uridbox->setText(fileName);
 		
 	}
 	
